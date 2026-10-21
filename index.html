@@ -546,7 +546,7 @@
                         });
                     }
                 } else if (totalCuotas > 1) {
-                    // Compra en cuotas múltiples
+                    // Compra en cuotas múltiples (ej: 3 cuotas, 6 cuotas)
                     const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
 
@@ -571,14 +571,14 @@
                         }
                     }
                 } else {
-                    // Gasto de tarjeta / contado de 1 sola cuota proyectado mensualmente
-                    if (currentMonth >= startYM) {
+                    // Gasto de 1 sola cuota (Contado o Tarjeta de pago único): SOLO aparece en el mes de inicio
+                    if (currentMonth === startYM) {
                         totalTarjetas += montoAplicar;
                         items.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: categoriaAplicar,
-                            tipo: 'Tarjeta / Mensual',
+                            tipo: 'Contado',
                             monto: montoAplicar
                         });
                     }
@@ -686,7 +686,7 @@
                             monto: gastoViejo.monto 
                         };
                     } else {
-                        // Modificación permanente: actualizamos el gasto base y limpiamos excepciones de este ID
+                        // Modificación permanente: actualizamos el gasto base, cuotas y limpiamos excepciones de este ID
                         const originalStartMonth = gastoViejo.startMonth || (gastoViejo.fecha ? gastoViejo.fecha.slice(0, 7) : currentMonth);
                         window.appState.gastos[idx] = { 
                             id, 
