@@ -228,7 +228,7 @@
         </div>
     </div>
 
-    <!-- Modal Registrar/Editar Gasto (Con el diseño exacto restaurado) -->
+    <!-- Modal Registrar/Editar Gasto -->
     <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
             <div class="flex justify-between items-center mb-5">
@@ -241,18 +241,17 @@
             <form id="formGasto" onsubmit="handleSaveGasto(event)">
                 <input type="hidden" id="gastoId">
 
-                <!-- Nombre del Concepto -->
                 <div class="mb-4">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">NOMBRE DEL CONCEPTO</label>
                     <input type="text" id="gastoConcepto" required placeholder="Ej: Luz, Gimnasio, Compra TV..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <!-- Categoria y Monto -->
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-2">CATEGORÍA / TARJETA</label>
                         <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="Gasto Fijo">Gasto Fijo (Sin Tarjeta)</option>
+                            <option value="Servicios">Servicios</option>
                             <option value="Visa Galicia">Visa Galicia</option>
                             <option value="Mastercard">Mastercard</option>
                             <option value="AMEX">AMEX</option>
@@ -266,16 +265,14 @@
                     </div>
                 </div>
 
-                <!-- A partir de qué mes empieza -->
                 <div class="mb-2">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QUÉ MES EMPIEZA</label>
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <p class="text-[11px] text-slate-500 mb-5">
-                    Este gasto NO figurará en los meses anteriores al seleccionado.
+                    Este gasto NO figurará en los meses anteriores al seleccionado. Si es Gasto Fijo, se repetirá automáticamente en todos los meses siguientes.
                 </p>
 
-                <!-- Checkbox Cuotas -->
                 <div class="mb-4">
                     <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
                         <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
@@ -283,7 +280,6 @@
                     </label>
                 </div>
 
-                <!-- Campos opcionales de Cuotas -->
                 <div id="sectionCuotas" class="hidden grid grid-cols-2 gap-3 mb-5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CANTIDAD DE CUOTAS</label>
@@ -297,7 +293,6 @@
                     </div>
                 </div>
 
-                <!-- Botones de Acción -->
                 <div class="flex justify-end gap-3 pt-2">
                     <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium">
                         Cancelar
@@ -324,8 +319,6 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             renderApp();
-            
-            // Recalcular valor por cuota automáticamente
             document.getElementById('gastoMonto').addEventListener('input', updateCuotaDisplay);
             document.getElementById('gastoCuotas').addEventListener('input', updateCuotaDisplay);
         });
@@ -387,36 +380,46 @@
             let totalTarjetas = 0;
 
             (window.appState.gastos || []).forEach(gasto => {
-                const totalCuotas = parseInt(gasto.cuotas) || 1;
-                const montoCuota = parseFloat(gasto.monto) / totalCuotas;
-                
-                const startYM = gasto.startMonth || gasto.fecha.slice(0, 7);
-                const [sYear, sMonth] = startYM.split('-').map(Number);
+                const isFijo = gasto.categoria === 'Gasto Fijo' || gasto.categoria === 'Servicios';
+                const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
 
-                for (let i = 0; i < totalCuotas; i++) {
-                    let fYear = sYear;
-                    let fMonth = sMonth + i;
-                    while (fMonth > 12) {
-                        fMonth -= 12;
-                        fYear++;
-                    }
-                    let mStr = `${fYear}-${String(fMonth).padStart(2, '0')}`;
-
-                    if (mStr === currentMonth) {
-                        const isFijo = gasto.categoria.includes('Gasto Fijo');
-                        if (isFijo) {
-                            totalFijos += montoCuota;
-                        } else {
-                            totalTarjetas += montoCuota;
-                        }
-
+                if (isFijo) {
+                    // Si es gasto fijo y el mes actual es igual o posterior al mes de inicio, se muestra siempre
+                    if (currentMonth >= startYM) {
+                        totalFijos += parseFloat(gasto.monto);
                         items.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: gasto.categoria,
-                            tipo: totalCuotas > 1 ? `Cuota ${i + 1}/${totalCuotas}` : 'Recurrente / Mensual',
-                            monto: montoCuota
+                            tipo: 'Recurrente / Mensual',
+                            monto: parseFloat(gasto.monto)
                         });
+                    }
+                } else {
+                    // Es tarjeta o compra en cuotas
+                    const totalCuotas = parseInt(gasto.cuotas) || 1;
+                    const montoCuota = parseFloat(gasto.monto) / totalCuotas;
+                    const [sYear, sMonth] = startYM.split('-').map(Number);
+
+                    for (let i = 0; i < totalCuotas; i++) {
+                        let fYear = sYear;
+                        let fMonth = sMonth + i;
+                        while (fMonth > 12) {
+                            fMonth -= 12;
+                            fYear++;
+                        }
+                        let mStr = `${fYear}-${String(fMonth).padStart(2, '0')}`;
+
+                        if (mStr === currentMonth) {
+                            totalTarjetas += montoCuota;
+                            items.push({
+                                id: gasto.id,
+                                concepto: gasto.concepto,
+                                categoria: gasto.categoria,
+                                tipo: totalCuotas > 1 ? `Cuota ${i + 1}/${totalCuotas}` : 'Contado',
+                                monto: montoCuota
+                            });
+                        }
                     }
                 }
             });
