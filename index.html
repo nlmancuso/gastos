@@ -88,7 +88,6 @@
     <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
         <div class="flex flex-col md:flex-row justify-between items-center gap-4">
             
-            <!-- Logo y Título -->
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
                     <i class="fa-solid fa-wallet text-xl"></i>
@@ -112,7 +111,6 @@
                 </button>
             </div>
 
-            <!-- Acciones -->
             <div class="flex items-center gap-2">
                 <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg shadow-emerald-950/50 transition flex items-center gap-2">
                     <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
@@ -179,7 +177,7 @@
                 </span>
             </div>
             <p class="px-6 pt-2 pb-4 text-xs text-slate-400">
-                Modifica o elimina valores: los cambios se aplicarán solo para este mes y los futuros.
+                Modifica o elimina valores: los cambios se aplicarán según tu elección.
             </p>
 
             <div class="overflow-x-auto">
@@ -265,12 +263,20 @@
                     </div>
                 </div>
 
+                <!-- Checkbox para modificar solo este mes (visible solo al editar) -->
+                <div id="containerCheckSoloEsteMes" class="mb-4 hidden p-3 rounded-xl bg-slate-900/80 border border-emerald-900/50">
+                    <label class="flex items-center gap-3 cursor-pointer select-none text-xs font-semibold text-emerald-300">
+                        <input type="checkbox" id="checkSoloEsteMes" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
+                        Aplicar este nuevo monto ÚNICAMENTE para el mes actual (<span id="labelMesActualCheck"></span>)
+                    </label>
+                </div>
+
                 <div class="mb-2">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QUÉ MES EMPIEZA</label>
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <p class="text-[11px] text-slate-500 mb-5">
-                    Este gasto NO figurará en los meses anteriores al seleccionado. Si es Gasto Fijo, se repetirá automáticamente en todos los meses siguientes.
+                    Este gasto NO figurará en los meses anteriores al seleccionado. Si es Gasto Fijo, se repetirá automáticamente.
                 </p>
 
                 <div class="mb-4">
@@ -310,6 +316,7 @@
         window.appState = window.appState || {
             currentMonth: new Date().toISOString().slice(0, 7),
             gastos: [],
+            excepcionesMonto: {},
             sueldos: {},
             sortColumn: 'concepto',
             sortAscending: true
@@ -383,22 +390,25 @@
                 const isFijo = gasto.categoria === 'Gasto Fijo' || gasto.categoria === 'Servicios';
                 const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
 
+                const excepcionKey = `${gasto.id}_${currentMonth}`;
+                const montoAplicar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
+                    ? window.appState.excepcionesMonto[excepcionKey]
+                    : parseFloat(gasto.monto);
+
                 if (isFijo) {
-                    // Si es gasto fijo y el mes actual es igual o posterior al mes de inicio, se muestra siempre
                     if (currentMonth >= startYM) {
-                        totalFijos += parseFloat(gasto.monto);
+                        totalFijos += montoAplicar;
                         items.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: gasto.categoria,
                             tipo: 'Recurrente / Mensual',
-                            monto: parseFloat(gasto.monto)
+                            monto: montoAplicar
                         });
                     }
                 } else {
-                    // Es tarjeta o compra en cuotas
                     const totalCuotas = parseInt(gasto.cuotas) || 1;
-                    const montoCuota = parseFloat(gasto.monto) / totalCuotas;
+                    const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
 
                     for (let i = 0; i < totalCuotas; i++) {
@@ -496,16 +506,32 @@
             const categoria = document.getElementById('gastoCategoria').value;
             const isCuotas = document.getElementById('checkCuotas').checked;
             const cuotas = isCuotas ? (parseInt(document.getElementById('gastoCuotas').value) || 1) : 1;
+            const currentMonth = window.appState.currentMonth;
 
             if (id) {
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
-                if (idx !== -1) window.appState.gastos[idx] = { id, concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas };
+                if (idx !== -1) {
+                    const soloEsteMes = document.getElementById('checkSoloEsteMes').checked;
+                    const gastoViejo = window.appState.gastos[idx];
+
+                    if (soloEsteMes) {
+                        if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+                        window.appState.excepcionesMonto[`${id}_${currentMonth}`] = monto;
+                        // Mantenemos el gasto base intacto y restauramos su monto original en el objeto principal
+                        window.appState.gastos[idx] = { id, concepto, startMonth: gastoViejo.startMonth, fecha: gastoViejo.fecha, categoria, cuotas, monto: gastoViejo.monto };
+                    } else {
+                        // Modificación permanente
+                        window.appState.gastos[idx] = { id, concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas };
+                        if (window.appState.excepcionesMonto) delete window.appState.excepcionesMonto[`${id}_${currentMonth}`];
+                    }
+                }
             } else {
                 window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas });
             }
 
             window.saveDataToCloud();
             closeModal('modalGasto');
+            renderApp();
         }
 
         function editGasto(id) {
@@ -514,10 +540,22 @@
 
             document.getElementById('gastoId').value = gasto.id;
             document.getElementById('gastoConcepto').value = gasto.concepto;
-            document.getElementById('gastoMonto').value = gasto.monto;
-            document.getElementById('gastoStartMonth').value = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : window.appState.currentMonth);
+            
+            const currentMonth = window.appState.currentMonth;
+            const excepcionKey = `${id}_${currentMonth}`;
+            const montoAMostrar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
+                ? window.appState.excepcionesMonto[excepcionKey]
+                : gasto.monto;
+
+            document.getElementById('gastoMonto').value = montoAMostrar;
+            document.getElementById('gastoStartMonth').value = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
             document.getElementById('gastoCategoria').value = gasto.categoria;
             
+            // Mostrar la opción del checkbox solo si estamos editando
+            document.getElementById('containerCheckSoloEsteMes').classList.remove('hidden');
+            document.getElementById('labelMesActualCheck').innerText = currentMonth;
+            document.getElementById('checkSoloEsteMes').checked = false;
+
             const isCuotas = (gasto.cuotas && gasto.cuotas > 1);
             document.getElementById('checkCuotas').checked = isCuotas;
             document.getElementById('gastoCuotas').value = gasto.cuotas || 1;
@@ -547,6 +585,8 @@
                 document.getElementById('formGasto').reset();
                 document.getElementById('gastoStartMonth').value = window.appState.currentMonth;
                 document.getElementById('checkCuotas').checked = false;
+                // Ocultar checkbox de solo este mes cuando es un gasto nuevo
+                document.getElementById('containerCheckSoloEsteMes').classList.add('hidden');
                 toggleCuotasFields();
             }
             document.getElementById('modalGasto').classList.remove('hidden');
@@ -557,6 +597,7 @@
             if (id === 'modalGasto') {
                 document.getElementById('gastoId').value = '';
                 document.getElementById('formGasto').reset();
+                document.getElementById('containerCheckSoloEsteMes').classList.add('hidden');
             }
         }
 
