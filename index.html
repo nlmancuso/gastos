@@ -119,7 +119,6 @@
                 <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg shadow-emerald-950/50 transition flex items-center gap-2">
                     <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
                 </button>
-                <!-- Ruedita de Ajustes restaurada -->
                 <button onclick="openModalConfig()" title="Gestión de Tarjetas y Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                     <i class="fa-solid fa-gear"></i>
                 </button>
@@ -214,7 +213,7 @@
         </div>
     </main>
 
-    <!-- Modal Gestión de Tarjetas y Categorías (Ajustes) -->
+    <!-- Modal Gestión de Tarjetas y Categorías -->
     <div id="modalConfig" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -364,6 +363,7 @@
             currentMonth: new Date().toISOString().slice(0, 7),
             gastos: [],
             excepcionesMonto: {},
+            excepcionesCategoria: {}, // Guarda cambios de categoría por mes y ID: {"gastoId_2026-11": "Visa Galicia"}
             sueldos: {},
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
@@ -518,7 +518,12 @@
             let totalTarjetas = 0;
 
             (window.appState.gastos || []).forEach(gasto => {
-                const isFijo = gasto.categoria.toLowerCase().includes('fijo') || gasto.categoria.toLowerCase().includes('servicio');
+                const excepcionCatKey = `${gasto.id}_${currentMonth}`;
+                const categoriaAplicar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
+                    ? window.appState.excepcionesCategoria[excepcionCatKey]
+                    : gasto.categoria;
+
+                const isFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
                 const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
 
                 const excepcionKey = `${gasto.id}_${currentMonth}`;
@@ -532,7 +537,7 @@
                         items.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
-                            categoria: gasto.categoria,
+                            categoria: categoriaAplicar,
                             tipo: 'Recurrente / Mensual',
                             monto: montoAplicar
                         });
@@ -556,7 +561,7 @@
                             items.push({
                                 id: gasto.id,
                                 concepto: gasto.concepto,
-                                categoria: gasto.categoria,
+                                categoria: categoriaAplicar,
                                 tipo: totalCuotas > 1 ? `Cuota ${i + 1}/${totalCuotas}` : 'Contado',
                                 monto: montoCuota
                             });
@@ -651,11 +656,26 @@
 
                     if (soloEsteMes) {
                         if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+                        if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
+
                         window.appState.excepcionesMonto[`${id}_${currentMonth}`] = monto;
-                        window.appState.gastos[idx] = { id, concepto, startMonth: gastoViejo.startMonth, fecha: gastoViejo.fecha, categoria, cuotas, monto: gastoViejo.monto };
+                        window.appState.excepcionesCategoria[`${id}_${currentMonth}`] = categoria;
+
+                        // Mantenemos el gasto base intacto para los demás meses
+                        window.appState.gastos[idx] = { 
+                            id, 
+                            concepto, 
+                            startMonth: gastoViejo.startMonth, 
+                            fecha: gastoViejo.fecha, 
+                            categoria: gastoViejo.categoria, 
+                            cuotas, 
+                            monto: gastoViejo.monto 
+                        };
                     } else {
+                        // Modificación permanente de todo
                         window.appState.gastos[idx] = { id, concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas };
                         if (window.appState.excepcionesMonto) delete window.appState.excepcionesMonto[`${id}_${currentMonth}`];
+                        if (window.appState.excepcionesCategoria) delete window.appState.excepcionesCategoria[`${id}_${currentMonth}`];
                     }
                 }
             } else {
@@ -675,15 +695,24 @@
             document.getElementById('gastoConcepto').value = gasto.concepto;
             
             const currentMonth = window.appState.currentMonth;
+            
+            // Cargar monto (considerando excepciones de este mes)
             const excepcionKey = `${id}_${currentMonth}`;
             const montoAMostrar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
                 ? window.appState.excepcionesMonto[excepcionKey]
                 : gasto.monto;
-
             document.getElementById('gastoMonto').value = montoAMostrar;
+
+            // Cargar categoría (considerando excepciones de este mes)
+            const excepcionCatKey = `${id}_${currentMonth}`;
+            const categoriaAMostrar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
+                ? window.appState.excepcionesCategoria[excepcionCatKey]
+                : gasto.categoria;
+
             document.getElementById('gastoStartMonth').value = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
+            
             renderCategoriasSelect();
-            document.getElementById('gastoCategoria').value = gasto.categoria;
+            document.getElementById('gastoCategoria').value = categoriaAMostrar;
             
             document.getElementById('containerCheckSoloEsteMes').classList.remove('hidden');
             document.getElementById('labelMesActualCheck').innerText = currentMonth;
