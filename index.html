@@ -783,13 +783,11 @@
             renderApp();
         }
 
-        // LÓGICA DE SUELDO: Busca el sueldo exacto o el último configurado hacia atrás (repropagación hacia adelante)
         function getSueldoForMonth(targetMonth) {
             const sueldos = window.appState.sueldos || {};
             if (sueldos[targetMonth] !== undefined) {
                 return parseFloat(sueldos[targetMonth]) || 0;
             }
-            // Si no está definido para este mes, busca el mes más cercano anterior configurado
             let keys = Object.keys(sueldos).sort();
             let sueldoAplicar = 0;
             for (let k of keys) {
@@ -907,7 +905,6 @@
 
             const { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
 
-            // Renderizar tarjetas de Totales por Categoría (Ocultando los que están en 0)
             const containerTotales = document.getElementById('containerTotalesCategoria');
             containerTotales.innerHTML = '';
             
@@ -932,7 +929,6 @@
                 containerTotales.appendChild(cardDiv);
             });
 
-            // Filtrar items según las categorías seleccionadas por checkbox múltiple temporal
             let itemsFiltrados = items;
             const filtrosActivos = window.filtrosTemporales || [];
             if (filtrosActivos.length > 0) {
@@ -990,7 +986,6 @@
                 });
             }
 
-            // Si la solapa activa es gráficos, los actualizamos
             if (!document.getElementById('vistaGraficos').classList.contains('hidden')) {
                 renderGraficos();
             }
@@ -999,7 +994,6 @@
         function renderGraficos() {
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             
-            // --- CÁLCULOS PARA LA VENTANA DE 7 MESES (-3 a +3) ---
             const rangeMonths = [];
             for (let i = -3; i <= 3; i++) {
                 rangeMonths.push(getMonthOffset(currentMonth, i));
@@ -1024,7 +1018,6 @@
                 });
             });
 
-            // Gráfico A: Evolución de Gastos Totales (7 Meses)
             if (chartEvolucionTotalesInstance) chartEvolucionTotalesInstance.destroy();
             const ctxEvolTot = document.getElementById('chartEvolucionTotales').getContext('2d');
             chartEvolucionTotalesInstance = new Chart(ctxEvolTot, {
@@ -1053,7 +1046,6 @@
                 }
             });
 
-            // Gráfico B: Evolución por Categoría (7 Meses)
             const datasetsCategorias = catList.map(c => {
                 return {
                     label: c.nombre,
@@ -1087,10 +1079,8 @@
                 }
             });
 
-            // --- GRÁFICOS DEL MES SELECCIONADO ---
             const { sueldoActual, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
 
-            // 1. Gráfico por Categoría
             const catLabels = [];
             const catData = [];
             const catColors = [];
@@ -1127,7 +1117,6 @@
                 }
             });
 
-            // 2. Gráfico Fijos vs. Tarjetas
             if (chartTiposInstance) chartTiposInstance.destroy();
             const ctxTipos = document.getElementById('chartTipos').getContext('2d');
             chartTiposInstance = new Chart(ctxTipos, {
@@ -1150,7 +1139,6 @@
                 }
             });
 
-            // 3. Gráfico Balance Mensual
             const totalGastos = totalFijos + totalTarjetas;
             const resto = sueldoActual - totalGastos;
 
@@ -1265,7 +1253,7 @@
                 });
             }
 
-            window.saveDataToCloud();
+            window.saveDataToCloud(); // <-- Aquí faltaba sincronizar con Firebase
             closeModal('modalGasto');
             renderApp();
         }
