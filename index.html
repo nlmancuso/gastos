@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js para los gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -84,13 +86,18 @@
         .text-green-accent { color: #10b981; }
         .text-red-accent { color: #f43f5e; }
         .text-blue-accent { color: #6366f1; }
+        .tab-btn-active {
+            border-bottom: 2px solid #10b981;
+            color: #10b981;
+            font-weight: 700;
+        }
     </style>
 </head>
 <body class="min-h-screen pb-12">
 
     <!-- Header Principal -->
-    <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+    <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
             
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
@@ -127,90 +134,188 @@
                 </span>
             </div>
         </div>
+
+        <!-- Navegación por Pestañas (Solapas) -->
+        <div class="flex border-b border-slate-800">
+            <button id="tabPlanillaBtn" onclick="switchTab('planilla')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition tab-btn-active flex items-center gap-2">
+                <i class="fa-solid fa-table-list"></i> Planilla de Gastos
+            </button>
+            <button id="tabGraficosBtn" onclick="switchTab('graficos')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos
+            </button>
+        </div>
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
-        <!-- 4 Tarjetas Dashboard Finanzas -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="card-bg p-5 rounded-2xl relative">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">INGRESO / SUELDO</span>
-                    <button onclick="openModalSueldo()" class="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1">
-                        <i class="fa-solid fa-pen text-[10px]"></i> Editar
-                    </button>
+        <!-- VISTA 1: PLANILLA DE GASTOS -->
+        <div id="vistaPlanilla">
+            <!-- 4 Tarjetas Dashboard Finanzas -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="card-bg p-5 rounded-2xl relative">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">INGRESO / SUELDO</span>
+                        <button onclick="openModalSueldo()" class="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-pen text-[10px]"></i> Editar
+                        </button>
+                    </div>
+                    <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
+                    <p class="text-xs text-slate-500 font-medium">Sueldo disponible en este mes</p>
                 </div>
-                <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
-                <p class="text-xs text-slate-500 font-medium">Sueldo disponible en este mes</p>
+
+                <div class="card-bg p-5 rounded-2xl relative">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS FIJOS</span>
+                        <i class="fa-solid fa-house text-slate-600 text-xs"></i>
+                    </div>
+                    <h2 id="cardGastosFijos" class="text-2xl font-extrabold text-red-accent my-1">$ 0,00</h2>
+                    <p class="text-xs text-slate-500 font-medium">Servicios, impuestos y fijos</p>
+                </div>
+
+                <div class="card-bg p-5 rounded-2xl relative">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">TOTAL TARJETAS</span>
+                        <i class="fa-solid fa-credit-card text-slate-600 text-xs"></i>
+                    </div>
+                    <h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2>
+                    <p class="text-xs text-slate-500 font-medium">Resumen de tarjetas y cuotas</p>
+                </div>
+
+                <div class="card-bg p-5 rounded-2xl relative">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">RESTO DISPONIBLE</span>
+                        <i class="fa-solid fa-piggy-bank text-slate-600 text-xs"></i>
+                    </div>
+                    <h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
+                    <p class="text-xs text-slate-500 font-medium">Sueldo – Gastos Totales</p>
+                </div>
             </div>
 
-            <div class="card-bg p-5 rounded-2xl relative">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS FIJOS</span>
-                    <i class="fa-solid fa-house text-slate-600 text-xs"></i>
+            <!-- Totales por Categoría -->
+            <div class="card-bg p-5 rounded-2xl mb-6">
+                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Totales por Categoría / Tarjeta (Mes Actual)</h3>
+                <div id="containerTotalesCategoria" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <!-- Dinámico -->
                 </div>
-                <h2 id="cardGastosFijos" class="text-2xl font-extrabold text-red-accent my-1">$ 0,00</h2>
-                <p class="text-xs text-slate-500 font-medium">Servicios, impuestos y fijos</p>
             </div>
 
-            <div class="card-bg p-5 rounded-2xl relative">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">TOTAL TARJETAS</span>
-                    <i class="fa-solid fa-credit-card text-slate-600 text-xs"></i>
+            <!-- Tabla Planilla de Gastos -->
+            <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
+                <div class="px-6 py-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-lg font-bold text-white">Planilla de Gastos</h3>
+                        <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">
+                            Noviembre 2026
+                        </span>
+                    </div>
+                    <!-- Filtro Múltiple por Categoría -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="containerFiltrosCategoria">
+                        <!-- Dinámico -->
+                    </div>
                 </div>
-                <h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2>
-                <p class="text-xs text-slate-500 font-medium">Resumen de tarjetas y cuotas</p>
-            </div>
+                <p class="px-6 pt-2 pb-4 text-xs text-slate-400">
+                    Modifica o elimina valores: los cambios se aplicarán según tu elección.
+                </p>
 
-            <div class="card-bg p-5 rounded-2xl relative">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">RESTO DISPONIBLE</span>
-                    <i class="fa-solid fa-piggy-bank text-slate-600 text-xs"></i>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('concepto')">
+                                    CONCEPTO / ÍTEM <i id="sortIcon_concepto" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
+                                </th>
+                                <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('categoria')">
+                                    CATEGORÍA / TARJETA <i id="sortIcon_categoria" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
+                                </th>
+                                <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('tipo')">
+                                    TIPO / CUOTAS <i id="sortIcon_tipo" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
+                                </th>
+                                <th scope="col" class="px-6 py-3.5 text-right cursor-pointer select-none" onclick="sortData('monto')">
+                                    MONTO <i id="sortIcon_monto" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
+                                </th>
+                                <th scope="col" class="px-6 py-3.5 text-right">
+                                    ACCIONES
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
                 </div>
-                <h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
-                <p class="text-xs text-slate-500 font-medium">Sueldo – Gastos Totales</p>
             </div>
         </div>
 
-        <!-- Tabla Planilla de Gastos -->
-        <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
-            <div class="px-6 py-5 border-b border-slate-800 flex items-center gap-3">
-                <h3 class="text-lg font-bold text-white">Planilla de Gastos</h3>
-                <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">
-                    Noviembre 2026
-                </span>
-            </div>
-            <p class="px-6 pt-2 pb-4 text-xs text-slate-400">
-                Modifica o elimina valores: los cambios se aplicarán según tu elección.
-            </p>
+        <!-- VISTA 2: ANÁLISIS Y GRÁFICOS (SOLAPA NUEVA) -->
+        <div id="vistaGraficos" class="hidden space-y-6">
+            
+            <!-- Fila 1: Comparativas de Evolución Mes a Mes (7 Meses) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Gráfico A: Evolución de Gastos Totales -->
+                <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales (7 Meses)
+                        </h3>
+                        <span class="text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">
+                            -3 Meses / +3 Meses
+                        </span>
+                    </div>
+                    <div class="relative h-64 w-full">
+                        <canvas id="chartEvolucionTotales"></canvas>
+                    </div>
+                </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('concepto')">
-                                CONCEPTO / ÍTEM <i id="sortIcon_concepto" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                            </th>
-                            <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('categoria')">
-                                CATEGORÍA / TARJETA <i id="sortIcon_categoria" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                            </th>
-                            <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('tipo')">
-                                TIPO / CUOTAS <i id="sortIcon_tipo" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                            </th>
-                            <th scope="col" class="px-6 py-3.5 text-right cursor-pointer select-none" onclick="sortData('monto')">
-                                MONTO <i id="sortIcon_monto" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                            </th>
-                            <th scope="col" class="px-6 py-3.5 text-right">
-                                ACCIONES
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="tablaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium">
-                        <!-- Carga dinámica -->
-                    </tbody>
-                </table>
+                <!-- Gráfico B: Evolución por Categoría Mes a Mes -->
+                <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría (7 Meses)
+                        </h3>
+                        <span class="text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">
+                            -3 Meses / +3 Meses
+                        </span>
+                    </div>
+                    <div class="relative h-64 w-full">
+                        <canvas id="chartEvolucionCategorias"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fila 2: Distribución y Proporciones del Mes Seleccionado -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Gráfico 1: Gastos por Categoría -->
+                <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-emerald-400"></i> Distribución del Mes por Categoría
+                    </h3>
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="chartCategorias"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico 2: Gastos Fijos vs. Tarjetas -->
+                <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-doughnut text-indigo-400"></i> Gastos Fijos vs. Tarjetas (Mes Actual)
+                    </h3>
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="chartTipos"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fila 3: Balance Ingreso vs Gastos del Mes Actual -->
+            <div class="card-bg p-6 rounded-2xl">
+                <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-column text-emerald-400"></i> Balance del Mes Actual (Ingreso vs. Gastos)
+                </h3>
+                <div class="relative h-64 w-full">
+                    <canvas id="chartBalance"></canvas>
+                </div>
             </div>
         </div>
+
     </main>
 
     <!-- Modal Gestión de Tarjetas y Categorías -->
@@ -375,10 +480,18 @@
             sueldos: {},
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
-            sortAscending: true
+            sortAscending: true,
+            filtrosCategorias: []
         };
 
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        // Instancias de Chart.js
+        let chartCatInstance = null;
+        let chartTiposInstance = null;
+        let chartBalanceInstance = null;
+        let chartEvolucionTotalesInstance = null;
+        let chartEvolucionCategoriasInstance = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!window.appState.categorias || window.appState.categorias.length === 0) {
@@ -389,6 +502,26 @@
             document.getElementById('gastoMonto').addEventListener('input', updateCuotaDisplay);
             document.getElementById('gastoCuotas').addEventListener('input', updateCuotaDisplay);
         });
+
+        function switchTab(tabName) {
+            const vistaPlanilla = document.getElementById('vistaPlanilla');
+            const vistaGraficos = document.getElementById('vistaGraficos');
+            const tabPlanillaBtn = document.getElementById('tabPlanillaBtn');
+            const tabGraficosBtn = document.getElementById('tabGraficosBtn');
+
+            if (tabName === 'planilla') {
+                vistaPlanilla.classList.remove('hidden');
+                vistaGraficos.classList.add('hidden');
+                tabPlanillaBtn.classList.add('tab-btn-active');
+                tabGraficosBtn.classList.remove('tab-btn-active');
+            } else {
+                vistaPlanilla.classList.add('hidden');
+                vistaGraficos.classList.remove('hidden');
+                tabGraficosBtn.classList.add('tab-btn-active');
+                tabPlanillaBtn.classList.remove('tab-btn-active');
+                renderGraficos();
+            }
+        }
 
         function openModalConfig() {
             renderCategoriasConfigList();
@@ -432,6 +565,7 @@
             window.saveDataToCloud();
             renderCategoriasConfigList();
             renderCategoriasSelect();
+            renderFiltrosCategoriasCheckboxes();
         }
 
         function eliminarCategoria(index) {
@@ -443,6 +577,7 @@
             window.saveDataToCloud();
             renderCategoriasConfigList();
             renderCategoriasSelect();
+            renderFiltrosCategoriasCheckboxes();
         }
 
         function restaurarCategoriasDefault() {
@@ -451,6 +586,7 @@
                 window.saveDataToCloud();
                 renderCategoriasConfigList();
                 renderCategoriasSelect();
+                renderFiltrosCategoriasCheckboxes();
             }
         }
 
@@ -467,6 +603,59 @@
                 select.appendChild(opt);
             });
             if (currentVal) select.value = currentVal;
+            renderFiltrosCategoriasCheckboxes();
+        }
+
+        function renderFiltrosCategoriasCheckboxes() {
+            const container = document.getElementById('containerFiltrosCategoria');
+            if (!container) return;
+            container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1 whitespace-nowrap">Filtrar:</span>`;
+
+            const catList = window.appState.categorias || categoriasDefault;
+            if (!window.appState.filtrosCategorias) {
+                window.appState.filtrosCategorias = [];
+            }
+
+            catList.forEach(cat => {
+                const isChecked = window.appState.filtrosCategorias.length === 0 || window.appState.filtrosCategorias.includes(cat.nombre);
+                
+                const label = document.createElement('label');
+                label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 whitespace-nowrap select-none ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                label.innerHTML = `
+                    <input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroCategoria(this)" class="hidden">
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>
+                    ${cat.nombre}
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        function toggleFiltroCategoria(checkbox) {
+            const catNombre = checkbox.value;
+            if (!window.appState.filtrosCategorias) {
+                window.appState.filtrosCategorias = [];
+            }
+
+            if (window.appState.filtrosCategorias.length === 0) {
+                const catList = window.appState.categorias || categoriasDefault;
+                window.appState.filtrosCategorias = catList.map(c => c.nombre);
+            }
+
+            if (checkbox.checked) {
+                if (!window.appState.filtrosCategorias.includes(catNombre)) {
+                    window.appState.filtrosCategorias.push(catNombre);
+                }
+            } else {
+                window.appState.filtrosCategorias = window.appState.filtrosCategorias.filter(c => c !== catNombre);
+            }
+
+            const catList = window.appState.categorias || categoriasDefault;
+            if (window.appState.filtrosCategorias.length === catList.length) {
+                window.appState.filtrosCategorias = [];
+            }
+
+            renderFiltrosCategoriasCheckboxes();
+            renderApp();
         }
 
         function toggleCuotasFields() {
@@ -476,7 +665,7 @@
             
             if (isChecked) {
                 sec.classList.remove('hidden');
-                checkRecurrente.checked = false; // Las cuotas mandan sobre la recurrencia infinita
+                checkRecurrente.checked = false;
             } else {
                 sec.classList.add('hidden');
                 document.getElementById('gastoCuotas').value = 1;
@@ -505,6 +694,14 @@
             return `${monthNames[month - 1]} ${year}`;
         }
 
+        function getMonthOffset(ymStr, offset) {
+            let [year, month] = ymStr.split('-').map(Number);
+            month += offset;
+            while (month > 12) { month -= 12; year++; }
+            while (month < 1) { month += 12; year--; }
+            return `${year}-${String(month).padStart(2, '0')}`;
+        }
+
         function sortData(col) {
             if (window.appState.sortColumn === col) {
                 window.appState.sortAscending = !window.appState.sortAscending;
@@ -515,27 +712,25 @@
             renderApp();
         }
 
-        function renderApp() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
-            const monthFormatted = formatMonthDisplay(currentMonth);
-
-            document.getElementById('displayMonthText').innerText = monthFormatted;
-            document.getElementById('badgeMonth').innerText = monthFormatted;
-
-            const sueldoActual = parseFloat((window.appState.sueldos || {})[currentMonth]) || 0;
-
+        function getCalculatedDataForMonth(targetMonth) {
+            const sueldoActual = parseFloat((window.appState.sueldos || {})[targetMonth]) || 0;
             let items = [];
             let totalFijos = 0;
             let totalTarjetas = 0;
+            let totalesPorCat = {};
+
+            (window.appState.categorias || categoriasDefault).forEach(cat => {
+                totalesPorCat[cat.nombre] = 0;
+            });
 
             (window.appState.gastos || []).forEach(gasto => {
-                const excepcionCatKey = `${gasto.id}_${currentMonth}`;
+                const excepcionCatKey = `${gasto.id}_${targetMonth}`;
                 const categoriaAplicar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
                     ? window.appState.excepcionesCategoria[excepcionCatKey]
                     : gasto.categoria;
 
-                const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
-                const excepcionKey = `${gasto.id}_${currentMonth}`;
+                const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : targetMonth);
+                const excepcionKey = `${gasto.id}_${targetMonth}`;
                 const montoAplicar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
                     ? window.appState.excepcionesMonto[excepcionKey]
                     : parseFloat(gasto.monto);
@@ -543,12 +738,11 @@
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
                 const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
                 const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
-                
-                // Es recurrente si tiene la marca explícita de débito automático (isRecurrente) o si es categoría de Gasto Fijo/Servicios
                 const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
 
+                let generatedItems = [];
+
                 if (totalCuotas > 1) {
-                    // Compra en cuotas múltiples (> 1): se distribuye mes a mes
                     const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
 
@@ -561,9 +755,8 @@
                         }
                         let mStr = `${fYear}-${String(fMonth).padStart(2, '0')}`;
 
-                        if (mStr === currentMonth) {
-                            totalTarjetas += montoCuota;
-                            items.push({
+                        if (mStr === targetMonth) {
+                            generatedItems.push({
                                 id: gasto.id,
                                 concepto: gasto.concepto,
                                 categoria: categoriaAplicar,
@@ -573,15 +766,9 @@
                         }
                     }
                 } else if (isRecurrente) {
-                    // Gasto recurrente / débito automático / fijo: se repite todos los meses desde startYM
-                    if (currentMonth >= startYM) {
+                    if (targetMonth >= startYM) {
                         const tipoStr = baseEsFijo ? 'Recurrente / Mensual' : 'Débito Automático';
-                        if (baseEsFijo) {
-                            totalFijos += montoAplicar;
-                        } else {
-                            totalTarjetas += montoAplicar;
-                        }
-                        items.push({
+                        generatedItems.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: categoriaAplicar,
@@ -590,10 +777,8 @@
                         });
                     }
                 } else {
-                    // Gasto de 1 sola vez (Contado o pago único sin débito automático): SOLO aparece en su mes de inicio
-                    if (currentMonth === startYM) {
-                        totalTarjetas += montoAplicar;
-                        items.push({
+                    if (targetMonth === startYM) {
+                        generatedItems.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: categoriaAplicar,
@@ -602,11 +787,71 @@
                         });
                     }
                 }
+
+                generatedItems.forEach(gi => {
+                    if (baseEsFijo || gi.tipo.includes('Recurrente')) {
+                        totalFijos += gi.monto;
+                    } else {
+                        totalTarjetas += gi.monto;
+                    }
+
+                    if (totalesPorCat[gi.categoria] !== undefined) {
+                        totalesPorCat[gi.categoria] += gi.monto;
+                    } else {
+                        totalesPorCat[gi.categoria] = gi.monto;
+                    }
+
+                    items.push(gi);
+                });
             });
+
+            return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
+        }
+
+        function renderApp() {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const monthFormatted = formatMonthDisplay(currentMonth);
+
+            document.getElementById('displayMonthText').innerText = monthFormatted;
+            document.getElementById('badgeMonth').innerText = monthFormatted;
+
+            const { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
+
+            // Renderizar tarjetas de Totales por Categoría (Ocultando los que están en 0)
+            const containerTotales = document.getElementById('containerTotalesCategoria');
+            containerTotales.innerHTML = '';
+            
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            Object.keys(totalesPorCat).forEach(catNombre => {
+                const montoCat = totalesPorCat[catNombre];
+                if (montoCat <= 0) return;
+
+                const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === catNombre);
+                const colorCat = catObj ? catObj.color : '#475569';
+
+                const cardDiv = document.createElement('div');
+                cardDiv.className = "card-bg p-3 rounded-xl border border-slate-800/80 flex flex-col justify-between";
+                cardDiv.innerHTML = `
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${colorCat};"></span>
+                        <span class="text-[11px] font-bold text-slate-300 truncate" title="${catNombre}">${catNombre}</span>
+                    </div>
+                    <span class="text-sm font-extrabold text-white mt-1">${fmt(montoCat)}</span>
+                `;
+                containerTotales.appendChild(cardDiv);
+            });
+
+            // Filtrar items según las categorías seleccionadas por checkbox múltiple
+            let itemsFiltrados = items;
+            const filtrosActivos = window.appState.filtrosCategorias || [];
+            if (filtrosActivos.length > 0) {
+                itemsFiltrados = items.filter(item => filtrosActivos.includes(item.categoria));
+            }
 
             const col = window.appState.sortColumn;
             const asc = window.appState.sortAscending;
-            items.sort((a, b) => {
+            itemsFiltrados.sort((a, b) => {
                 let valA = a[col] || '';
                 let valB = b[col] || '';
                 if (typeof valA === 'string') {
@@ -619,8 +864,6 @@
             const totalGastos = totalFijos + totalTarjetas;
             const resto = sueldoActual - totalGastos;
 
-            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
             document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
             document.getElementById('cardGastosFijos').innerText = fmt(totalFijos);
             document.getElementById('cardTarjetas').innerText = fmt(totalTarjetas);
@@ -629,33 +872,220 @@
             const tbody = document.getElementById('tablaCuerpo');
             tbody.innerHTML = '';
 
-            if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500 font-normal">No hay movimientos en este mes.</td></tr>`;
-                return;
+            if (itemsFiltrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500 font-normal">No hay movimientos en este mes con los filtros seleccionados.</td></tr>`;
+            } else {
+                itemsFiltrados.forEach(item => {
+                    const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === item.categoria);
+                    const colorCat = catObj ? catObj.color : '#475569';
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-900/40 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 text-white font-bold">${item.concepto}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-lg text-xs font-semibold text-white border border-slate-700 inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;">
+                                <span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>
+                                ${item.categoria}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-slate-400 text-xs">${item.tipo}</td>
+                        <td class="px-6 py-4 text-right font-extrabold text-white">${fmt(item.monto)}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="editGasto('${item.id}')" class="text-slate-400 hover:text-white mr-3 transition" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                            <button onclick="deleteGasto('${item.id}')" class="text-slate-400 hover:text-rose-400 transition" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
             }
 
-            items.forEach(item => {
-                const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === item.categoria);
-                const colorCat = catObj ? catObj.color : '#475569';
+            // Si la solapa activa es gráficos, los actualizamos
+            if (!document.getElementById('vistaGraficos').classList.contains('hidden')) {
+                renderGraficos();
+            }
+        }
 
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-900/40 transition-colors";
-                tr.innerHTML = `
-                    <td class="px-6 py-4 text-white font-bold">${item.concepto}</td>
-                    <td class="px-6 py-4">
-                        <span class="px-3 py-1 rounded-lg text-xs font-semibold text-white border border-slate-700 inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;">
-                            <span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>
-                            ${item.categoria}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 text-slate-400 text-xs">${item.tipo}</td>
-                    <td class="px-6 py-4 text-right font-extrabold text-white">${fmt(item.monto)}</td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="editGasto('${item.id}')" class="text-slate-400 hover:text-white mr-3 transition" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
-                        <button onclick="deleteGasto('${item.id}')" class="text-slate-400 hover:text-rose-400 transition" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
+        function renderGraficos() {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            
+            // --- CÁLCULOS PARA LA VENTANA DE 7 MESES (-3 a +3) ---
+            const rangeMonths = [];
+            for (let i = -3; i <= 3; i++) {
+                rangeMonths.push(getMonthOffset(currentMonth, i));
+            }
+
+            const labels7Meses = rangeMonths.map(m => formatMonthDisplay(m));
+            const dataTotales7Meses = [];
+            const dataPorCat7Meses = {};
+
+            const catList = window.appState.categorias || categoriasDefault;
+            catList.forEach(c => {
+                dataPorCat7Meses[c.nombre] = [];
+            });
+
+            rangeMonths.forEach(mStr => {
+                const dataM = getCalculatedDataForMonth(mStr);
+                const tGasto = dataM.totalFijos + dataM.totalTarjetas;
+                dataTotales7Meses.push(tGasto);
+
+                catList.forEach(c => {
+                    dataPorCat7Meses[c.nombre].push(dataM.totalesPorCat[c.nombre] || 0);
+                });
+            });
+
+            // Gráfico A: Evolución de Gastos Totales (7 Meses)
+            if (chartEvolucionTotalesInstance) chartEvolucionTotalesInstance.destroy();
+            const ctxEvolTot = document.getElementById('chartEvolucionTotales').getContext('2d');
+            chartEvolucionTotalesInstance = new Chart(ctxEvolTot, {
+                type: 'line',
+                data: {
+                    labels: labels7Meses,
+                    datasets: [{
+                        label: 'Gastos Totales ($)',
+                        data: dataTotales7Meses,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: rangeMonths.map(m => m === currentMonth ? '#f43f5e' : '#10b981'),
+                        pointRadius: rangeMonths.map(m => m === currentMonth ? 7 : 4)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    }
+                }
+            });
+
+            // Gráfico B: Evolución por Categoría (7 Meses)
+            const datasetsCategorias = catList.map(c => {
+                return {
+                    label: c.nombre,
+                    data: dataPorCat7Meses[c.nombre],
+                    borderColor: c.color,
+                    backgroundColor: c.color,
+                    tension: 0.3,
+                    borderWidth: 2,
+                    pointRadius: 3
+                };
+            }).filter(ds => ds.data.some(val => val > 0)); // Filtramos categorías sin movimiento en el rango
+
+            if (chartEvolucionCategoriasInstance) chartEvolucionCategoriasInstance.destroy();
+            const ctxEvolCat = document.getElementById('chartEvolucionCategorias').getContext('2d');
+            chartEvolucionCategoriasInstance = new Chart(ctxEvolCat, {
+                type: 'line',
+                data: {
+                    labels: labels7Meses,
+                    datasets: datasetsCategorias
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#f1f5f9', font: { size: 10 }, boxWidth: 12 } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    }
+                }
+            });
+
+            // --- GRÁFICOS DEL MES SELECCIONADO ---
+            const { sueldoActual, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
+
+            // 1. Gráfico por Categoría
+            const catLabels = [];
+            const catData = [];
+            const catColors = [];
+
+            Object.keys(totalesPorCat).forEach(catNombre => {
+                const val = totalesPorCat[catNombre];
+                if (val > 0) {
+                    catLabels.push(catNombre);
+                    catData.push(val);
+                    const catObj = catList.find(c => c.nombre === catNombre);
+                    catColors.push(catObj ? catObj.color : '#64748b');
+                }
+            });
+
+            if (chartCatInstance) chartCatInstance.destroy();
+            const ctxCat = document.getElementById('chartCategorias').getContext('2d');
+            chartCatInstance = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: catLabels,
+                    datasets: [{
+                        data: catData,
+                        backgroundColor: catColors,
+                        borderWidth: 2,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#f1f5f9', font: { size: 11 } } }
+                    }
+                }
+            });
+
+            // 2. Gráfico Fijos vs. Tarjetas
+            if (chartTiposInstance) chartTiposInstance.destroy();
+            const ctxTipos = document.getElementById('chartTipos').getContext('2d');
+            chartTiposInstance = new Chart(ctxTipos, {
+                type: 'pie',
+                data: {
+                    labels: ['Gastos Fijos', 'Total Tarjetas'],
+                    datasets: [{
+                        data: [totalFijos, totalTarjetas],
+                        backgroundColor: ['#f43f5e', '#6366f1'],
+                        borderWidth: 2,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#f1f5f9', font: { size: 11 } } }
+                    }
+                }
+            });
+
+            // 3. Gráfico Balance Mensual
+            const totalGastos = totalFijos + totalTarjetas;
+            const resto = sueldoActual - totalGastos;
+
+            if (chartBalanceInstance) chartBalanceInstance.destroy();
+            const ctxBalance = document.getElementById('chartBalance').getContext('2d');
+            chartBalanceInstance = new Chart(ctxBalance, {
+                type: 'bar',
+                data: {
+                    labels: ['Ingreso / Sueldo', 'Gastos Totales', 'Resto Disponible'],
+                    datasets: [{
+                        label: 'Monto ($)',
+                        data: [sueldoActual, totalGastos, resto < 0 ? 0 : resto],
+                        backgroundColor: ['#10b981', '#f43f5e', '#3b82f6'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    }
+                }
             });
         }
 
@@ -707,7 +1137,6 @@
                             monto: gastoViejo.monto 
                         };
                     } else {
-                        // Modificación permanente: actualizamos el gasto base, flags y limpiamos excepciones
                         const originalStartMonth = gastoViejo.startMonth || (gastoViejo.fecha ? gastoViejo.fecha.slice(0, 7) : currentMonth);
                         window.appState.gastos[idx] = { 
                             id, 
@@ -716,7 +1145,7 @@
                             startMonth: originalStartMonth, 
                             fecha: `${originalStartMonth}-01`, 
                             categoria, 
-                            isRecurrente,
+                            isRecurrente, 
                             cuotas 
                         };
 
