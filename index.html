@@ -303,7 +303,7 @@
                 <div id="containerCheckSoloEsteMes" class="mb-4 hidden p-3 rounded-xl bg-slate-900/80 border border-emerald-900/50">
                     <label class="flex items-center gap-3 cursor-pointer select-none text-xs font-semibold text-emerald-300">
                         <input type="checkbox" id="checkSoloEsteMes" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
-                        Aplicar este nuevo monto ÚNICAMENTE para el mes actual (<span id="labelMesActualCheck"></span>)
+                        Aplicar este cambio ÚNICAMENTE para el mes actual (<span id="labelMesActualCheck"></span>)
                     </label>
                 </div>
 
@@ -363,7 +363,7 @@
             currentMonth: new Date().toISOString().slice(0, 7),
             gastos: [],
             excepcionesMonto: {},
-            excepcionesCategoria: {}, // Guarda cambios de categoría por mes y ID: {"gastoId_2026-11": "Visa Galicia"}
+            excepcionesCategoria: {},
             sueldos: {},
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
@@ -542,8 +542,36 @@
                             monto: montoAplicar
                         });
                     }
+                } else {(window.appState.gastos || []).forEach(gasto => {
+                const excepcionCatKey = `${gasto.id}_${currentMonth}`;
+                const categoriaAplicar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
+                    ? window.appState.excepcionesCategoria[excepcionCatKey]
+                    : gasto.categoria;
+
+                const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
+                const excepcionKey = `${gasto.id}_${currentMonth}`;
+                const montoAplicar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
+                    ? window.appState.excepcionesMonto[excepcionKey]
+                    : parseFloat(gasto.monto);
+
+                const totalCuotas = parseInt(gasto.cuotas) || 1;
+
+                // Si es un gasto de 1 sola cuota pero querés que se repita mensualmente como un gasto de tarjeta recurrente, 
+                // o si prefieres que las tarjetas se proyecten mes a mes:
+                if (totalCuotas === 1) {
+                    // Si querés que este gasto con tarjeta se repita todos los meses a partir de startMonth:
+                    if (currentMonth >= startYM) {
+                        totalTarjetas += montoAplicar;
+                        items.push({
+                            id: gasto.id,
+                            concepto: gasto.concepto,
+                            categoria: categoriaAplicar,
+                            tipo: 'Tarjeta / Mensual',
+                            monto: montoAplicar
+                        });
+                    }
                 } else {
-                    const totalCuotas = parseInt(gasto.cuotas) || 1;
+                    // Lógica normal de cuotas múltiples
                     const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
 
@@ -562,11 +590,13 @@
                                 id: gasto.id,
                                 concepto: gasto.concepto,
                                 categoria: categoriaAplicar,
-                                tipo: totalCuotas > 1 ? `Cuota ${i + 1}/${totalCuotas}` : 'Contado',
+                                tipo: `Cuota ${i + 1}/${totalCuotas}`,
                                 monto: montoCuota
                             });
                         }
                     }
+                }
+            });
                 }
             });
 
@@ -642,7 +672,7 @@
             const id = document.getElementById('gastoId').value;
             const concepto = document.getElementById('gastoConcepto').value;
             const monto = parseFloat(document.getElementById('gastoMonto').value);
-            const startMonth = document.getElementById('gastoStartMonth').value;
+            const startMonthInput = document.getElementById('gastoStartMonth').value;
             const categoria = document.getElementById('gastoCategoria').value;
             const isCuotas = document.getElementById('checkCuotas').checked;
             const cuotas = isCuotas ? (parseInt(document.getElementById('gastoCuotas').value) || 1) : 1;
@@ -661,7 +691,6 @@
                         window.appState.excepcionesMonto[`${id}_${currentMonth}`] = monto;
                         window.appState.excepcionesCategoria[`${id}_${currentMonth}`] = categoria;
 
-                        // Mantenemos el gasto base intacto para los demás meses
                         window.appState.gastos[idx] = { 
                             id, 
                             concepto, 
@@ -672,14 +701,33 @@
                             monto: gastoViejo.monto 
                         };
                     } else {
-                        // Modificación permanente de todo
-                        window.appState.gastos[idx] = { id, concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas };
-                        if (window.appState.excepcionesMonto) delete window.appState.excepcionesMonto[`${id}_${currentMonth}`];
-                        if (window.appState.excepcionesCategoria) delete window.appState.excepcionesCategoria[`${id}_${currentMonth}`];
+                        // Modificación permanente: actualizamos el gasto base y LIMPIAMOS CUALQUIER EXCEPCIÓN PREVIA DE ESTE ID
+                        const originalStartMonth = gastoViejo.startMonth || (gastoViejo.fecha ? gastoViejo.fecha.slice(0, 7) : currentMonth);
+                        window.appState.gastos[idx] = { 
+                            id, 
+                            concepto, 
+                            monto, 
+                            startMonth: originalStartMonth, 
+                            fecha: `${originalStartMonth}-01`, 
+                            categoria, 
+                            cuotas 
+                        };
+
+                        // Limpiamos todas las excepciones de este gasto para que no oculten el cambio permanente
+                        if (window.appState.excepcionesMonto) {
+                            Object.keys(window.appState.excepcionesMonto).forEach(k => {
+                                if (k.startsWith(`${id}_`)) delete window.appState.excepcionesMonto[k];
+                            });
+                        }
+                        if (window.appState.excepcionesCategoria) {
+                            Object.keys(window.appState.excepcionesCategoria).forEach(k => {
+                                if (k.startsWith(`${id}_`)) delete window.appState.excepcionesCategoria[k];
+                            });
+                        }
                     }
                 }
             } else {
-                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas });
+                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, startMonth: startMonthInput, fecha: `${startMonthInput}-01`, categoria, cuotas });
             }
 
             window.saveDataToCloud();
@@ -696,14 +744,12 @@
             
             const currentMonth = window.appState.currentMonth;
             
-            // Cargar monto (considerando excepciones de este mes)
             const excepcionKey = `${id}_${currentMonth}`;
             const montoAMostrar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
                 ? window.appState.excepcionesMonto[excepcionKey]
                 : gasto.monto;
             document.getElementById('gastoMonto').value = montoAMostrar;
 
-            // Cargar categoría (considerando excepciones de este mes)
             const excepcionCatKey = `${id}_${currentMonth}`;
             const categoriaAMostrar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
                 ? window.appState.excepcionesCategoria[excepcionCatKey]
