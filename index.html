@@ -551,9 +551,11 @@
             sueldos: {},
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
-            sortAscending: true,
-            filtrosCategorias: []
+            sortAscending: true
         };
+
+        // Filtro estrictamente local y temporal (nunca se guarda en la nube)
+        window.filtrosTemporales = [];
 
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -681,12 +683,12 @@
             container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1 whitespace-nowrap">Filtrar:</span>`;
 
             const catList = window.appState.categorias || categoriasDefault;
-            if (!window.appState.filtrosCategorias) {
-                window.appState.filtrosCategorias = [];
+            if (!window.filtrosTemporales) {
+                window.filtrosTemporales = [];
             }
 
             catList.forEach(cat => {
-                const isChecked = window.appState.filtrosCategorias.length === 0 || window.appState.filtrosCategorias.includes(cat.nombre);
+                const isChecked = window.filtrosTemporales.length === 0 || window.filtrosTemporales.includes(cat.nombre);
                 
                 const label = document.createElement('label');
                 label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 whitespace-nowrap select-none ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
@@ -701,26 +703,26 @@
 
         function toggleFiltroCategoria(checkbox) {
             const catNombre = checkbox.value;
-            if (!window.appState.filtrosCategorias) {
-                window.appState.filtrosCategorias = [];
-            }
-
-            if (window.appState.filtrosCategorias.length === 0) {
-                const catList = window.appState.categorias || categoriasDefault;
-                window.appState.filtrosCategorias = catList.map(c => c.nombre);
-            }
-
-            if (checkbox.checked) {
-                if (!window.appState.filtrosCategorias.includes(catNombre)) {
-                    window.appState.filtrosCategorias.push(catNombre);
-                }
-            } else {
-                window.appState.filtrosCategorias = window.appState.filtrosCategorias.filter(c => c !== catNombre);
+            if (!window.filtrosTemporales) {
+                window.filtrosTemporales = [];
             }
 
             const catList = window.appState.categorias || categoriasDefault;
-            if (window.appState.filtrosCategorias.length === catList.length) {
-                window.appState.filtrosCategorias = [];
+
+            if (window.filtrosTemporales.length === 0) {
+                window.filtrosTemporales = catList.map(c => c.nombre);
+            }
+
+            if (checkbox.checked) {
+                if (!window.filtrosTemporales.includes(catNombre)) {
+                    window.filtrosTemporales.push(catNombre);
+                }
+            } else {
+                window.filtrosTemporales = window.filtrosTemporales.filter(c => c !== catNombre);
+            }
+
+            if (window.filtrosTemporales.length === catList.length) {
+                window.filtrosTemporales = [];
             }
 
             renderFiltrosCategoriasCheckboxes();
@@ -781,8 +783,27 @@
             renderApp();
         }
 
+        // LÓGICA DE SUELDO: Busca el sueldo exacto o el último configurado hacia atrás (repropagación hacia adelante)
+        function getSueldoForMonth(targetMonth) {
+            const sueldos = window.appState.sueldos || {};
+            if (sueldos[targetMonth] !== undefined) {
+                return parseFloat(sueldos[targetMonth]) || 0;
+            }
+            // Si no está definido para este mes, busca el mes más cercano anterior configurado
+            let keys = Object.keys(sueldos).sort();
+            let sueldoAplicar = 0;
+            for (let k of keys) {
+                if (k <= targetMonth) {
+                    sueldoAplicar = parseFloat(sueldos[k]) || 0;
+                } else {
+                    break;
+                }
+            }
+            return sueldoAplicar;
+        }
+
         function getCalculatedDataForMonth(targetMonth) {
-            const sueldoActual = parseFloat((window.appState.sueldos || {})[targetMonth]) || 0;
+            const sueldoActual = getSueldoForMonth(targetMonth);
             let items = [];
             let totalFijos = 0;
             let totalTarjetas = 0;
@@ -911,9 +932,9 @@
                 containerTotales.appendChild(cardDiv);
             });
 
-            // Filtrar items según las categorías seleccionadas por checkbox múltiple
+            // Filtrar items según las categorías seleccionadas por checkbox múltiple temporal
             let itemsFiltrados = items;
-            const filtrosActivos = window.appState.filtrosCategorias || [];
+            const filtrosActivos = window.filtrosTemporales || [];
             if (filtrosActivos.length > 0) {
                 itemsFiltrados = items.filter(item => filtrosActivos.includes(item.categoria));
             }
@@ -1168,6 +1189,7 @@
 
             window.saveDataToCloud();
             closeModal('modalSueldo');
+            renderApp();
         }
 
         function handleSaveGasto(e) {
@@ -1297,8 +1319,8 @@
 
         function openModalSueldo() {
             const currentMonth = window.appState.currentMonth;
-            const sueldoActual = (window.appState.sueldos || {})[currentMonth] || '';
-            document.getElementById('sueldoMonto').value = sueldoActual;
+            const sueldoActual = getSueldoForMonth(currentMonth);
+            document.getElementById('sueldoMonto').value = sueldoActual || '';
             document.getElementById('modalSueldo').classList.remove('hidden');
         }
 
