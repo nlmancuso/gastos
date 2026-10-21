@@ -33,7 +33,9 @@
         onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                window.appState = data.appState || window.appState;
+                if (data.appState) {
+                    window.appState = { ...window.appState, ...data.appState };
+                }
             } else {
                 saveDataToCloud();
             }
@@ -43,6 +45,7 @@
                 statusEl.title = "Sincronizado en la Nube";
             }
             renderApp();
+            renderCategoriasSelect();
         }, (error) => {
             console.error("Error en nube: ", error);
             const statusEl = document.getElementById('cloudStatus');
@@ -51,6 +54,7 @@
                 statusEl.title = "Modo Sin Conexión";
             }
             renderApp();
+            renderCategoriasSelect();
         });
 
         window.saveDataToCloud = async function() {
@@ -115,7 +119,8 @@
                 <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg shadow-emerald-950/50 transition flex items-center gap-2">
                     <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
                 </button>
-                <button onclick="exportData()" title="Respaldar Datos" class="p-2 rounded-lg card-bg text-slate-400 hover:text-white transition">
+                <!-- Ruedita de Ajustes restaurada -->
+                <button onclick="openModalConfig()" title="Gestión de Tarjetas y Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                     <i class="fa-solid fa-gear"></i>
                 </button>
                 <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">
@@ -209,6 +214,45 @@
         </div>
     </main>
 
+    <!-- Modal Gestión de Tarjetas y Categorías (Ajustes) -->
+    <div id="modalConfig" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Gestión de Tarjetas y Categorías</h3>
+                <button type="button" onclick="closeModal('modalConfig')" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">AGREGAR NUEVA TARJETA / CATEGORÍA</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nuevaCatNombre" placeholder="Ej: Tarjeta Visa Galicia" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <input type="color" id="nuevaCatColor" value="#3b82f6" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoria()" class="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow transition">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto pr-1">
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">TARJETAS Y CATEGORÍAS EXISTENTES</label>
+                <div id="listaCategoriasConfig" class="space-y-2.5">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
+                <button onclick="restaurarCategoriasDefault()" class="text-rose-400 hover:text-rose-300 font-medium">
+                    Restablecer datos iniciales
+                </button>
+                <button onclick="closeModal('modalConfig')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 font-medium">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Modificar Sueldo -->
     <div id="modalSueldo" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700">
@@ -248,13 +292,7 @@
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-2">CATEGORÍA / TARJETA</label>
                         <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="Gasto Fijo">Gasto Fijo (Sin Tarjeta)</option>
-                            <option value="Servicios">Servicios</option>
-                            <option value="Visa Galicia">Visa Galicia</option>
-                            <option value="Mastercard">Mastercard</option>
-                            <option value="AMEX">AMEX</option>
-                            <option value="Mercado Pago">Mercado Pago</option>
-                            <option value="Otros">Otros</option>
+                            <!-- Dinámico -->
                         </select>
                     </div>
                     <div>
@@ -263,7 +301,6 @@
                     </div>
                 </div>
 
-                <!-- Checkbox para modificar solo este mes (visible solo al editar) -->
                 <div id="containerCheckSoloEsteMes" class="mb-4 hidden p-3 rounded-xl bg-slate-900/80 border border-emerald-900/50">
                     <label class="flex items-center gap-3 cursor-pointer select-none text-xs font-semibold text-emerald-300">
                         <input type="checkbox" id="checkSoloEsteMes" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
@@ -313,11 +350,22 @@
 
     <!-- Logic Script -->
     <script>
+        const categoriasDefault = [
+            { nombre: "Gasto Fijo", color: "#ef4444" },
+            { nombre: "Servicios", color: "#f97316" },
+            { nombre: "Visa Galicia", color: "#3b82f6" },
+            { nombre: "Mastercard", color: "#8b5cf6" },
+            { nombre: "AMEX", color: "#10b981" },
+            { nombre: "Mercado Pago", color: "#06b6d4" },
+            { nombre: "Otros", color: "#64748b" }
+        ];
+
         window.appState = window.appState || {
             currentMonth: new Date().toISOString().slice(0, 7),
             gastos: [],
             excepcionesMonto: {},
             sueldos: {},
+            categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
             sortAscending: true
         };
@@ -325,10 +373,93 @@
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
         document.addEventListener('DOMContentLoaded', () => {
+            if (!window.appState.categorias || window.appState.categorias.length === 0) {
+                window.appState.categorias = JSON.parse(JSON.stringify(categoriasDefault));
+            }
             renderApp();
+            renderCategoriasSelect();
             document.getElementById('gastoMonto').addEventListener('input', updateCuotaDisplay);
             document.getElementById('gastoCuotas').addEventListener('input', updateCuotaDisplay);
         });
+
+        function openModalConfig() {
+            renderCategoriasConfigList();
+            document.getElementById('modalConfig').classList.remove('hidden');
+        }
+
+        function renderCategoriasConfigList() {
+            const container = document.getElementById('listaCategoriasConfig');
+            container.innerHTML = '';
+            
+            (window.appState.categorias || []).forEach((cat, index) => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800";
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-4 h-4 rounded-full inline-block shadow" style="background-color: ${cat.color};"></span>
+                        <span class="text-sm font-bold text-white">${cat.nombre}</span>
+                    </div>
+                    <button onclick="eliminarCategoria(${index})" class="text-slate-500 hover:text-rose-400 transition" title="Eliminar">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function agregarCategoria() {
+            const nombreInput = document.getElementById('nuevaCatNombre');
+            const colorInput = document.getElementById('nuevaCatColor');
+            const nombre = nombreInput.value.trim();
+            const color = colorInput.value;
+
+            if (!nombre) return;
+
+            if (!window.appState.categorias) window.appState.categorias = [];
+            window.appState.categorias.push({ nombre, color });
+
+            nombreInput.value = '';
+            colorInput.value = '#3b82f6';
+
+            window.saveDataToCloud();
+            renderCategoriasConfigList();
+            renderCategoriasSelect();
+        }
+
+        function eliminarCategoria(index) {
+            if (window.appState.categorias.length <= 1) {
+                alert("Debes tener al menos una categoría.");
+                return;
+            }
+            window.appState.categorias.splice(index, 1);
+            window.saveDataToCloud();
+            renderCategoriasConfigList();
+            renderCategoriasSelect();
+        }
+
+        function restaurarCategoriasDefault() {
+            if (confirm("¿Estás seguro de restablecer las categorías iniciales?")) {
+                window.appState.categorias = JSON.parse(JSON.stringify(categoriasDefault));
+                window.saveDataToCloud();
+                renderCategoriasConfigList();
+                renderCategoriasSelect();
+            }
+        }
+
+        function renderCategoriasSelect() {
+            const select = document.getElementById('gastoCategoria');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '';
+            
+            (window.appState.categorias || categoriasDefault).forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.nombre;
+                opt.innerText = cat.nombre;
+                select.appendChild(opt);
+            });
+            if (currentVal) select.value = currentVal;
+        }
 
         function toggleCuotasFields() {
             const isChecked = document.getElementById('checkCuotas').checked;
@@ -387,7 +518,7 @@
             let totalTarjetas = 0;
 
             (window.appState.gastos || []).forEach(gasto => {
-                const isFijo = gasto.categoria === 'Gasto Fijo' || gasto.categoria === 'Servicios';
+                const isFijo = gasto.categoria.toLowerCase().includes('fijo') || gasto.categoria.toLowerCase().includes('servicio');
                 const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
 
                 const excepcionKey = `${gasto.id}_${currentMonth}`;
@@ -465,12 +596,16 @@
             }
 
             items.forEach(item => {
+                const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === item.categoria);
+                const colorCat = catObj ? catObj.color : '#475569';
+
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-900/40 transition-colors";
                 tr.innerHTML = `
                     <td class="px-6 py-4 text-white font-bold">${item.concepto}</td>
                     <td class="px-6 py-4">
-                        <span class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                        <span class="px-3 py-1 rounded-lg text-xs font-semibold text-white border border-slate-700 inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;">
+                            <span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>
                             ${item.categoria}
                         </span>
                     </td>
@@ -517,10 +652,8 @@
                     if (soloEsteMes) {
                         if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
                         window.appState.excepcionesMonto[`${id}_${currentMonth}`] = monto;
-                        // Mantenemos el gasto base intacto y restauramos su monto original en el objeto principal
                         window.appState.gastos[idx] = { id, concepto, startMonth: gastoViejo.startMonth, fecha: gastoViejo.fecha, categoria, cuotas, monto: gastoViejo.monto };
                     } else {
-                        // Modificación permanente
                         window.appState.gastos[idx] = { id, concepto, monto, startMonth, fecha: `${startMonth}-01`, categoria, cuotas };
                         if (window.appState.excepcionesMonto) delete window.appState.excepcionesMonto[`${id}_${currentMonth}`];
                     }
@@ -549,9 +682,9 @@
 
             document.getElementById('gastoMonto').value = montoAMostrar;
             document.getElementById('gastoStartMonth').value = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
+            renderCategoriasSelect();
             document.getElementById('gastoCategoria').value = gasto.categoria;
             
-            // Mostrar la opción del checkbox solo si estamos editando
             document.getElementById('containerCheckSoloEsteMes').classList.remove('hidden');
             document.getElementById('labelMesActualCheck').innerText = currentMonth;
             document.getElementById('checkSoloEsteMes').checked = false;
@@ -583,9 +716,9 @@
             if (!document.getElementById('gastoId').value) {
                 document.getElementById('modalGastoTitulo').innerText = "Nuevo Gasto";
                 document.getElementById('formGasto').reset();
+                renderCategoriasSelect();
                 document.getElementById('gastoStartMonth').value = window.appState.currentMonth;
                 document.getElementById('checkCuotas').checked = false;
-                // Ocultar checkbox de solo este mes cuando es un gasto nuevo
                 document.getElementById('containerCheckSoloEsteMes').classList.add('hidden');
                 toggleCuotasFields();
             }
