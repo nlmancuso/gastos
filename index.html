@@ -523,13 +523,16 @@
                     ? window.appState.excepcionesCategoria[excepcionCatKey]
                     : gasto.categoria;
 
-                const isFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
                 const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
-
                 const excepcionKey = `${gasto.id}_${currentMonth}`;
                 const montoAplicar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
                     ? window.appState.excepcionesMonto[excepcionKey]
                     : parseFloat(gasto.monto);
+
+                const totalCuotas = parseInt(gasto.cuotas) || 1;
+                const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
+                const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
+                const isFijo = baseEsFijo || catEsFijo;
 
                 if (isFijo) {
                     if (currentMonth >= startYM) {
@@ -542,36 +545,8 @@
                             monto: montoAplicar
                         });
                     }
-                } else {(window.appState.gastos || []).forEach(gasto => {
-                const excepcionCatKey = `${gasto.id}_${currentMonth}`;
-                const categoriaAplicar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
-                    ? window.appState.excepcionesCategoria[excepcionCatKey]
-                    : gasto.categoria;
-
-                const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
-                const excepcionKey = `${gasto.id}_${currentMonth}`;
-                const montoAplicar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
-                    ? window.appState.excepcionesMonto[excepcionKey]
-                    : parseFloat(gasto.monto);
-
-                const totalCuotas = parseInt(gasto.cuotas) || 1;
-
-                // Si es un gasto de 1 sola cuota pero querés que se repita mensualmente como un gasto de tarjeta recurrente, 
-                // o si prefieres que las tarjetas se proyecten mes a mes:
-                if (totalCuotas === 1) {
-                    // Si querés que este gasto con tarjeta se repita todos los meses a partir de startMonth:
-                    if (currentMonth >= startYM) {
-                        totalTarjetas += montoAplicar;
-                        items.push({
-                            id: gasto.id,
-                            concepto: gasto.concepto,
-                            categoria: categoriaAplicar,
-                            tipo: 'Tarjeta / Mensual',
-                            monto: montoAplicar
-                        });
-                    }
-                } else {
-                    // Lógica normal de cuotas múltiples
+                } else if (totalCuotas > 1) {
+                    // Compra en cuotas múltiples
                     const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
 
@@ -595,8 +570,18 @@
                             });
                         }
                     }
-                }
-            });
+                } else {
+                    // Gasto de tarjeta / contado de 1 sola cuota proyectado mensualmente
+                    if (currentMonth >= startYM) {
+                        totalTarjetas += montoAplicar;
+                        items.push({
+                            id: gasto.id,
+                            concepto: gasto.concepto,
+                            categoria: categoriaAplicar,
+                            tipo: 'Tarjeta / Mensual',
+                            monto: montoAplicar
+                        });
+                    }
                 }
             });
 
@@ -701,7 +686,7 @@
                             monto: gastoViejo.monto 
                         };
                     } else {
-                        // Modificación permanente: actualizamos el gasto base y LIMPIAMOS CUALQUIER EXCEPCIÓN PREVIA DE ESTE ID
+                        // Modificación permanente: actualizamos el gasto base y limpiamos excepciones de este ID
                         const originalStartMonth = gastoViejo.startMonth || (gastoViejo.fecha ? gastoViejo.fecha.slice(0, 7) : currentMonth);
                         window.appState.gastos[idx] = { 
                             id, 
@@ -713,7 +698,6 @@
                             cuotas 
                         };
 
-                        // Limpiamos todas las excepciones de este gasto para que no oculten el cambio permanente
                         if (window.appState.excepcionesMonto) {
                             Object.keys(window.appState.excepcionesMonto).forEach(k => {
                                 if (k.startsWith(`${id}_`)) delete window.appState.excepcionesMonto[k];
