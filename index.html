@@ -99,8 +99,10 @@
 
         window.saveDataToCloud = async function() {
             try {
-                await setDoc(docRef, { appState: window.appState });
-                localStorage.setItem('gastos_app_state_backup', JSON.stringify(window.appState));
+                // Forzamos clonación para que Firebase detecte los cambios internos en mapas y objetos
+                const cleanState = JSON.parse(JSON.stringify(window.appState));
+                await setDoc(docRef, { appState: cleanState });
+                localStorage.setItem('gastos_app_state_backup', JSON.stringify(cleanState));
             } catch (e) {
                 console.error("Error guardando datos:", e);
             }
@@ -1202,8 +1204,15 @@
                         if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
                         if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
 
-                        window.appState.excepcionesMonto[`${id}_${currentMonth}`] = monto;
-                        window.appState.excepcionesCategoria[`${id}_${currentMonth}`] = categoria;
+                        // Asignamos explícitamente para que Firebase detecte el cambio de mapa
+                        window.appState.excepcionesMonto = {
+                            ...window.appState.excepcionesMonto,
+                            [`${id}_${currentMonth}`]: monto
+                        };
+                        window.appState.excepcionesCategoria = {
+                            ...window.appState.excepcionesCategoria,
+                            [`${id}_${currentMonth}`]: categoria
+                        };
 
                         window.appState.gastos[idx] = { 
                             id, 
@@ -1253,7 +1262,7 @@
                 });
             }
 
-            window.saveDataToCloud(); // <-- Aquí faltaba sincronizar con Firebase
+            window.saveDataToCloud();
             closeModal('modalGasto');
             renderApp();
         }
