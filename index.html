@@ -284,7 +284,7 @@
 
                 <div class="mb-4">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">NOMBRE DEL CONCEPTO</label>
-                    <input type="text" id="gastoConcepto" required placeholder="Ej: Luz, Gimnasio, Compra TV..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <input type="text" id="gastoConcepto" required placeholder="Ej: Luz, Gimnasio, Telepase..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 mb-4">
@@ -307,13 +307,21 @@
                     </label>
                 </div>
 
-                <div class="mb-2">
+                <div class="mb-3">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QUÉ MES EMPIEZA</label>
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
-                <p class="text-[11px] text-slate-500 mb-5">
-                    Este gasto NO figurará en los meses anteriores al seleccionado. Si es Gasto Fijo, se repetirá automáticamente.
-                </p>
+
+                <!-- Checkbox de Débito Automático / Recurrente -->
+                <div class="mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                    <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
+                        <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
+                        🔄 Débito Automático / Repetir todos los meses
+                    </label>
+                    <p class="text-[11px] text-slate-400 mt-1 ml-7">
+                        Tildalo si este gasto se debita todos los meses. Si no lo tildás, aparecerá únicamente en el mes seleccionado.
+                    </p>
+                </div>
 
                 <div class="mb-4">
                     <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
@@ -464,8 +472,11 @@
         function toggleCuotasFields() {
             const isChecked = document.getElementById('checkCuotas').checked;
             const sec = document.getElementById('sectionCuotas');
+            const checkRecurrente = document.getElementById('checkRecurrente');
+            
             if (isChecked) {
                 sec.classList.remove('hidden');
+                checkRecurrente.checked = false; // Las cuotas mandan sobre la recurrencia infinita
             } else {
                 sec.classList.add('hidden');
                 document.getElementById('gastoCuotas').value = 1;
@@ -532,21 +543,12 @@
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
                 const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
                 const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
-                const isFijo = baseEsFijo || catEsFijo;
+                
+                // Es recurrente si tiene la marca explícita de débito automático (isRecurrente) o si es categoría de Gasto Fijo/Servicios
+                const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
 
-                if (isFijo) {
-                    if (currentMonth >= startYM) {
-                        totalFijos += montoAplicar;
-                        items.push({
-                            id: gasto.id,
-                            concepto: gasto.concepto,
-                            categoria: categoriaAplicar,
-                            tipo: 'Recurrente / Mensual',
-                            monto: montoAplicar
-                        });
-                    }
-                } else if (totalCuotas > 1) {
-                    // Compra en cuotas múltiples (ej: 3 cuotas, 6 cuotas)
+                if (totalCuotas > 1) {
+                    // Compra en cuotas múltiples (> 1): se distribuye mes a mes
                     const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
 
@@ -570,15 +572,32 @@
                             });
                         }
                     }
+                } else if (isRecurrente) {
+                    // Gasto recurrente / débito automático / fijo: se repite todos los meses desde startYM
+                    if (currentMonth >= startYM) {
+                        const tipoStr = baseEsFijo ? 'Recurrente / Mensual' : 'Débito Automático';
+                        if (baseEsFijo) {
+                            totalFijos += montoAplicar;
+                        } else {
+                            totalTarjetas += montoAplicar;
+                        }
+                        items.push({
+                            id: gasto.id,
+                            concepto: gasto.concepto,
+                            categoria: categoriaAplicar,
+                            tipo: tipoStr,
+                            monto: montoAplicar
+                        });
+                    }
                 } else {
-                    // Gasto de 1 sola cuota (Contado o Tarjeta de pago único): SOLO aparece en el mes de inicio
+                    // Gasto de 1 sola vez (Contado o pago único sin débito automático): SOLO aparece en su mes de inicio
                     if (currentMonth === startYM) {
                         totalTarjetas += montoAplicar;
                         items.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: categoriaAplicar,
-                            tipo: 'Contado',
+                            tipo: 'Contado / Único',
                             monto: montoAplicar
                         });
                     }
@@ -659,6 +678,7 @@
             const monto = parseFloat(document.getElementById('gastoMonto').value);
             const startMonthInput = document.getElementById('gastoStartMonth').value;
             const categoria = document.getElementById('gastoCategoria').value;
+            const isRecurrente = document.getElementById('checkRecurrente').checked;
             const isCuotas = document.getElementById('checkCuotas').checked;
             const cuotas = isCuotas ? (parseInt(document.getElementById('gastoCuotas').value) || 1) : 1;
             const currentMonth = window.appState.currentMonth;
@@ -682,11 +702,12 @@
                             startMonth: gastoViejo.startMonth, 
                             fecha: gastoViejo.fecha, 
                             categoria: gastoViejo.categoria, 
+                            isRecurrente: gastoViejo.isRecurrente,
                             cuotas, 
                             monto: gastoViejo.monto 
                         };
                     } else {
-                        // Modificación permanente: actualizamos el gasto base, cuotas y limpiamos excepciones de este ID
+                        // Modificación permanente: actualizamos el gasto base, flags y limpiamos excepciones
                         const originalStartMonth = gastoViejo.startMonth || (gastoViejo.fecha ? gastoViejo.fecha.slice(0, 7) : currentMonth);
                         window.appState.gastos[idx] = { 
                             id, 
@@ -695,6 +716,7 @@
                             startMonth: originalStartMonth, 
                             fecha: `${originalStartMonth}-01`, 
                             categoria, 
+                            isRecurrente,
                             cuotas 
                         };
 
@@ -711,7 +733,16 @@
                     }
                 }
             } else {
-                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, startMonth: startMonthInput, fecha: `${startMonthInput}-01`, categoria, cuotas });
+                window.appState.gastos.push({ 
+                    id: Date.now().toString(), 
+                    concepto, 
+                    monto, 
+                    startMonth: startMonthInput, 
+                    fecha: `${startMonthInput}-01`, 
+                    categoria, 
+                    isRecurrente, 
+                    cuotas 
+                });
             }
 
             window.saveDataToCloud();
@@ -748,6 +779,8 @@
             document.getElementById('labelMesActualCheck').innerText = currentMonth;
             document.getElementById('checkSoloEsteMes').checked = false;
 
+            document.getElementById('checkRecurrente').checked = !!gasto.isRecurrente;
+
             const isCuotas = (gasto.cuotas && gasto.cuotas > 1);
             document.getElementById('checkCuotas').checked = isCuotas;
             document.getElementById('gastoCuotas').value = gasto.cuotas || 1;
@@ -777,6 +810,7 @@
                 document.getElementById('formGasto').reset();
                 renderCategoriasSelect();
                 document.getElementById('gastoStartMonth').value = window.appState.currentMonth;
+                document.getElementById('checkRecurrente').checked = false;
                 document.getElementById('checkCuotas').checked = false;
                 document.getElementById('containerCheckSoloEsteMes').classList.add('hidden');
                 toggleCuotasFields();
