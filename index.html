@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Gastos Personales v2.0</title>
+    <title>Control de Gastos Personales</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome icons -->
@@ -14,7 +14,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Configuración de tu proyecto Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
             authDomain: "gastos-334ff.firebaseapp.com",
@@ -24,62 +23,49 @@
             appId: "1:140017165186:web:2b6d7d57896696bef3a59b"
         };
 
-        // Inicializar Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const docRef = doc(db, "app_data", "usuario_principal");
 
         window.db = db;
         window.docRef = docRef;
-        window.setDoc = setDoc;
 
-        // Escuchar cambios en tiempo real desde la nube
         onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 window.appState = data.appState || window.appState;
             } else {
-                // Si la base está vacía, guardar estado inicial
                 saveDataToCloud();
             }
             document.getElementById('cloudStatus').innerText = "☁️ Conectado a la Nube";
             document.getElementById('cloudStatus').className = "text-xs bg-green-100 text-green-800 font-semibold px-2.5 py-0.5 rounded border border-green-300";
             renderApp();
         }, (error) => {
-            console.error("Error al conectar con la nube: ", error);
-            document.getElementById('cloudStatus').innerText = "⚠️ Modo Local (Sin Conexión)";
+            console.error("Error en nube: ", error);
+            document.getElementById('cloudStatus').innerText = "⚠️ Modo Local";
             document.getElementById('cloudStatus').className = "text-xs bg-yellow-100 text-yellow-800 font-semibold px-2.5 py-0.5 rounded border border-yellow-300";
             renderApp();
         });
 
-        // Función global para guardar en Firebase
         window.saveDataToCloud = async function() {
             try {
                 await setDoc(docRef, { appState: window.appState });
                 localStorage.setItem('gastos_app_state_backup', JSON.stringify(window.appState));
             } catch (e) {
-                console.error("Error guardando datos en Firestore:", e);
+                console.error("Error guardando datos:", e);
             }
         };
     </script>
 
     <style>
-        .active-tab {
-            border-bottom: 3px solid #3B82F6;
-            color: #3B82F6;
-            font-weight: 600;
-        }
-        .sort-icon {
-            font-size: 0.75rem;
-            margin-left: 0.25rem;
-        }
+        .sort-icon { font-size: 0.75rem; margin-left: 0.25rem; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800">
 
-    <!-- Navbar Header -->
+    <!-- Header -->
     <header class="bg-white shadow">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center flex-wrap gap-2">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <i class="fa-solid fa-wallet text-blue-600"></i> Control de Gastos Personales
             </h1>
@@ -96,46 +82,49 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        <!-- Selector de Mes y Acciones -->
+        <!-- Selector de Mes y Botón de Gastos -->
         <div class="bg-white p-4 rounded-lg shadow mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
                 <label for="monthSelector" class="font-semibold text-gray-700">Período Actual:</label>
                 <input type="month" id="monthSelector" class="border rounded px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="changeMonth(this.value)">
             </div>
             
-            <div class="flex gap-2 flex-wrap">
-                <button onclick="openModal('modalSueldo')" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded shadow transition flex items-center gap-2">
-                    <i class="fa-solid fa-plus-circle"></i> Ingreso / Sueldo
-                </button>
-                <button onclick="openModal('modalGasto')" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded shadow transition flex items-center gap-2">
-                    <i class="fa-solid fa-cart-plus"></i> Registrar Gasto
-                </button>
-            </div>
+            <button onclick="openModalGasto()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded shadow transition flex items-center gap-2">
+                <i class="fa-solid fa-cart-plus"></i> Registrar Gasto
+            </button>
         </div>
 
-        <!-- Tarjetas de Resumen Financiero -->
+        <!-- Tarjetas de Resumen Financiero con opción de editar Sueldo con Lápiz -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
-                <p class="text-sm text-gray-500 font-medium">Ingresos Totales</p>
-                <h2 id="totalIngresos" class="text-2xl font-bold text-gray-800">$0,00</h2>
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500 relative">
+                <div class="flex justify-between items-center">
+                    <p class="text-sm text-gray-500 font-medium">Ingresos / Sueldo</p>
+                    <button onclick="openModalSueldo()" class="text-gray-400 hover:text-green-600 transition" title="Editar Sueldo">
+                        <i class="fa-solid fa-pen text-sm"></i>
+                    </button>
+                </div>
+                <h2 id="totalIngresos" class="text-2xl font-bold text-gray-800 mt-1">$0,00</h2>
             </div>
+
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
                 <p class="text-sm text-gray-500 font-medium">Gastos del Mes</p>
-                <h2 id="totalGastos" class="text-2xl font-bold text-gray-800">$0,00</h2>
+                <h2 id="totalGastos" class="text-2xl font-bold text-gray-800 mt-1">$0,00</h2>
             </div>
+
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
                 <p class="text-sm text-gray-500 font-medium">Compromisos Cuotas Futuras</p>
-                <h2 id="totalCompromisos" class="text-2xl font-bold text-gray-800">$0,00</h2>
+                <h2 id="totalCompromisos" class="text-2xl font-bold text-gray-800 mt-1">$0,00</h2>
             </div>
+
             <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
                 <p class="text-sm text-gray-500 font-medium">Saldo Restante</p>
-                <h2 id="saldoRestante" class="text-2xl font-bold text-gray-800">$0,00</h2>
+                <h2 id="saldoRestante" class="text-2xl font-bold text-gray-800 mt-1">$0,00</h2>
             </div>
         </div>
 
         <!-- Tabla Principal de Movimientos -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div class="px-6 py-4 border-b border-gray-200">
                 <h3 class="text-lg font-bold text-gray-800">Detalle de Gastos e Ingresos</h3>
             </div>
             <div class="overflow-x-auto">
@@ -163,14 +152,31 @@
                         </tr>
                     </thead>
                     <tbody id="tablaCuerpo" class="bg-white divide-y divide-gray-200">
-                        <!-- Se llena dinámicamente -->
+                        <!-- Carga dinámica -->
                     </tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <!-- Modal Agregar/Editar Gasto -->
+    <!-- Modal Editar Sueldo -->
+    <div id="modalSueldo" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4"><i class="fa-solid fa-pen text-green-600"></i> Modificar Sueldo del Mes</h3>
+            <form id="formSueldo" onsubmit="handleSaveSueldo(event)">
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700">Monto del Sueldo / Ingreso ($)</label>
+                    <input type="number" step="0.01" id="sueldoMonto" required class="mt-1 w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium">Guardar Sueldo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Registrar/Editar Gasto -->
     <div id="modalGasto" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 id="modalGastoTitulo" class="text-lg font-bold text-gray-900 mb-4">Registrar Nuevo Gasto</h3>
@@ -215,49 +221,17 @@
         </div>
     </div>
 
-    <!-- Modal Agregar Ingreso/Sueldo -->
-    <div id="modalSueldo" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">Registrar Ingreso / Sueldo</h3>
-            <form id="formSueldo" onsubmit="handleSaveSueldo(event)">
-                <div class="mb-3">
-                    <label class="block text-sm font-medium text-gray-700">Concepto</label>
-                    <input type="text" id="sueldoConcepto" value="Sueldo / Ingreso" required class="mt-1 w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Monto ($)</label>
-                        <input type="number" step="0.01" id="sueldoMonto" required class="mt-1 w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Fecha</label>
-                        <input type="date" id="sueldoFecha" required class="mt-1 w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
-                    </div>
-                </div>
-                <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium">Guardar Ingreso</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Script principal de lógica Javascript -->
     <script>
-        // Estado global de la app
         window.appState = window.appState || {
             currentMonth: new Date().toISOString().slice(0, 7),
             gastos: [],
-            ingresos: [],
+            sueldos: {}, // Guarda el sueldo por cada mes, ej: {"2026-10": 500000}
             sortColumn: 'fecha',
             sortAscending: false
         };
 
-        // Inicialización
         document.addEventListener('DOMContentLoaded', () => {
-            const today = new Date().toISOString().slice(0, 10);
-            document.getElementById('gastoFecha').value = today;
-            document.getElementById('sueldoFecha').value = today;
+            document.getElementById('gastoFecha').value = new Date().toISOString().slice(0, 10);
             document.getElementById('monthSelector').value = window.appState.currentMonth;
         });
 
@@ -280,25 +254,25 @@
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             document.getElementById('monthSelector').value = currentMonth;
 
-            // Filtrar y procesar movimientos del mes
+            // Obtener sueldo del mes actual
+            const sueldoActual = parseFloat((window.appState.sueldos || {})[currentMonth]) || 0;
+
             let items = [];
 
-            // Procesar ingresos
-            (window.appState.ingresos || []).forEach(ing => {
-                if (ing.fecha.startsWith(currentMonth)) {
-                    items.push({
-                        id: ing.id,
-                        tipo: 'ingreso',
-                        concepto: ing.concepto,
-                        categoria: 'Ingreso',
-                        monto: parseFloat(ing.monto),
-                        fecha: ing.fecha,
-                        cuotaInfo: 'Único'
-                    });
-                }
-            });
+            // Si hay sueldo configurado, se agrega como ítem de ingreso
+            if (sueldoActual > 0) {
+                items.push({
+                    id: 'sueldo_' + currentMonth,
+                    tipo: 'ingreso',
+                    concepto: 'Sueldo / Ingreso Mensual',
+                    categoria: 'Ingreso',
+                    monto: sueldoActual,
+                    fecha: `${currentMonth}-01`,
+                    cuotaInfo: 'Mensual'
+                });
+            }
 
-            // Procesar gastos (incluyendo cuotas)
+            // Gastos y Cuotas
             let totalCompromisosFuturos = 0;
             (window.appState.gastos || []).forEach(gasto => {
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
@@ -318,8 +292,7 @@
                             categoria: gasto.categoria,
                             monto: montoCuota,
                             fecha: gasto.fecha,
-                            cuotaInfo: totalCuotas > 1 ? `Cuota ${i + 1}/${totalCuotas}` : 'Contado',
-                            original: gasto
+                            cuotaInfo: totalCuotas > 1 ? `Cuota ${i + 1}/${totalCuotas}` : 'Contado'
                         });
                     }
 
@@ -335,7 +308,6 @@
             items.sort((a, b) => {
                 let valA = a[col];
                 let valB = b[col];
-
                 if (typeof valA === 'string') {
                     return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
                 } else {
@@ -343,17 +315,16 @@
                 }
             });
 
-            // Cálculos Totales
-            let totalIng = items.filter(i => i.tipo === 'ingreso').reduce((acc, i) => acc + i.monto, 0);
+            // Totales
             let totalGas = items.filter(i => i.tipo === 'gasto').reduce((acc, i) => acc + i.monto, 0);
-            let saldo = totalIng - totalGas;
+            let saldo = sueldoActual - totalGas;
 
-            document.getElementById('totalIngresos').innerText = `$${totalIng.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalIngresos').innerText = `$${sueldoActual.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
             document.getElementById('totalGastos').innerText = `$${totalGas.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
             document.getElementById('totalCompromisos').innerText = `$${totalCompromisosFuturos.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
             document.getElementById('saldoRestante').innerText = `$${saldo.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
 
-            // Renderizar Tabla
+            // Render Tabla
             const tbody = document.getElementById('tablaCuerpo');
             tbody.innerHTML = '';
 
@@ -379,11 +350,11 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.cuotaInfo}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        ${!isIngreso ? `
+                        ${isIngreso ? `
+                            <button onclick="openModalSueldo()" class="text-blue-600 hover:text-blue-900 mr-2" title="Editar Sueldo"><i class="fa-solid fa-pen"></i></button>
+                        ` : `
                             <button onclick="editGasto('${item.id}')" class="text-blue-600 hover:text-blue-900 mr-3"><i class="fa-solid fa-pen"></i></button>
                             <button onclick="deleteGasto('${item.id}')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></button>
-                        ` : `
-                            <button onclick="deleteIngreso('${item.id}')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></button>
                         `}
                     </td>
                 `;
@@ -391,7 +362,18 @@
             });
         }
 
-        // Acciones CRUD
+        function handleSaveSueldo(e) {
+            e.preventDefault();
+            const monto = parseFloat(document.getElementById('sueldoMonto').value);
+            const currentMonth = window.appState.currentMonth;
+
+            if (!window.appState.sueldos) window.appState.sueldos = {};
+            window.appState.sueldos[currentMonth] = monto;
+
+            window.saveDataToCloud();
+            closeModal('modalSueldo');
+        }
+
         function handleSaveGasto(e) {
             e.preventDefault();
             const id = document.getElementById('gastoId').value;
@@ -402,32 +384,14 @@
             const cuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
 
             if (id) {
-                // Editar
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
-                if (idx !== -1) {
-                    window.appState.gastos[idx] = { id, concepto, monto, fecha, categoria, cuotas };
-                }
+                if (idx !== -1) window.appState.gastos[idx] = { id, concepto, monto, fecha, categoria, cuotas };
             } else {
-                // Agregar
-                const newGasto = { id: Date.now().toString(), concepto, monto, fecha, categoria, cuotas };
-                window.appState.gastos.push(newGasto);
+                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, fecha, categoria, cuotas });
             }
 
             window.saveDataToCloud();
             closeModal('modalGasto');
-        }
-
-        function handleSaveSueldo(e) {
-            e.preventDefault();
-            const concepto = document.getElementById('sueldoConcepto').value;
-            const monto = parseFloat(document.getElementById('sueldoMonto').value);
-            const fecha = document.getElementById('sueldoFecha').value;
-
-            const newIngreso = { id: Date.now().toString(), concepto, monto, fecha };
-            window.appState.ingresos.push(newIngreso);
-
-            window.saveDataToCloud();
-            closeModal('modalSueldo');
         }
 
         function editGasto(id) {
@@ -442,7 +406,7 @@
             document.getElementById('gastoCuotas').value = gasto.cuotas || 1;
 
             document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
-            openModal('modalGasto');
+            openModalGasto();
         }
 
         function deleteGasto(id) {
@@ -452,21 +416,20 @@
             }
         }
 
-        function deleteIngreso(id) {
-            if (confirm('¿Estás seguro de que querés eliminar este ingreso?')) {
-                window.appState.ingresos = window.appState.ingresos.filter(i => i.id !== id);
-                window.saveDataToCloud();
-            }
+        function openModalSueldo() {
+            const currentMonth = window.appState.currentMonth;
+            const sueldoActual = (window.appState.sueldos || {})[currentMonth] || '';
+            document.getElementById('sueldoMonto').value = sueldoActual;
+            document.getElementById('modalSueldo').classList.remove('hidden');
         }
 
-        // Modales
-        function openModal(id) {
-            if (id === 'modalGasto' && !document.getElementById('gastoId').value) {
+        function openModalGasto() {
+            if (!document.getElementById('gastoId').value) {
                 document.getElementById('modalGastoTitulo').innerText = "Registrar Nuevo Gasto";
                 document.getElementById('formGasto').reset();
                 document.getElementById('gastoFecha').value = new Date().toISOString().slice(0, 10);
             }
-            document.getElementById(id).classList.remove('hidden');
+            document.getElementById('modalGasto').classList.remove('hidden');
         }
 
         function closeModal(id) {
