@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Gastos - Proyección y Finanzas Personales</title>
+    <title>Control de Gastos</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -53,24 +53,23 @@
             document.getElementById('appContent').classList.remove('hidden');
         }
 
-        // Control de Estado de Autenticación
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 showLoading();
 
-                // 1. Limpiamos el estado en memoria para evitar ver datos previos
                 window.appState = {
                     currentMonth: new Date().toISOString().slice(0, 7),
                     gastos: [],
                     excepcionesMonto: {},
                     excepcionesCategoria: {},
+                    excepcionesVencimiento: {},
+                    excepcionesEstado: {},
                     sueldos: {},
                     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
                     sortColumn: 'concepto',
                     sortAscending: true
                 };
 
-                // 2. Obtener el grupo asignado al usuario desde Firestore
                 let grupoId = user.uid; 
                 
                 try {
@@ -80,19 +79,17 @@
                         grupoId = rolSnap.data().grupo;
                     }
                 } catch (err) {
-                    console.warn("No se pudo leer la asignación de grupo:", err);
+                    console.warn("No se pudo leer la asignaci&oacute;n de grupo:", err);
                 }
 
-                // 3. Apuntar la referencia a la base del grupo correspondiente
                 const docRef = doc(db, "app_data", grupoId);
                 window.docRef = docRef;
                 window.currentGrupo = grupoId;
 
-                // Extraemos la parte del mail antes del '@'
                 const userName = user.email ? user.email.split('@')[0] : 'Usuario';
                 const grupoDisplay = document.getElementById('grupoStatus');
                 if (grupoDisplay) {
-                    grupoDisplay.innerText = `👤 Usuario: ${userName}`;
+                    grupoDisplay.innerHTML = `&#128100; Usuario: ${userName}`;
                 }
 
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -102,6 +99,10 @@
                         const data = docSnap.data();
                         if (data.appState) {
                             window.appState = { ...window.appState, ...data.appState };
+                            window.appState.categorias = (window.appState.categorias || categoriasDefault).map(c => ({
+                                ...c,
+                                esTarjeta: c.esTarjeta ?? (!c.nombre.toLowerCase().includes('fijo') && !c.nombre.toLowerCase().includes('servicio'))
+                            }));
                         }
                     } else {
                         saveDataToCloud();
@@ -109,12 +110,11 @@
 
                     const statusEl = document.getElementById('cloudStatus');
                     if (statusEl) {
-                        statusEl.innerText = "☁️ Nube";
+                        statusEl.innerHTML = "&#9729; Nube";
                     }
 
                     renderApp();
                     renderCategoriasSelect();
-
                     showApp();
                 }, (error) => {
                     console.error("Error en nube: ", error);
@@ -143,9 +143,9 @@
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
             } catch (error) {
-                console.error("Error al iniciar sesión:", error);
+                console.error("Error al iniciar sesi&oacute;n:", error);
                 showLogin();
-                loginError.innerText = "Correo o contraseña incorrectos.";
+                loginError.innerText = "Correo o contrase&ntilde;a incorrectos.";
                 loginError.classList.remove('hidden');
             }
         };
@@ -193,34 +193,33 @@
 </head>
 <body class="min-h-screen pb-12">
 
-    <!-- PANTALLA DE LOGIN DE SEGURIDAD (Mail y Contraseña) -->
+    <!-- LOGIN -->
     <div id="loginOverlay" class="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50">
         <div class="card-bg p-8 rounded-2xl max-w-md w-full text-center border border-slate-800 shadow-2xl">
             <div class="w-16 h-16 bg-emerald-950/80 border border-emerald-800/60 rounded-2xl flex items-center justify-center text-emerald-400 mx-auto mb-4 text-2xl">
                 <i class="fa-solid fa-lock"></i>
             </div>
             <h2 class="text-xl font-bold text-white mb-2">Acceso Protegido</h2>
-            <p class="text-xs text-slate-400 mb-6">Ingresá tus credenciales para acceder a tu planilla de gastos.</p>
+            <p class="text-xs text-slate-400 mb-6">Ingres&aacute; tus credenciales para acceder a tu planilla.</p>
             
             <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electrónico</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electr&oacute;nico</label>
                     <input type="email" id="loginEmail" required placeholder="tucorreo@email.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contrase&ntilde;a</label>
                     <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center justify-center gap-2 mt-2">
-                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesi&oacute;n
                 </button>
             </form>
-
             <p id="loginError" class="text-xs text-rose-400 font-medium mt-4 hidden"></p>
         </div>
     </div>
 
-    <!-- PANTALLA DE CARGA (SPINNER) -->
+    <!-- SPINNER -->
     <div id="loadingOverlay" class="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 hidden">
         <div class="text-center">
             <div class="inline-block w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
@@ -228,67 +227,57 @@
         </div>
     </div>
 
-    <!-- CONTENIDO PRINCIPAL DE LA APLICACIÓN -->
+    <!-- APP CONTENT -->
     <div id="appContent" class="hidden">
-        <!-- Header Principal -->
         <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-                
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
                         <i class="fa-solid fa-wallet text-xl"></i>
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Control de Gastos</h1>
-                        <p class="text-xs text-slate-400 font-medium" id="grupoStatus">Proyección y Finanzas Personales</p>
+                        <p class="text-xs text-slate-400 font-medium" id="grupoStatus">Proyecci&oacute;n y Finanzas</p>
                     </div>
                 </div>
 
-                <!-- Navegador de Mes central con Flechas -->
                 <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 shadow-inner">
                     <button onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1 transition text-sm">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center capitalize">
-                        Octubre 2026
-                    </span>
+                    <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center capitalize">Octubre 2026</span>
                     <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1 transition text-sm">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg shadow-emerald-950/50 transition flex items-center gap-2">
+                    <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
                     </button>
-                    <button onclick="openModalConfig()" title="Gestión de Tarjetas y Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
+                    <button onclick="openModalConfig()" title="Configuraci&oacute;n" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                         <i class="fa-solid fa-gear"></i>
                     </button>
-                    <button onclick="cerrarSesion()" title="Cerrar Sesión" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition">
+                    <button onclick="cerrarSesion()" title="Cerrar Sesi&oacute;n" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
-                    <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">
-                        ☁️ Nube
-                    </span>
+                    <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">&#9729; Nube</span>
                 </div>
             </div>
 
-            <!-- Navegación por Pestañas (Solapas) -->
             <div class="flex border-b border-slate-800">
                 <button id="tabPlanillaBtn" onclick="switchTab('planilla')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition tab-btn-active flex items-center gap-2">
                     <i class="fa-solid fa-table-list"></i> Planilla de Gastos
                 </button>
                 <button id="tabGraficosBtn" onclick="switchTab('graficos')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2">
-                    <i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos
+                    <i class="fa-solid fa-chart-pie"></i> An&aacute;lisis y Gr&aacute;ficos
                 </button>
             </div>
         </header>
 
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-
-            <!-- VISTA 1: PLANILLA DE GASTOS -->
+            <!-- VISTA PLANILLA -->
             <div id="vistaPlanilla">
-                <!-- 4 Tarjetas Dashboard Finanzas -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div class="card-bg p-5 rounded-2xl relative">
                         <div class="flex justify-between items-center mb-1">
@@ -298,222 +287,163 @@
                             </button>
                         </div>
                         <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
-                        <p class="text-xs text-slate-500 font-medium">Sueldo disponible en este mes</p>
                     </div>
-
                     <div class="card-bg p-5 rounded-2xl relative">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS FIJOS</span>
-                            <i class="fa-solid fa-house text-slate-600 text-xs"></i>
-                        </div>
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS FIJOS</span>
                         <h2 id="cardGastosFijos" class="text-2xl font-extrabold text-red-accent my-1">$ 0,00</h2>
-                        <p class="text-xs text-slate-500 font-medium">Servicios, impuestos y fijos</p>
                     </div>
-
                     <div class="card-bg p-5 rounded-2xl relative">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">TOTAL TARJETAS</span>
-                            <i class="fa-solid fa-credit-card text-slate-600 text-xs"></i>
-                        </div>
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">TOTAL TARJETAS</span>
                         <h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2>
-                        <p class="text-xs text-slate-500 font-medium">Resumen de tarjetas y cuotas</p>
                     </div>
-
                     <div class="card-bg p-5 rounded-2xl relative">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">RESTO DISPONIBLE</span>
-                            <i class="fa-solid fa-piggy-bank text-slate-600 text-xs"></i>
-                        </div>
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">RESTO DISPONIBLE</span>
                         <h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
-                        <p class="text-xs text-slate-500 font-medium">Sueldo – Gastos Totales</p>
                     </div>
                 </div>
 
-                <!-- Totales por Categoría -->
                 <div class="card-bg p-5 rounded-2xl mb-6">
-                    <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Totales por Categoría / Tarjeta (Mes Actual)</h3>
-                    <div id="containerTotalesCategoria" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                        <!-- Dinámico -->
-                    </div>
+                    <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Totales por Categor&iacute;a (Mes Actual)</h3>
+                    <div id="containerTotalesCategoria" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"></div>
                 </div>
 
-                <!-- Tabla Planilla de Gastos -->
+                <!-- TABLA PRINCIPAL -->
                 <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
                     <div class="px-6 py-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div class="flex items-center gap-3">
                             <h3 class="text-lg font-bold text-white">Planilla de Gastos</h3>
-                            <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">
-                                Octubre 2026
-                            </span>
+                            <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">Octubre 2026</span>
                         </div>
-                        <!-- Filtro Múltiple por Categoría -->
-                        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="containerFiltrosCategoria">
-                            <!-- Dinámico -->
-                        </div>
+                        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="containerFiltrosCategoria"></div>
                     </div>
-                    <p class="px-6 pt-2 pb-4 text-xs text-slate-400">
-                        Modifica o elimina valores: los cambios se aplicarán según tu elección.
-                    </p>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('concepto')">
-                                        CONCEPTO / ÍTEM <i id="sortIcon_concepto" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                                    </th>
-                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('categoria')">
-                                        CATEGORÍA / TARJETA <i id="sortIcon_categoria" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                                    </th>
-                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('tipo')">
-                                        TIPO / CUOTAS <i id="sortIcon_tipo" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                                    </th>
-                                    <th scope="col" class="px-6 py-3.5 text-right cursor-pointer select-none" onclick="sortData('monto')">
-                                        MONTO <i id="sortIcon_monto" class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i>
-                                    </th>
-                                    <th scope="col" class="px-6 py-3.5 text-right">
-                                        ACCIONES
-                                    </th>
+                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('concepto')">CONCEPTO <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
+                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('categoria')">CATEGOR&Iacute;A <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
+                                    <th scope="col" class="px-6 py-3.5">VENCIMIENTO</th>
+                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('tipo')">TIPO / CUOTAS <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
+                                    <th scope="col" class="px-6 py-3.5 text-right cursor-pointer select-none" onclick="sortData('monto')">MONTO <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
+                                    <th scope="col" class="px-6 py-3.5 text-center">ESTADO</th>
+                                    <th scope="col" class="px-6 py-3.5 text-right">ACCIONES</th>
                                 </tr>
                             </thead>
-                            <tbody id="tablaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium">
-                                <!-- Carga dinámica -->
-                            </tbody>
+                            <tbody id="tablaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- VISTA 2: ANÁLISIS Y GRÁFICOS -->
+            <!-- VISTA GRAFICOS -->
             <div id="vistaGraficos" class="hidden space-y-6">
-                
-                <!-- Fila 1: Comparativas de Evolución Mes a Mes (7 Meses) -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Gráfico A: Evolución de Gastos Totales -->
-                    <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <div class="card-bg p-6 rounded-2xl">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                                <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales (7 Meses)
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-emerald-400"></i> Evoluci&oacute;n Gastos Totales (7 Meses)
                             </h3>
-                            <span class="text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">
+                            <button onclick="changeChartRange(-3)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition">
                                 -3 Meses / +3 Meses
-                            </span>
+                            </button>
                         </div>
-                        <div class="relative h-64 w-full">
-                            <canvas id="chartEvolucionTotales"></canvas>
-                        </div>
+                        <div class="relative h-64 w-full"><canvas id="chartEvolucionTotales"></canvas></div>
                     </div>
 
-                    <!-- Gráfico B: Evolución por Categoría Mes a Mes -->
-                    <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <div class="card-bg p-6 rounded-2xl">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                                <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría (7 Meses)
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-area text-blue-400"></i> Evoluci&oacute;n por Categor&iacute;a (7 Meses)
                             </h3>
-                            <span class="text-[10px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">
+                            <button onclick="changeChartRange(-3)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition">
                                 -3 Meses / +3 Meses
-                            </span>
+                            </button>
                         </div>
-                        <div class="relative h-64 w-full">
-                            <canvas id="chartEvolucionCategorias"></canvas>
-                        </div>
+                        <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
                     </div>
-                </div>
 
-                <!-- Fila 2: Distribución y Proporciones del Mes Seleccionado -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Gráfico 1: Gastos por Categoría -->
-                    <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
-                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-emerald-400"></i> Distribución del Mes por Categoría
+                    <div class="card-bg p-6 rounded-2xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto - 7 Meses)
+                            </h3>
+                            <button onclick="changeChartRange(-3)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition">
+                                -3 Meses / +3 Meses
+                            </button>
+                        </div>
+                        <div class="relative h-64 w-full"><canvas id="chartBalanceGeneral"></canvas></div>
+                    </div>
+
+                    <div class="card-bg p-6 rounded-2xl">
+                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-cyan-400"></i> Distribuci&oacute;n del Mes por Categor&iacute;a
                         </h3>
-                        <div class="relative h-64 flex items-center justify-center">
-                            <canvas id="chartCategorias"></canvas>
-                        </div>
+                        <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartDistribucionCategoria"></canvas></div>
                     </div>
 
-                    <!-- Gráfico 2: Gastos Fijos vs. Tarjetas -->
-                    <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
-                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-doughnut text-indigo-400"></i> Gastos Fijos vs. Tarjetas (Mes Actual)
+                    <div class="card-bg p-6 rounded-2xl">
+                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-indigo-400"></i> Gastos Fijos vs. Tarjetas (Mes Actual)
                         </h3>
-                        <div class="relative h-64 flex items-center justify-center">
-                            <canvas id="chartTipos"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Fila 3: Balance Ingreso vs Gastos del Mes Actual -->
-                <div class="card-bg p-6 rounded-2xl">
-                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-column text-emerald-400"></i> Balance del Mes Actual (Ingreso vs. Gastos)
-                    </h3>
-                    <div class="relative h-64 w-full">
-                        <canvas id="chartBalance"></canvas>
+                        <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartFijosVsTarjetas"></canvas></div>
                     </div>
                 </div>
             </div>
-
         </main>
     </div>
 
-    <!-- Modal Gestión de Tarjetas y Categorías -->
+    <!-- MODAL CONFIG -->
     <div id="modalConfig" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative max-h-[90vh] flex flex-col">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">Gestión de Tarjetas y Categorías</h3>
-                <button type="button" onclick="closeModal('modalConfig')" class="text-slate-400 hover:text-white text-lg">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <h3 class="text-lg font-bold">Gesti&oacute;n de Categor&iacute;as</h3>
+                <button type="button" onclick="closeModal('modalConfig')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
-
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">AGREGAR NUEVA TARJETA / CATEGORÍA</label>
+            
+            <div class="space-y-3 mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800">
                 <div class="flex items-center gap-2">
-                    <input type="text" id="nuevaCatNombre" placeholder="Ej: Tarjeta Visa Galicia" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <input type="color" id="nuevaCatColor" value="#3b82f6" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer p-1">
-                    <button onclick="agregarCategoria()" class="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow transition">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <input type="text" id="nuevaCatNombre" placeholder="Nueva categor&iacute;a..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                    <input type="color" id="nuevaCatColor" value="#3b82f6" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoria()" class="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center" title="Agregar"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div class="flex items-center gap-2 pl-1">
+                    <input type="checkbox" id="nuevaCatEsTarjeta" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-emerald-500" checked>
+                    <label for="nuevaCatEsTarjeta" class="text-xs font-semibold text-slate-300 cursor-pointer">&iquest;Es tarjeta o comparte vencimiento &uacute;nico en bloque?</label>
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto pr-1">
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">TARJETAS Y CATEGORÍAS EXISTENTES</label>
-                <div id="listaCategoriasConfig" class="space-y-2.5">
-                    <!-- Dinámico -->
-                </div>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
-                <button onclick="restaurarCategoriasDefault()" class="text-rose-400 hover:text-rose-300 font-medium">
-                    Restablecer datos iniciales
-                </button>
-                <button onclick="closeModal('modalConfig')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 font-medium">
-                    Cerrar
-                </button>
-            </div>
+            <div id="listaCategoriasConfig" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
         </div>
     </div>
 
-    <!-- Modal Modificar Sueldo -->
+    <!-- MODAL SUELDO -->
     <div id="modalSueldo" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-        <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700">
-            <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-pen text-emerald-400"></i> Modificar Sueldo del Mes</h3>
-            <form id="formSueldo" onsubmit="handleSaveSueldo(event)">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Modificar Sueldo / Ingreso</h3>
+                <button type="button" onclick="closeModal('modalSueldo')" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSaveSueldo(event)">
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Monto del Sueldo ($)</label>
-                    <input type="number" step="0.01" id="sueldoMonto" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">MONTO INGRESO ($)</label>
+                    <input type="number" step="0.01" id="sueldoMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
-                <div class="flex justify-end gap-2 mt-6">
-                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium">Cancelar</button>
-                    <button type="submit" class="px-5 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 text-sm font-semibold shadow-lg shadow-emerald-950">Guardar</button>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-sm font-medium transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition text-sm">
+                        Guardar
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal Registrar/Editar Gasto -->
+    <!-- MODAL NUEVO/EDITAR GASTO -->
     <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
             <div class="flex justify-between items-center mb-5">
@@ -533,26 +463,23 @@
 
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">CATEGORÍA / TARJETA</label>
-                        <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <!-- Dinámico -->
-                        </select>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">CATEGOR&Iacute;A / TARJETA</label>
+                        <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-2">MONTO ($)</label>
-                        <input type="number" step="0.01" id="gastoMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <input type="number" step="0.01" id="gastoMonto" oninput="calcularValorCuota()" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
                 </div>
 
-                <div id="containerCheckSoloEsteMes" class="mb-4 hidden p-3 rounded-xl bg-slate-900/80 border border-emerald-900/50">
-                    <label class="flex items-center gap-3 cursor-pointer select-none text-xs font-semibold text-emerald-300">
-                        <input type="checkbox" id="checkSoloEsteMes" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
-                        Aplicar este cambio ÚNICAMENTE para el mes actual (<span id="labelMesActualCheck"></span>)
-                    </label>
+                <!-- FECHA DE VENCIMIENTO INICIAL -->
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">FECHA DE VENCIMIENTO (OPCIONAL)</label>
+                    <input type="date" id="gastoVencimiento" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QUÉ MES EMPIEZA</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QU&Eacute; MES EMPIEZA</label>
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
@@ -562,47 +489,43 @@
                         <i class="fa-solid fa-credit-card text-emerald-400 mr-1"></i> Opciones de Tarjeta / Pago
                     </span>
 
-                    <!-- Checkbox de Débito Automático -->
                     <div>
                         <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
-                            <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
-                            🔄 Débito Automático
+                            <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
+                            <i class="fa-solid fa-rotate text-emerald-400"></i> D&eacute;bito Autom&aacute;tico / Recurrente
                         </label>
                         <p class="text-[11px] text-slate-400 mt-0.5 ml-7">
-                            Tildalo si este gasto se debita todos los meses. Si no lo tildás, aparecerá únicamente en el mes seleccionado.
+                            Tildalo si este gasto se debita todos los meses. Si es fijo/servicio se propaga sumando un mes a su vencimiento autom&aacute;ticamente.
                         </p>
                     </div>
 
                     <hr class="border-slate-800">
 
-                    <!-- Checkbox de Cuotas -->
                     <div>
                         <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
-                            <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
-                            ¿Es una compra en Cuotas?
+                            <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
+                            &iquest;Es una compra en Cuotas?
                         </label>
                     </div>
 
-                    <!-- Campos Desplegables de Cuotas -->
-                    <div id="sectionCuotas" class="hidden grid grid-cols-2 gap-3 pt-2">
+                    <div id="sectionCuotas" class="hidden pt-1 space-y-2">
                         <div>
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CANTIDAD DE CUOTAS</label>
-                            <input type="number" id="gastoCuotas" value="1" min="1" max="60" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <input type="number" id="gastoCuotas" value="1" min="1" max="60" oninput="calcularValorCuota()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">VALOR POR CUOTA</label>
-                            <div id="montoCalculadoCuota" class="px-3 py-2 text-sm font-bold text-emerald-400 bg-slate-950 border border-slate-700 rounded-lg">
-                                $ 0,00
-                            </div>
+                        <div id="infoCuotaCalculada" class="text-xs text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-900/50 p-2 rounded-lg hidden flex items-center gap-2">
+                            <i class="fa-solid fa-lightbulb text-emerald-400"></i>
+                            <span id="textoInfoCuota"></span>
                         </div>
                     </div>
                 </div>
 
+                <!-- BOTONES DE ACCI&Oacute;N -->
                 <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium">
+                    <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium transition">
                         Cancelar
                     </button>
-                    <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 text-sm font-bold shadow-lg shadow-emerald-950/50">
+                    <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 text-sm font-bold shadow-lg shadow-emerald-950/50 transition">
                         Guardar Gasto
                     </button>
                 </div>
@@ -610,16 +533,16 @@
         </div>
     </div>
 
-    <!-- Logic Script -->
+    <!-- LOGIC SCRIPT -->
     <script>
         const categoriasDefault = [
-            { nombre: "Gasto Fijo", color: "#ef4444" },
-            { nombre: "Servicios", color: "#f97316" },
-            { nombre: "Visa Galicia", color: "#3b82f6" },
-            { nombre: "Mastercard", color: "#8b5cf6" },
-            { nombre: "AMEX", color: "#10b981" },
-            { nombre: "Mercado Pago", color: "#06b6d4" },
-            { nombre: "Otros", color: "#64748b" }
+            { nombre: "Gasto Fijo", color: "#ef4444", esTarjeta: false },
+            { nombre: "Servicios", color: "#f97316", esTarjeta: false },
+            { nombre: "Visa Santander", color: "#3b82f6", esTarjeta: true },
+            { nombre: "Mastercard", color: "#8b5cf6", esTarjeta: true },
+            { nombre: "AMEX", color: "#10b981", esTarjeta: true },
+            { nombre: "Mercado Pago", color: "#06b6d4", esTarjeta: true },
+            { nombre: "Otros", color: "#64748b", esTarjeta: true }
         ];
 
         window.appState = window.appState || {
@@ -627,91 +550,103 @@
             gastos: [],
             excepcionesMonto: {},
             excepcionesCategoria: {},
+            excepcionesVencimiento: {},
+            excepcionesEstado: {},
             sueldos: {},
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
             sortAscending: true
         };
 
-        // Filtro estrictamente local y temporal (nunca se guarda en la nube)
         window.filtrosTemporales = [];
+        let chartOffsetMonths = 0; 
+        let chartInstTotales = null;
+        let chartInstEvolCat = null;
+        let chartInstBalance = null;
+        let chartInstDistribucion = null;
+        let chartInstFijosVsTarjetas = null;
 
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-        // Instancias de Chart.js
-        let chartCatInstance = null;
-        let chartTiposInstance = null;
-        let chartBalanceInstance = null;
-        let chartEvolucionTotalesInstance = null;
-        let chartEvolucionCategoriasInstance = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!window.appState.categorias || window.appState.categorias.length === 0) {
                 window.appState.categorias = JSON.parse(JSON.stringify(categoriasDefault));
             }
-            document.getElementById('gastoMonto').addEventListener('input', updateCuotaDisplay);
-            document.getElementById('gastoCuotas').addEventListener('input', updateCuotaDisplay);
         });
 
         function switchTab(tabName) {
-            const vistaPlanilla = document.getElementById('vistaPlanilla');
-            const vistaGraficos = document.getElementById('vistaGraficos');
-            const tabPlanillaBtn = document.getElementById('tabPlanillaBtn');
-            const tabGraficosBtn = document.getElementById('tabGraficosBtn');
-
-            if (tabName === 'planilla') {
-                vistaPlanilla.classList.remove('hidden');
-                vistaGraficos.classList.add('hidden');
-                tabPlanillaBtn.classList.add('tab-btn-active');
-                tabGraficosBtn.classList.remove('tab-btn-active');
-            } else {
-                vistaPlanilla.classList.add('hidden');
-                vistaGraficos.classList.remove('hidden');
-                tabGraficosBtn.classList.add('tab-btn-active');
-                tabPlanillaBtn.classList.remove('tab-btn-active');
-                renderGraficos();
+            document.getElementById('vistaPlanilla').classList.toggle('hidden', tabName !== 'planilla');
+            document.getElementById('vistaGraficos').classList.toggle('hidden', tabName !== 'graficos');
+            document.getElementById('tabPlanillaBtn').classList.toggle('tab-btn-active', tabName === 'planilla');
+            document.getElementById('tabGraficosBtn').classList.toggle('tab-btn-active', tabName === 'graficos');
+            
+            if (tabName === 'graficos') {
+                setTimeout(() => renderCharts(), 100);
             }
         }
 
-        function openModalConfig() {
-            renderCategoriasConfigList();
-            document.getElementById('modalConfig').classList.remove('hidden');
+        function changeChartRange(delta) {
+            chartOffsetMonths += delta;
+            renderCharts();
         }
 
+        function openModalConfig() { renderCategoriasConfigList(); document.getElementById('modalConfig').classList.remove('hidden'); }
+        
         function renderCategoriasConfigList() {
             const container = document.getElementById('listaCategoriasConfig');
             container.innerHTML = '';
-            
             (window.appState.categorias || []).forEach((cat, index) => {
                 const div = document.createElement('div');
-                div.className = "flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800";
+                div.className = "p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2";
                 div.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <span class="w-4 h-4 rounded-full inline-block shadow" style="background-color: ${cat.color};"></span>
-                        <span class="text-sm font-bold text-white">${cat.nombre}</span>
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-1">
+                            <input type="color" value="${cat.color}" onchange="actualizarCatCampo(${index}, 'color', this.value)" class="w-8 h-8 rounded bg-slate-900 border border-slate-800 cursor-pointer p-0.5">
+                            <input type="text" value="${cat.nombre}" onchange="actualizarCatCampo(${index}, 'nombre', this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                        </div>
+                        <button onclick="eliminarCategoria(${index})" class="text-rose-400 hover:text-rose-300 p-2" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
                     </div>
-                    <button onclick="eliminarCategoria(${index})" class="text-slate-500 hover:text-rose-400 transition" title="Eliminar">
-                        <i class="fa-solid fa-trash-can text-sm"></i>
-                    </button>
+                    <div class="flex items-center gap-2 pl-1">
+                        <input type="checkbox" id="catBloque_${index}" ${cat.esTarjeta ? 'checked' : ''} onchange="actualizarCatCampo(${index}, 'esTarjeta', this.checked)" class="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
+                        <label for="catBloque_${index}" class="text-[11px] text-slate-400 cursor-pointer flex items-center gap-1.5">
+                            <i class="fa-solid ${cat.esTarjeta ? 'fa-credit-card text-emerald-400' : 'fa-thumbtack text-slate-400'}"></i>
+                            ${cat.esTarjeta ? 'Vencimiento &uacute;nico en bloque' : 'Vencimiento individual'}
+                        </label>
+                    </div>
                 `;
                 container.appendChild(div);
             });
         }
 
+        window.actualizarCatCampo = function(index, campo, valor) {
+            if (!window.appState.categorias[index]) return;
+            const nombreAnterior = window.appState.categorias[index].nombre;
+            
+            if (campo === 'nombre') {
+                const nuevoNombre = valor.trim();
+                if (!nuevoNombre) return;
+                (window.appState.gastos || []).forEach(g => {
+                    if (g.categoria === nombreAnterior) g.categoria = nuevoNombre;
+                });
+                window.appState.categorias[index].nombre = nuevoNombre;
+            } else {
+                window.appState.categorias[index][campo] = valor;
+            }
+
+            window.saveDataToCloud();
+            renderCategoriasSelect();
+            renderFiltrosCategoriasCheckboxes();
+            renderApp();
+        };
+
         function agregarCategoria() {
-            const nombreInput = document.getElementById('nuevaCatNombre');
-            const colorInput = document.getElementById('nuevaCatColor');
-            const nombre = nombreInput.value.trim();
-            const color = colorInput.value;
-
+            const nombre = document.getElementById('nuevaCatNombre').value.trim();
+            const color = document.getElementById('nuevaCatColor').value;
+            const esTarjeta = document.getElementById('nuevaCatEsTarjeta').checked;
             if (!nombre) return;
-
-            if (!window.appState.categorias) window.appState.categorias = [];
-            window.appState.categorias.push({ nombre, color });
-
-            nombreInput.value = '';
-            colorInput.value = '#3b82f6';
-
+            window.appState.categorias.push({ nombre, color, esTarjeta });
+            document.getElementById('nuevaCatNombre').value = '';
+            document.getElementById('nuevaCatEsTarjeta').checked = true;
             window.saveDataToCloud();
             renderCategoriasConfigList();
             renderCategoriasSelect();
@@ -719,10 +654,7 @@
         }
 
         function eliminarCategoria(index) {
-            if (window.appState.categorias.length <= 1) {
-                alert("Debes tener al menos una categoría.");
-                return;
-            }
+            if (window.appState.categorias.length <= 1) return alert("M&iacute;nimo una categor&iacute;a.");
             window.appState.categorias.splice(index, 1);
             window.saveDataToCloud();
             renderCategoriasConfigList();
@@ -730,26 +662,14 @@
             renderFiltrosCategoriasCheckboxes();
         }
 
-        function restaurarCategoriasDefault() {
-            if (confirm("¿Estás seguro de restablecer las categorías iniciales?")) {
-                window.appState.categorias = JSON.parse(JSON.stringify(categoriasDefault));
-                window.saveDataToCloud();
-                renderCategoriasConfigList();
-                renderCategoriasSelect();
-                renderFiltrosCategoriasCheckboxes();
-            }
-        }
-
         function renderCategoriasSelect() {
             const select = document.getElementById('gastoCategoria');
             if (!select) return;
             const currentVal = select.value;
             select.innerHTML = '';
-            
             (window.appState.categorias || categoriasDefault).forEach(cat => {
                 const opt = document.createElement('option');
-                opt.value = cat.nombre;
-                opt.innerText = cat.nombre;
+                opt.value = cat.nombre; opt.innerText = cat.nombre;
                 select.appendChild(opt);
             });
             if (currentVal) select.value = currentVal;
@@ -760,81 +680,60 @@
             const container = document.getElementById('containerFiltrosCategoria');
             if (!container) return;
             container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1 whitespace-nowrap">Filtrar:</span>`;
-
             const catList = window.appState.categorias || categoriasDefault;
-            if (!window.filtrosTemporales) {
-                window.filtrosTemporales = [];
-            }
-
             catList.forEach(cat => {
                 const isChecked = window.filtrosTemporales.length === 0 || window.filtrosTemporales.includes(cat.nombre);
-                
                 const label = document.createElement('label');
-                label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 whitespace-nowrap select-none ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
-                label.innerHTML = `
-                    <input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroCategoria(this)" class="hidden">
-                    <span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>
-                    ${cat.nombre}
-                `;
+                label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                label.innerHTML = `<input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}`;
                 container.appendChild(label);
             });
         }
 
         function toggleFiltroCategoria(checkbox) {
             const catNombre = checkbox.value;
-            if (!window.filtrosTemporales) {
-                window.filtrosTemporales = [];
-            }
-
             const catList = window.appState.categorias || categoriasDefault;
-
-            if (window.filtrosTemporales.length === 0) {
-                window.filtrosTemporales = catList.map(c => c.nombre);
-            }
-
-            if (checkbox.checked) {
-                if (!window.filtrosTemporales.includes(catNombre)) {
-                    window.filtrosTemporales.push(catNombre);
-                }
-            } else {
-                window.filtrosTemporales = window.filtrosTemporales.filter(c => c !== catNombre);
-            }
-
-            if (window.filtrosTemporales.length === catList.length) {
-                window.filtrosTemporales = [];
-            }
-
+            if (window.filtrosTemporales.length === 0) window.filtrosTemporales = catList.map(c => c.nombre);
+            if (checkbox.checked) { if (!window.filtrosTemporales.includes(catNombre)) window.filtrosTemporales.push(catNombre); }
+            else { window.filtrosTemporales = window.filtrosTemporales.filter(c => c !== catNombre); }
+            if (window.filtrosTemporales.length === catList.length) window.filtrosTemporales = [];
             renderFiltrosCategoriasCheckboxes();
             renderApp();
         }
 
         function toggleCuotasFields() {
             const isChecked = document.getElementById('checkCuotas').checked;
-            const sec = document.getElementById('sectionCuotas');
-            const checkRecurrente = document.getElementById('checkRecurrente');
-            
+            document.getElementById('sectionCuotas').classList.toggle('hidden', !isChecked);
             if (isChecked) {
-                sec.classList.remove('hidden');
-                checkRecurrente.checked = false;
-            } else {
-                sec.classList.add('hidden');
-                document.getElementById('gastoCuotas').value = 1;
+                document.getElementById('checkRecurrente').checked = false;
             }
-            updateCuotaDisplay();
+            calcularValorCuota();
         }
 
-        function updateCuotaDisplay() {
-            const totalMonto = parseFloat(document.getElementById('gastoMonto').value) || 0;
-            const cuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
-            const cuotaVal = totalMonto / cuotas;
-            document.getElementById('montoCalculadoCuota').innerText = "$ " + cuotaVal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        function calcularValorCuota() {
+            const isCuotas = document.getElementById('checkCuotas').checked;
+            const infoBox = document.getElementById('infoCuotaCalculada');
+            const textoInfo = document.getElementById('textoInfoCuota');
+            if (!isCuotas) {
+                infoBox.classList.add('hidden');
+                return;
+            }
+            const montoTotal = parseFloat(document.getElementById('gastoMonto').value) || 0;
+            const cantCuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
+            if (montoTotal > 0 && cantCuotas > 0) {
+                const valorCuota = montoTotal / cantCuotas;
+                const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                textoInfo.innerHTML = `Valor de cada cuota: <strong>${fmt(valorCuota)}</strong> (${cantCuotas} cuotas)`;
+                infoBox.classList.remove('hidden');
+            } else {
+                infoBox.classList.add('hidden');
+            }
         }
 
         function navigateMonth(direction) {
             let [year, month] = window.appState.currentMonth.split('-').map(Number);
             month += direction;
-            if (month > 12) { month = 1; year++; }
-            if (month < 1) { month = 12; year--; }
+            if (month > 12) { month = 1; year++; } if (month < 1) { month = 12; year--; }
             window.appState.currentMonth = `${year}-${String(month).padStart(2, '0')}`;
             renderApp();
         }
@@ -844,562 +743,508 @@
             return `${monthNames[month - 1]} ${year}`;
         }
 
-        function getMonthOffset(ymStr, offset) {
-            let [year, month] = ymStr.split('-').map(Number);
-            month += offset;
-            while (month > 12) { month -= 12; year--; }
-            while (month < 1) { month += 12; year--; }
-            return `${year}-${String(month).padStart(2, '0')}`;
-        }
-
         function sortData(col) {
-            if (window.appState.sortColumn === col) {
-                window.appState.sortAscending = !window.appState.sortAscending;
-            } else {
-                window.appState.sortColumn = col;
-                window.appState.sortAscending = true;
-            }
+            if (window.appState.sortColumn === col) window.appState.sortAscending = !window.appState.sortAscending;
+            else { window.appState.sortColumn = col; window.appState.sortAscending = true; }
             renderApp();
         }
 
         function getSueldoForMonth(targetMonth) {
             const sueldos = window.appState.sueldos || {};
-            if (sueldos[targetMonth] !== undefined) {
-                return parseFloat(sueldos[targetMonth]) || 0;
-            }
+            if (sueldos[targetMonth] !== undefined) return parseFloat(sueldos[targetMonth]) || 0;
             let keys = Object.keys(sueldos).sort();
             let sueldoAplicar = 0;
-            for (let k of keys) {
-                if (k <= targetMonth) {
-                    sueldoAplicar = parseFloat(sueldos[k]) || 0;
-                } else {
-                    break;
-                }
-            }
+            for (let k of keys) { if (k <= targetMonth) sueldoAplicar = parseFloat(sueldos[k]) || 0; else break; }
             return sueldoAplicar;
+        }
+
+        function sumarUnMesAFecha(fechaStr) {
+            if (!fechaStr) return '';
+            const partes = fechaStr.split('-');
+            if (partes.length !== 3) return '';
+            let y = parseInt(partes[0]);
+            let m = parseInt(partes[1]);
+            let d = parseInt(partes[2]);
+            m += 1;
+            if (m > 12) { m = 1; y += 1; }
+            const ultimoDiaMes = new Date(y, m, 0).getDate();
+            if (d > ultimoDiaMes) d = ultimoDiaMes;
+            return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         }
 
         function getCalculatedDataForMonth(targetMonth) {
             const sueldoActual = getSueldoForMonth(targetMonth);
             let items = [];
-            let totalFijos = 0;
-            let totalTarjetas = 0;
+            let totalFijos = 0, totalTarjetas = 0;
             let totalesPorCat = {};
+            (window.appState.categorias || categoriasDefault).forEach(cat => totalesPorCat[cat.nombre] = 0);
 
-            (window.appState.categorias || categoriasDefault).forEach(cat => {
-                totalesPorCat[cat.nombre] = 0;
-            });
+            const hoyStr = new Date().toISOString().slice(0, 10);
 
             (window.appState.gastos || []).forEach(gasto => {
                 const excepcionCatKey = `${gasto.id}_${targetMonth}`;
-                const categoriaAplicar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
-                    ? window.appState.excepcionesCategoria[excepcionCatKey]
-                    : gasto.categoria;
-
-                const startYM = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : targetMonth);
-                const excepcionKey = `${gasto.id}_${targetMonth}`;
-                const montoAplicar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
-                    ? window.appState.excepcionesMonto[excepcionKey]
-                    : parseFloat(gasto.monto);
-
+                const categoriaAplicar = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
+                const startYM = gasto.startMonth || targetMonth;
+                const excepcionMontoKey = `${gasto.id}_${targetMonth}`;
+                const montoAplicar = window.appState.excepcionesMonto?.[excepcionMontoKey] ?? parseFloat(gasto.monto);
+                
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
                 const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
                 const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
-                
-                // Si la categoría contiene 'Fijo' o 'Servicios', se propaga automáticamente como recurrente
                 const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
 
                 let generatedItems = [];
-
                 if (totalCuotas > 1) {
                     const montoCuota = montoAplicar / totalCuotas;
                     const [sYear, sMonth] = startYM.split('-').map(Number);
-
                     for (let i = 0; i < totalCuotas; i++) {
-                        let fYear = sYear;
-                        let fMonth = sMonth + i;
-                        while (fMonth > 12) {
-                            fMonth -= 12;
-                            fYear++;
-                        }
+                        let fYear = sYear, fMonth = sMonth + i;
+                        while (fMonth > 12) { fMonth -= 12; fYear++; }
                         let mStr = `${fYear}-${String(fMonth).padStart(2, '0')}`;
-
                         if (mStr === targetMonth) {
-                            generatedItems.push({
-                                id: gasto.id,
-                                concepto: gasto.concepto,
-                                categoria: categoriaAplicar,
-                                tipo: `Cuota ${i + 1}/${totalCuotas}`,
-                                monto: montoCuota
-                            });
+                            let vencFinal = gasto.vencimiento || '';
+                            for (let step = 0; step < i; step++) {
+                                vencFinal = sumarUnMesAFecha(vencFinal);
+                            }
+                            const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
+                            const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] ?? vencFinal;
+
+                            const estadoKey = `${gasto.id}_${targetMonth}`;
+                            const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
+                            
+                            let estadoAplicar = 'PENDIENTE';
+                            if (estadoGuardado === 'PAGADO') {
+                                estadoAplicar = 'PAGADO';
+                            } else if (estadoGuardado === 'VENCIDO') {
+                                estadoAplicar = 'VENCIDO';
+                            } else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) {
+                                estadoAplicar = 'VENCIDO';
+                            }
+
+                            generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: `Cuota ${i + 1}/${totalCuotas}`, monto: montoCuota, vencimiento: vencimientoAplicar, estado: estadoAplicar });
                         }
                     }
                 } else if (isRecurrente) {
                     if (targetMonth >= startYM) {
-                        const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'Débito Automático';
-                        generatedItems.push({
-                            id: gasto.id,
-                            concepto: gasto.concepto,
-                            categoria: categoriaAplicar,
-                            tipo: tipoStr,
-                            monto: montoAplicar
-                        });
+                        const [sY, sM] = startYM.split('-').map(Number);
+                        const [tY, tM] = targetMonth.split('-').map(Number);
+                        const diffMeses = (tY - sY) * 12 + (tM - sM);
+
+                        let vencCalculado = gasto.vencimiento || '';
+                        for (let step = 0; step < diffMeses; step++) {
+                            vencCalculado = sumarUnMesAFecha(vencCalculado);
+                        }
+
+                        const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
+                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] ?? vencCalculado;
+
+                        const estadoKey = `${gasto.id}_${targetMonth}`;
+                        const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
+                        
+                        let estadoAplicar = 'PENDIENTE';
+                        if (estadoGuardado === 'PAGADO') {
+                            estadoAplicar = 'PAGADO';
+                        } else if (estadoGuardado === 'VENCIDO') {
+                            estadoAplicar = 'VENCIDO';
+                        } else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) {
+                            estadoAplicar = 'VENCIDO';
+                        }
+
+                        const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'D&eacute;bito Autom&aacute;tico';
+                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
                     }
                 } else {
                     if (targetMonth === startYM) {
-                        generatedItems.push({
-                            id: gasto.id,
-                            concepto: gasto.concepto,
-                            categoria: categoriaAplicar,
-                            tipo: 'Débito',
-                            monto: montoAplicar
-                        });
+                        const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
+                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] ?? gasto.vencimiento ?? '';
+
+                        const estadoKey = `${gasto.id}_${targetMonth}`;
+                        const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
+                        
+                        let estadoAplicar = 'PENDIENTE';
+                        if (estadoGuardado === 'PAGADO') {
+                            estadoAplicar = 'PAGADO';
+                        } else if (estadoGuardado === 'VENCIDO') {
+                            estadoAplicar = 'VENCIDO';
+                        } else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) {
+                            estadoAplicar = 'VENCIDO';
+                        }
+
+                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'D&eacute;bito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
                     }
                 }
 
                 generatedItems.forEach(gi => {
-                    if (baseEsFijo || catEsFijo || gi.tipo.includes('Recurrente') || gi.tipo.includes('Débito Automático')) {
-                        totalFijos += gi.monto;
-                    } else {
-                        totalTarjetas += gi.monto;
-                    }
-
-                    if (totalesPorCat[gi.categoria] !== undefined) {
-                        totalesPorCat[gi.categoria] += gi.monto;
-                    } else {
-                        totalesPorCat[gi.categoria] = gi.monto;
-                    }
-
+                    if (baseEsFijo || catEsFijo || gi.tipo.includes('Recurrente') || gi.tipo.includes('D&eacute;bito Autom&aacute;tico')) totalFijos += gi.monto;
+                    else totalTarjetas += gi.monto;
+                    if (totalesPorCat[gi.categoria] !== undefined) totalesPorCat[gi.categoria] += gi.monto;
                     items.push(gi);
                 });
             });
-
             return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
         }
 
         function renderApp() {
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
-            const monthFormatted = formatMonthDisplay(currentMonth);
-
-            document.getElementById('displayMonthText').innerText = monthFormatted;
-            document.getElementById('badgeMonth').innerText = monthFormatted;
+            document.getElementById('displayMonthText').innerText = formatMonthDisplay(currentMonth);
+            document.getElementById('badgeMonth').innerText = formatMonthDisplay(currentMonth);
 
             const { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             const containerTotales = document.getElementById('containerTotalesCategoria');
             containerTotales.innerHTML = '';
-            
-            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
             Object.keys(totalesPorCat).forEach(catNombre => {
-                const montoCat = totalesPorCat[catNombre];
-                if (montoCat <= 0) return;
-
+                if (totalesPorCat[catNombre] <= 0) return;
                 const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === catNombre);
                 const colorCat = catObj ? catObj.color : '#475569';
-
-                const cardDiv = document.createElement('div');
-                cardDiv.className = "card-bg p-3 rounded-xl border border-slate-800/80 flex flex-col justify-between";
-                cardDiv.innerHTML = `
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${colorCat};"></span>
-                        <span class="text-[11px] font-bold text-slate-300 truncate" title="${catNombre}">${catNombre}</span>
-                    </div>
-                    <span class="text-sm font-extrabold text-white mt-1">${fmt(montoCat)}</span>
-                `;
-                containerTotales.appendChild(cardDiv);
+                containerTotales.innerHTML += `<div class="card-bg p-3 rounded-xl border border-slate-800 flex flex-col justify-between"><div class="flex items-center gap-2 mb-1"><span class="w-2.5 h-2.5 rounded-full" style="background-color: ${colorCat};"></span><span class="text-[11px] font-bold text-slate-300 truncate">${catNombre}</span></div><span class="text-sm font-extrabold text-white">${fmt(totalesPorCat[catNombre])}</span></div>`;
             });
 
             let itemsFiltrados = items;
-            const filtrosActivos = window.filtrosTemporales || [];
-            if (filtrosActivos.length > 0) {
-                itemsFiltrados = items.filter(item => filtrosActivos.includes(item.categoria));
-            }
+            if (window.filtrosTemporales?.length > 0) itemsFiltrados = items.filter(item => window.filtrosTemporales.includes(item.categoria));
 
-            const col = window.appState.sortColumn;
-            const asc = window.appState.sortAscending;
+            const col = window.appState.sortColumn, asc = window.appState.sortAscending;
             itemsFiltrados.sort((a, b) => {
-                let valA = a[col] || '';
-                let valB = b[col] || '';
-                if (typeof valA === 'string') {
-                    return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                } else {
-                    return asc ? valA - valB : valB - valA;
-                }
+                let vA = a[col] || '', vB = b[col] || '';
+                return typeof vA === 'string' ? (asc ? vA.localeCompare(vB) : vB.localeCompare(vA)) : (asc ? vA - vB : vB - vA);
             });
-
-            const totalGastos = totalFijos + totalTarjetas;
-            const resto = sueldoActual - totalGastos;
 
             document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
             document.getElementById('cardGastosFijos').innerText = fmt(totalFijos);
             document.getElementById('cardTarjetas').innerText = fmt(totalTarjetas);
-            document.getElementById('cardResto').innerText = fmt(resto);
+            document.getElementById('cardResto').innerText = fmt(sueldoActual - (totalFijos + totalTarjetas));
 
             const tbody = document.getElementById('tablaCuerpo');
             tbody.innerHTML = '';
 
             if (itemsFiltrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500 font-normal">No hay movimientos en este mes con los filtros seleccionados.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-slate-500">No hay movimientos en este mes con los filtros seleccionados.</td></tr>`;
             } else {
                 itemsFiltrados.forEach(item => {
                     const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === item.categoria);
                     const colorCat = catObj ? catObj.color : '#475569';
+                    const vencimientoInputHtml = `<input type="date" value="${item.vencimiento || ''}" onchange="actualizarVencimientoGrilla('${item.id}', '${item.categoria}', this.value)" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">`;
 
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-slate-900/40 transition-colors";
-                    tr.innerHTML = `
-                        <td class="px-6 py-4 text-white font-bold">${item.concepto}</td>
-                        <td class="px-6 py-4">
-                            <span class="px-3 py-1 rounded-lg text-xs font-semibold text-white border border-slate-700 inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;">
-                                <span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>
-                                ${item.categoria}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-slate-400 text-xs">${item.tipo}</td>
-                        <td class="px-6 py-4 text-right font-extrabold text-white">${fmt(item.monto)}</td>
-                        <td class="px-6 py-4 text-right">
-                            <button onclick="editGasto('${item.id}')" class="text-slate-400 hover:text-white mr-3 transition" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
-                            <button onclick="deleteGasto('${item.id}')" class="text-slate-400 hover:text-rose-400 transition" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
-                        </td>
+                    let estadoColorClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+                    if (item.estado === 'PAGADO') estadoColorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+                    if (item.estado === 'VENCIDO') estadoColorClass = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+
+                    const estadoSelectHtml = `
+                        <select onchange="actualizarEstadoGrilla('${item.id}', '${item.categoria}', this.value)" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs font-semibold ${estadoColorClass} focus:outline-none">
+                            <option value="PENDIENTE" ${item.estado === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
+                            <option value="PAGADO" ${item.estado === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
+                            <option value="VENCIDO" ${item.estado === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
+                        </select>
                     `;
-                    tbody.appendChild(tr);
-                });
-            }
 
-            if (!document.getElementById('vistaGraficos').classList.contains('hidden')) {
-                renderGraficos();
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-900/40 transition-colors">
+                            <td class="px-6 py-4 text-white font-bold">${item.concepto}</td>
+                            <td class="px-6 py-4"><span class="px-3 py-1 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${item.categoria}</span></td>
+                            <td class="px-6 py-4">${vencimientoInputHtml}</td>
+                            <td class="px-6 py-4 text-slate-400 text-xs">${item.tipo}</td>
+                            <td class="px-6 py-4 text-right font-extrabold text-white">${fmt(item.monto)}</td>
+                            <td class="px-6 py-4 text-center">${estadoSelectHtml}</td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="editGasto('${item.id}')" class="text-slate-400 hover:text-white mr-3" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deleteGasto('${item.id}')" class="text-slate-400 hover:text-rose-400" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                            </td>
+                        </tr>`;
+                });
             }
         }
 
-        function renderGraficos() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+        // RENDERIZADO DE GRÁFICOS (Chart.js)
+        function renderCharts() {
+            let [cYear, cMonth] = window.appState.currentMonth.split('-').map(Number);
+            let labelsMonths = [];
+            let dataTotales = [];
+            let dataIngresos = [];
+            let dataResto = [];
+            let catList = window.appState.categorias || categoriasDefault;
             
-            const rangeMonths = [];
-            for (let i = -3; i <= 3; i++) {
-                rangeMonths.push(getMonthOffset(currentMonth, i));
+            let datasetsEvolCat = catList.map(cat => ({
+                label: cat.nombre,
+                data: [],
+                borderColor: cat.color,
+                backgroundColor: cat.color + '33',
+                fill: false,
+                tension: 0.3
+            }));
+
+            // Generar 7 meses alrededor del desplazamiento actual
+            for (let i = -3 + chartOffsetMonths; i <= 3 + chartOffsetMonths; i++) {
+                let m = cMonth + i;
+                let y = cYear;
+                while (m > 12) { m -= 12; y++; }
+                while (m < 1) { m += 12; y--; }
+                let ymStr = `${y}-${String(m).padStart(2, '0')}`;
+                
+                labelsMonths.push(`${monthNames[m - 1]} ${y}`);
+
+                const calc = getCalculatedDataForMonth(ymStr);
+                const sumaTotalMes = calc.totalFijos + calc.totalTarjetas;
+                dataTotales.push(sumaTotalMes);
+                dataIngresos.push(calc.sueldoActual);
+                dataResto.push(calc.sueldoActual - sumaTotalMes);
+
+                catList.forEach((cat, idx) => {
+                    datasetsEvolCat[idx].data.push(calc.totalesPorCat[cat.nombre] || 0);
+                });
             }
 
-            const labels7Meses = rangeMonths.map(m => formatMonthDisplay(m));
-            const dataTotales7Meses = [];
-            const dataPorCat7Meses = {};
-
-            const catList = window.appState.categorias || categoriasDefault;
-            catList.forEach(c => {
-                dataPorCat7Meses[c.nombre] = [];
-            });
-
-            rangeMonths.forEach(mStr => {
-                const dataM = getCalculatedDataForMonth(mStr);
-                const tGasto = dataM.totalFijos + dataM.totalTarjetas;
-                dataTotales7Meses.push(tGasto);
-
-                catList.forEach(c => {
-                    dataPorCat7Meses[c.nombre].push(dataM.totalesPorCat[c.nombre] || 0);
-                });
-            });
-
-            if (chartEvolucionTotalesInstance) chartEvolucionTotalesInstance.destroy();
-            const ctxEvolTot = document.getElementById('chartEvolucionTotales').getContext('2d');
-            chartEvolucionTotalesInstance = new Chart(ctxEvolTot, {
-                type: 'line',
-                data: {
-                    labels: labels7Meses,
-                    datasets: [{
-                        label: 'Gastos Totales ($)',
-                        data: dataTotales7Meses,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        fill: true,
-                        tension: 0.3,
-                        pointBackgroundColor: rangeMonths.map(m => m === currentMonth ? '#f43f5e' : '#10b981'),
-                        pointRadius: rangeMonths.map(m => m === currentMonth ? 7 : 4)
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
-                    }
-                }
-            });
-
-            const datasetsCategorias = catList.map(c => {
-                return {
-                    label: c.nombre,
-                    data: dataPorCat7Meses[c.nombre],
-                    borderColor: c.color,
-                    backgroundColor: c.color,
-                    tension: 0.3,
-                    borderWidth: 2,
-                    pointRadius: 3
-                };
-            }).filter(ds => ds.data.some(val => val > 0));
-
-            if (chartEvolucionCategoriasInstance) chartEvolucionCategoriasInstance.destroy();
-            const ctxEvolCat = document.getElementById('chartEvolucionCategorias').getContext('2d');
-            chartEvolucionCategoriasInstance = new Chart(ctxEvolCat, {
-                type: 'line',
-                data: {
-                    labels: labels7Meses,
-                    datasets: datasetsCategorias
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { color: '#f1f5f9', font: { size: 10 }, boxWidth: 12 } }
+            // 1. Gráfico Evolución Gastos Totales
+            const ctxTotales = document.getElementById('chartEvolucionTotales');
+            if (ctxTotales) {
+                if (chartInstTotales) chartInstTotales.destroy();
+                chartInstTotales = new Chart(ctxTotales, {
+                    type: 'line',
+                    data: {
+                        labels: labelsMonths,
+                        datasets: [{
+                            label: 'Gasto Total',
+                            data: dataTotales,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.3
+                        }]
                     },
-                    scales: {
-                        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        }
                     }
-                }
-            });
+                });
+            }
 
-            const { sueldoActual, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
-
-            const catLabels = [];
-            const catData = [];
-            const catColors = [];
-
-            Object.keys(totalesPorCat).forEach(catNombre => {
-                const val = totalesPorCat[catNombre];
-                if (val > 0) {
-                    catLabels.push(catNombre);
-                    catData.push(val);
-                    const catObj = catList.find(c => c.nombre === catNombre);
-                    catColors.push(catObj ? catObj.color : '#64748b');
-                }
-            });
-
-            if (chartCatInstance) chartCatInstance.destroy();
-            const ctxCat = document.getElementById('chartCategorias').getContext('2d');
-            chartCatInstance = new Chart(ctxCat, {
-                type: 'doughnut',
-                data: {
-                    labels: catLabels,
-                    datasets: [{
-                        data: catData,
-                        backgroundColor: catColors,
-                        borderWidth: 2,
-                        borderColor: '#111827'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { color: '#f1f5f9', font: { size: 11 } } }
+            // 2. Gráfico Evolución por Categoría
+            const ctxEvolCat = document.getElementById('chartEvolucionCategorias');
+            if (ctxEvolCat) {
+                if (chartInstEvolCat) chartInstEvolCat.destroy();
+                chartInstEvolCat = new Chart(ctxEvolCat, {
+                    type: 'line',
+                    data: { labels: labelsMonths, datasets: datasetsEvolCat },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 10 } } } },
+                        scales: {
+                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        }
                     }
-                }
-            });
+                });
+            }
 
-            if (chartTiposInstance) chartTiposInstance.destroy();
-            const ctxTipos = document.getElementById('chartTipos').getContext('2d');
-            chartTiposInstance = new Chart(ctxTipos, {
-                type: 'pie',
-                data: {
-                    labels: ['Gastos Fijos', 'Total Tarjetas'],
-                    datasets: [{
-                        data: [totalFijos, totalTarjetas],
-                        backgroundColor: ['#f43f5e', '#6366f1'],
-                        borderWidth: 2,
-                        borderColor: '#111827'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { color: '#f1f5f9', font: { size: 11 } } }
+            // 3. Gráfico Balance General (Ingreso vs Gastos vs Resto - 7 Meses)
+            const ctxBalance = document.getElementById('chartBalanceGeneral');
+            if (ctxBalance) {
+                if (chartInstBalance) chartInstBalance.destroy();
+                chartInstBalance = new Chart(ctxBalance, {
+                    type: 'bar',
+                    data: {
+                        labels: labelsMonths,
+                        datasets: [
+                            { label: 'Ingreso / Sueldo', data: dataIngresos, backgroundColor: '#10b981', borderRadius: 6 },
+                            { label: 'Gastos Totales', data: dataTotales, backgroundColor: '#f43f5e', borderRadius: 6 },
+                            { label: 'Resto Disponible', data: dataResto, backgroundColor: '#3b82f6', borderRadius: 6 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 10 } } } },
+                        scales: {
+                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        }
                     }
-                }
-            });
+                });
+            }
 
-            const totalGastos = totalFijos + totalTarjetas;
-            const resto = sueldoActual - totalGastos;
-
-            if (chartBalanceInstance) chartBalanceInstance.destroy();
-            const ctxBalance = document.getElementById('chartBalance').getContext('2d');
-            chartBalanceInstance = new Chart(ctxBalance, {
-                type: 'bar',
-                data: {
-                    labels: ['Ingreso / Sueldo', 'Gastos Totales', 'Resto Disponible'],
-                    datasets: [{
-                        label: 'Monto ($)',
-                        data: [sueldoActual, totalGastos, resto < 0 ? 0 : resto],
-                        backgroundColor: ['#10b981', '#f43f5e', '#3b82f6'],
-                        borderRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+            // Datos del mes actual exacto para gráficos circulares
+            const currentCalc = getCalculatedDataForMonth(window.appState.currentMonth);
+            
+            // 4. Gráfico Distribución por Categoría (Doughnut)
+            const ctxDistribucion = document.getElementById('chartDistribucionCategoria');
+            if (ctxDistribucion) {
+                if (chartInstDistribucion) chartInstDistribucion.destroy();
+                let catLabels = [];
+                let catData = [];
+                let catColors = [];
+                catList.forEach(cat => {
+                    let val = currentCalc.totalesPorCat[cat.nombre] || 0;
+                    if (val > 0) {
+                        catLabels.push(cat.nombre);
+                        catData.push(val);
+                        catColors.push(cat.color);
                     }
-                }
-            });
+                });
+
+                chartInstDistribucion = new Chart(ctxDistribucion, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0 }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } } }
+                    }
+                });
+            }
+
+            // 5. Gráfico Gastos Fijos vs Tarjetas (Pie)
+            const ctxFijosVsTarjetas = document.getElementById('chartFijosVsTarjetas');
+            if (ctxFijosVsTarjetas) {
+                if (chartInstFijosVsTarjetas) chartInstFijosVsTarjetas.destroy();
+                chartInstFijosVsTarjetas = new Chart(ctxFijosVsTarjetas, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Gastos Fijos', 'Total Tarjetas'],
+                        datasets: [{
+                            data: [currentCalc.totalFijos, currentCalc.totalTarjetas],
+                            backgroundColor: ['#f43f5e', '#6366f1'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } } }
+                    }
+                });
+            }
         }
 
-        function handleSaveSueldo(e) {
+        window.actualizarVencimientoGrilla = function(idGastoOrigen, categoriaNombre, nuevaFecha) {
+            const currentMonth = window.appState.currentMonth;
+            if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+
+            const catConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaNombre);
+            const esEnBloque = catConfig ? catConfig.esTarjeta : false;
+
+            if (esEnBloque) {
+                (window.appState.gastos || []).forEach(gasto => {
+                    const excepcionCatKey = `${gasto.id}_${currentMonth}`;
+                    const catAplicada = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
+                    const startYM = gasto.startMonth || currentMonth;
+
+                    if (catAplicada === categoriaNombre && currentMonth >= startYM) {
+                        window.appState.excepcionesVencimiento[`${gasto.id}_${currentMonth}`] = nuevaFecha;
+                    }
+                });
+            } else {
+                window.appState.excepcionesVencimiento[`${idGastoOrigen}_${currentMonth}`] = nuevaFecha;
+            }
+
+            window.saveDataToCloud();
+            renderApp();
+        };
+
+        window.actualizarEstadoGrilla = function(idGastoOrigen, categoriaNombre, nuevoEstado) {
+            const currentMonth = window.appState.currentMonth;
+            if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
+
+            const catConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaNombre);
+            const esEnBloque = catConfig ? catConfig.esTarjeta : false;
+
+            if (esEnBloque) {
+                (window.appState.gastos || []).forEach(gasto => {
+                    const excepcionCatKey = `${gasto.id}_${currentMonth}`;
+                    const catAplicada = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
+                    const startYM = gasto.startMonth || currentMonth;
+
+                    if (catAplicada === categoriaNombre && currentMonth >= startYM) {
+                        window.appState.excepcionesEstado[`${gasto.id}_${currentMonth}`] = nuevoEstado;
+                    }
+                });
+            } else {
+                window.appState.excepcionesEstado[`${idGastoOrigen}_${currentMonth}`] = nuevoEstado;
+            }
+
+            window.saveDataToCloud();
+            renderApp();
+        };
+
+        window.handleSaveSueldo = function(e) {
             e.preventDefault();
             const monto = parseFloat(document.getElementById('sueldoMonto').value);
-            const currentMonth = window.appState.currentMonth;
-
             if (!window.appState.sueldos) window.appState.sueldos = {};
-            window.appState.sueldos[currentMonth] = monto;
-
+            window.appState.sueldos[window.appState.currentMonth] = monto;
             window.saveDataToCloud();
             closeModal('modalSueldo');
             renderApp();
-        }
+        };
 
-        function handleSaveGasto(e) {
+        window.handleSaveGasto = function(e) {
             e.preventDefault();
             const id = document.getElementById('gastoId').value;
             const concepto = document.getElementById('gastoConcepto').value;
             const monto = parseFloat(document.getElementById('gastoMonto').value);
             const startMonthInput = document.getElementById('gastoStartMonth').value;
             const categoria = document.getElementById('gastoCategoria').value;
+            const vencimiento = document.getElementById('gastoVencimiento').value;
             const isRecurrente = document.getElementById('checkRecurrente').checked;
-            const isCuotas = document.getElementById('checkCuotas').checked;
-            const cuotas = isCuotas ? (parseInt(document.getElementById('gastoCuotas').value) || 1) : 1;
-            const currentMonth = window.appState.currentMonth;
+            const cuotas = document.getElementById('checkCuotas').checked ? (parseInt(document.getElementById('gastoCuotas').value) || 1) : 1;
 
             if (id) {
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
                 if (idx !== -1) {
-                    const soloEsteMes = document.getElementById('checkSoloEsteMes').checked;
-                    const gastoViejo = window.appState.gastos[idx];
-
-                    if (soloEsteMes) {
-                        if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
-                        if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
-
-                        window.appState.excepcionesMonto = {
-                            ...window.appState.excepcionesMonto,
-                            [`${id}_${currentMonth}`]: monto
-                        };
-                        window.appState.excepcionesCategoria = {
-                            ...window.appState.excepcionesCategoria,
-                            [`${id}_${currentMonth}`]: categoria
-                        };
-
-                        window.appState.gastos[idx] = { 
-                            id, 
-                            concepto, 
-                            startMonth: gastoViejo.startMonth, 
-                            fecha: gastoViejo.fecha, 
-                            categoria: gastoViejo.categoria, 
-                            isRecurrente: gastoViejo.isRecurrente,
-                            cuotas, 
-                            monto: gastoViejo.monto 
-                        };
-                    } else {
-                        const originalStartMonth = gastoViejo.startMonth || (gastoViejo.fecha ? gastoViejo.fecha.slice(0, 7) : currentMonth);
-                        window.appState.gastos[idx] = { 
-                            id, 
-                            concepto, 
-                            monto, 
-                            startMonth: originalStartMonth, 
-                            fecha: `${originalStartMonth}-01`, 
-                            categoria, 
-                            isRecurrente, 
-                            cuotas 
-                        };
-
-                        if (window.appState.excepcionesMonto) {
-                            Object.keys(window.appState.excepcionesMonto).forEach(k => {
-                                if (k.startsWith(`${id}_`)) delete window.appState.excepcionesMonto[k];
-                            });
-                        }
-                        if (window.appState.excepcionesCategoria) {
-                            Object.keys(window.appState.excepcionesCategoria).forEach(k => {
-                                if (k.startsWith(`${id}_`)) delete window.appState.excepcionesCategoria[k];
-                            });
-                        }
-                    }
+                    window.appState.gastos[idx] = { id, concepto, monto, startMonth: window.appState.gastos[idx].startMonth, categoria, isRecurrente, cuotas, vencimiento };
                 }
             } else {
-                window.appState.gastos.push({ 
-                    id: Date.now().toString(), 
-                    concepto, 
-                    monto, 
-                    startMonth: startMonthInput, 
-                    fecha: `${startMonthInput}-01`, 
-                    categoria, 
-                    isRecurrente, 
-                    cuotas 
-                });
+                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, startMonth: startMonthInput, categoria, isRecurrente, cuotas, vencimiento });
             }
 
             window.saveDataToCloud();
             closeModal('modalGasto');
             renderApp();
-        }
+        };
 
-        function editGasto(id) {
+        window.editGasto = function(id) {
             const gasto = window.appState.gastos.find(g => g.id === id);
             if (!gasto) return;
-
             document.getElementById('gastoId').value = gasto.id;
             document.getElementById('gastoConcepto').value = gasto.concepto;
-            
-            const currentMonth = window.appState.currentMonth;
-            
-            const excepcionKey = `${id}_${currentMonth}`;
-            const montoAMostrar = (window.appState.excepcionesMonto && window.appState.excepcionesMonto[excepcionKey] !== undefined)
-                ? window.appState.excepcionesMonto[excepcionKey]
-                : gasto.monto;
-            document.getElementById('gastoMonto').value = montoAMostrar;
-
-            const excepcionCatKey = `${id}_${currentMonth}`;
-            const categoriaAMostrar = (window.appState.excepcionesCategoria && window.appState.excepcionesCategoria[excepcionCatKey] !== undefined)
-                ? window.appState.excepcionesCategoria[excepcionCatKey]
-                : gasto.categoria;
-
-            document.getElementById('gastoStartMonth').value = gasto.startMonth || (gasto.fecha ? gasto.fecha.slice(0, 7) : currentMonth);
-            
+            document.getElementById('gastoMonto').value = gasto.monto;
+            document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
+            document.getElementById('gastoVencimiento').value = gasto.vencimiento || '';
             renderCategoriasSelect();
-            document.getElementById('gastoCategoria').value = categoriaAMostrar;
-            
-            document.getElementById('containerCheckSoloEsteMes').classList.remove('hidden');
-            document.getElementById('labelMesActualCheck').innerText = currentMonth;
-            document.getElementById('checkSoloEsteMes').checked = false;
-
+            document.getElementById('gastoCategoria').value = gasto.categoria;
             document.getElementById('checkRecurrente').checked = !!gasto.isRecurrente;
-
-            const isCuotas = (gasto.cuotas && gasto.cuotas > 1);
-            document.getElementById('checkCuotas').checked = isCuotas;
+            
+            const esCuotas = (gasto.cuotas || 1) > 1;
+            document.getElementById('checkCuotas').checked = esCuotas;
             document.getElementById('gastoCuotas').value = gasto.cuotas || 1;
             toggleCuotasFields();
 
             document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
             openModalGasto();
-        }
+        };
 
-        function deleteGasto(id) {
-            if (confirm('¿Estás seguro de que querés eliminar este gasto?')) {
+        window.deleteGasto = function(id) {
+            if (confirm('&iquest;Est&aacute;s seguro de que quer&eacute;s eliminar este gasto?')) {
                 window.appState.gastos = window.appState.gastos.filter(g => g.id !== id);
                 window.saveDataToCloud();
+                renderApp();
             }
-        }
+        };
 
-        function openModalSueldo() {
-            const currentMonth = window.appState.currentMonth;
-            const sueldoActual = getSueldoForMonth(currentMonth);
-            document.getElementById('sueldoMonto').value = sueldoActual || '';
+        window.openModalSueldo = function() {
+            document.getElementById('sueldoMonto').value = getSueldoForMonth(window.appState.currentMonth) || '';
             document.getElementById('modalSueldo').classList.remove('hidden');
-        }
+        };
 
-        function openModalGasto() {
+        window.openModalGasto = function() {
             if (!document.getElementById('gastoId').value) {
                 document.getElementById('modalGastoTitulo').innerText = "Nuevo Gasto";
                 document.getElementById('formGasto').reset();
@@ -1407,30 +1252,18 @@
                 document.getElementById('gastoStartMonth').value = window.appState.currentMonth;
                 document.getElementById('checkRecurrente').checked = false;
                 document.getElementById('checkCuotas').checked = false;
-                document.getElementById('containerCheckSoloEsteMes').classList.add('hidden');
                 toggleCuotasFields();
             }
             document.getElementById('modalGasto').classList.remove('hidden');
-        }
+        };
 
-        function closeModal(id) {
+        window.closeModal = function(id) {
             document.getElementById(id).classList.add('hidden');
             if (id === 'modalGasto') {
                 document.getElementById('gastoId').value = '';
                 document.getElementById('formGasto').reset();
-                document.getElementById('containerCheckSoloEsteMes').classList.add('hidden');
             }
-        }
-
-        function exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.appState));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `respaldo_gastos_${new Date().toISOString().slice(0,10)}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
+        };
     </script>
 </body>
 </html>
