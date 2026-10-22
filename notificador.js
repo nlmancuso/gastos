@@ -1,4 +1,4 @@
-// notificador.js - Modo diagnóstico para Firestore
+// notificador.js - Inspector de estructura de Firestore
 const { Resend } = require('resend');
 const https = require('https');
 
@@ -27,57 +27,31 @@ function consultarFirestorePublico() {
 
 async function procesarAlertas() {
   try {
-    console.log("Consultando Firestore...");
+    console.log("Inspeccionando documento en Firestore...");
     const resultado = await consultarFirestorePublico();
     
-    let gastosPorVencer = [];
-    let textoDiagnostico = "<h3>Datos leídos de Firebase:</h3><pre>";
-
-    if (resultado && resultado.fields && resultado.fields.gastos) {
-      const arrayGastos = resultado.fields.gastos.arrayValue.values || [];
-      
-      arrayGastos.forEach((item, index) => {
-        const fields = item.mapValue.fields;
-        
-        const concepto = fields.concepto ? fields.concepto.stringValue : (fields.nombre ? fields.nombre.stringValue : 'Sin concepto');
-        const monto = fields.monto ? (fields.monto.doubleValue || fields.monto.integerValue || 0) : 0;
-        const vencimiento = fields.vencimiento ? fields.vencimiento.stringValue : 'Sin fecha';
-        const estado = fields.estado ? fields.estado.stringValue : 'Sin estado';
-
-        textoDiagnostico += `\n[${index}] ${concepto} - Estado: '${estado}' - Vence: ${vencimiento}`;
-
-        // Verificamos si coincide el estado (ignorando mayúsculas/minúsculas o espacios)
-        if (estado.trim().toUpperCase() === 'PENDIENTE') {
-          gastosPorVencer.push({ concepto, monto, vencimiento });
-        }
-      });
-    } else {
-      textoDiagnostico += "\nNo se encontró el campo 'gastos' en el documento.";
+    let camposDisponibles = [];
+    if (resultado && resultado.fields) {
+      camposDisponibles = Object.keys(resultado.fields);
     }
 
-    textoDiagnostico += "</pre>";
+    let htmlContenido = `<h2>🔍 Diagnóstico de Campos - Grupo Mancuso Sosa</h2>`;
+    htmlContenido += `<p>Los campos encontrados en el documento <b>grupo_mancusososa</b> son:</p>`;
+    htmlContenido += `<ul>`;
+    camposDisponibles.forEach(campo => {
+      htmlContenido += `<li><b>${campo}</b></li>`;
+    });
+    htmlContenido += `</ul>`;
+    htmlContenido += `<p>Con esta lista exacta sabremos cómo leer tus gastos correctamente.</p>`;
 
-    let htmlContenido = `<h2>🔔 Reporte de Vencimientos - Grupo Mancuso Sosa</h2>`;
-    
-    if (gastosPorVencer.length > 0) {
-      htmlContenido += `<p>Se encontraron <b>${gastosPorVencer.length}</b> gastos pendientes:</p><ul>`;
-      gastosPorVencer.forEach(g => {
-        htmlContenido += `<li><b>${g.concepto}</b> - Monto: <b>$${g.monto}</b> - Vence: <b>${g.vencimiento}</b></li>`;
-      });
-      htmlContenido += `</ul>`;
-    } else {
-      htmlContenido += `<p>⚠️ El filtro estricto no encontró elementos con estado PENDIENTE, pero aquí tenés el diagnóstico técnico:</p>` + textoDiagnostico;
-    }
-
-    // Enviamos siempre el correo para ver qué detectó
     await resend.emails.send({
       from: 'Control de Gastos <onboarding@resend.dev>',
       to: [process.env.MY_EMAIL],
-      subject: '📊 Diagnóstico de Vencimientos - Grupo Mancuso Sosa',
+      subject: '🔍 Inspector de Campos - Firestore',
       html: htmlContenido
     });
 
-    console.log("Correo de diagnóstico enviado con éxito.");
+    console.log("Correo de inspección enviado con éxito.");
   } catch (error) {
     console.error("Error al procesar:", error);
   }
