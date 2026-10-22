@@ -34,6 +34,7 @@
         window.auth = auth;
 
         let unsubscribeSnapshot = null;
+        let unsubscribeHormiga = null;
 
         function showLoading() {
             document.getElementById('loginOverlay').classList.add('hidden');
@@ -70,6 +71,11 @@
                     sortAscending: true
                 };
 
+                window.hormigaState = {
+                    gastos: [],
+                    categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault))
+                };
+
                 let grupoId = user.uid; 
                 
                 try {
@@ -79,21 +85,28 @@
                         grupoId = rolSnap.data().grupo;
                     }
                 } catch (err) {
-                    console.warn("No se pudo leer la asignaci&oacute;n de grupo:", err);
+                    console.warn("No se pudo leer la asignación de grupo:", err);
                 }
 
+                // 1. Conexión a la base grupal (Planilla y Gráficos)
                 const docRef = doc(db, "app_data", grupoId);
                 window.docRef = docRef;
                 window.currentGrupo = grupoId;
 
+                // 2. Conexión a la base PRIVADA del usuario (Gastos Hormiga)
+                const docHormigaRef = doc(db, "app_data_hormiga", user.uid);
+                window.docHormigaRef = docHormigaRef;
+
                 const userName = user.email ? user.email.split('@')[0] : 'Usuario';
                 const grupoDisplay = document.getElementById('grupoStatus');
                 if (grupoDisplay) {
-                    grupoDisplay.innerHTML = `&#128100; Usuario: ${userName}`;
+                    grupoDisplay.innerHTML = `👤 Usuario: ${userName}`;
                 }
 
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
+                if (unsubscribeHormiga) unsubscribeHormiga();
 
+                // Listener Datos Grupales
                 unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -109,25 +122,30 @@
                     }
 
                     const statusEl = document.getElementById('cloudStatus');
-                    if (statusEl) {
-                        statusEl.innerHTML = "&#9729; Nube";
-                    }
+                    if (statusEl) statusEl.innerHTML = "☁️ Nube";
 
                     renderApp();
                     renderCategoriasSelect();
                     showApp();
-                }, (error) => {
-                    console.error("Error en nube: ", error);
-                    renderApp();
-                    renderCategoriasSelect();
-                    showApp();
                 });
+
+                // Listener Datos Privados (Gastos Hormiga)
+                unsubscribeHormiga = onSnapshot(docHormigaRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        if (data.hormigaState) {
+                            window.hormigaState = { ...window.hormigaState, ...data.hormigaState };
+                        }
+                    } else {
+                        saveHormigaDataToCloud();
+                    }
+                    renderHormigaApp();
+                });
+
             } else {
                 showLogin();
-                if (unsubscribeSnapshot) {
-                    unsubscribeSnapshot();
-                    unsubscribeSnapshot = null;
-                }
+                if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+                if (unsubscribeHormiga) { unsubscribeHormiga(); unsubscribeHormiga = null; }
             }
         });
 
@@ -143,9 +161,9 @@
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
             } catch (error) {
-                console.error("Error al iniciar sesi&oacute;n:", error);
+                console.error("Error al iniciar sesión:", error);
                 showLogin();
-                loginError.innerText = "Correo o contrase&ntilde;a incorrectos.";
+                loginError.innerText = "Correo o contraseña incorrectos.";
                 loginError.classList.remove('hidden');
             }
         };
@@ -160,9 +178,18 @@
                 if (!window.docRef) return;
                 const cleanState = JSON.parse(JSON.stringify(window.appState));
                 await setDoc(window.docRef, { appState: cleanState });
-                localStorage.setItem('gastos_app_state_backup', JSON.stringify(cleanState));
             } catch (e) {
-                console.error("Error guardando datos:", e);
+                console.error("Error guardando datos grupales:", e);
+            }
+        };
+
+        window.saveHormigaDataToCloud = async function() {
+            try {
+                if (!window.docHormigaRef) return;
+                const cleanHormiga = JSON.parse(JSON.stringify(window.hormigaState));
+                await setDoc(window.docHormigaRef, { hormigaState: cleanHormiga });
+            } catch (e) {
+                console.error("Error guardando datos hormiga:", e);
             }
         };
     </script>
@@ -200,19 +227,19 @@
                 <i class="fa-solid fa-lock"></i>
             </div>
             <h2 class="text-xl font-bold text-white mb-2">Acceso Protegido</h2>
-            <p class="text-xs text-slate-400 mb-6">Ingres&aacute; tus credenciales para acceder a tu planilla.</p>
+            <p class="text-xs text-slate-400 mb-6">Ingresá tus credenciales para acceder a tu planilla.</p>
             
             <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electr&oacute;nico</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electrónico</label>
                     <input type="email" id="loginEmail" required placeholder="tucorreo@email.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contrase&ntilde;a</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label>
                     <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
-                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesi&oacute;n
+                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
                 </button>
             </form>
             <p id="loginError" class="text-xs text-rose-400 font-medium mt-4 hidden"></p>
@@ -237,7 +264,7 @@
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Control de Gastos</h1>
-                        <p class="text-xs text-slate-400 font-medium" id="grupoStatus">Proyecci&oacute;n y Finanzas</p>
+                        <p class="text-xs text-slate-400 font-medium" id="grupoStatus">Proyección y Finanzas</p>
                     </div>
                 </div>
 
@@ -252,31 +279,35 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg transition flex items-center gap-2">
+                    <button id="btnNuevoGastoHeader" onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
                     </button>
-                    <button onclick="openModalConfig()" title="Configuraci&oacute;n" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
+                    <button onclick="openModalConfig()" title="Configuración Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                         <i class="fa-solid fa-gear"></i>
                     </button>
-                    <button onclick="cerrarSesion()" title="Cerrar Sesi&oacute;n" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition">
+                    <button onclick="cerrarSesion()" title="Cerrar Sesión" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
-                    <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">&#9729; Nube</span>
+                    <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">☁️ Nube</span>
                 </div>
             </div>
 
-            <div class="flex border-b border-slate-800">
-                <button id="tabPlanillaBtn" onclick="switchTab('planilla')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition tab-btn-active flex items-center gap-2">
+            <!-- NAVEGACIÓN PRINCIPAL ENTRE 3 SOLAPAS -->
+            <div class="flex border-b border-slate-800 overflow-x-auto">
+                <button id="tabPlanillaBtn" onclick="switchTab('planilla')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition tab-btn-active flex items-center gap-2 whitespace-nowrap">
                     <i class="fa-solid fa-table-list"></i> Planilla de Gastos
                 </button>
-                <button id="tabGraficosBtn" onclick="switchTab('graficos')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2">
-                    <i class="fa-solid fa-chart-pie"></i> An&aacute;lisis y Gr&aacute;ficos
+                <button id="tabGraficosBtn" onclick="switchTab('graficos')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos
+                </button>
+                <button id="tabHormigaBtn" onclick="switchTab('hormiga')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga <span class="text-[10px] bg-amber-950 text-amber-400 px-1.5 py-0.5 rounded border border-amber-800">Privado</span>
                 </button>
             </div>
         </header>
 
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <!-- VISTA PLANILLA -->
+            <!-- VISTA 1: PLANILLA GENERAL -->
             <div id="vistaPlanilla">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div class="card-bg p-5 rounded-2xl relative">
@@ -303,7 +334,7 @@
                 </div>
 
                 <div class="card-bg p-5 rounded-2xl mb-6">
-                    <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Totales por Categor&iacute;a (Mes Actual)</h3>
+                    <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Totales por Categoría (Mes Actual)</h3>
                     <div id="containerTotalesCategoria" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"></div>
                 </div>
 
@@ -322,7 +353,7 @@
                             <thead>
                                 <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                                     <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('concepto')">CONCEPTO <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
-                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('categoria')">CATEGOR&Iacute;A <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
+                                    <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('categoria')">CATEGORÍA <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
                                     <th scope="col" class="px-6 py-3.5">VENCIMIENTO</th>
                                     <th scope="col" class="px-6 py-3.5 cursor-pointer select-none" onclick="sortData('tipo')">TIPO / CUOTAS <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
                                     <th scope="col" class="px-6 py-3.5 text-right cursor-pointer select-none" onclick="sortData('monto')">MONTO <i class="fa-solid fa-arrows-up-down text-[10px] ml-1"></i></th>
@@ -336,13 +367,13 @@
                 </div>
             </div>
 
-            <!-- VISTA GRAFICOS -->
+            <!-- VISTA 2: GRAFICOS GENERALES -->
             <div id="vistaGraficos" class="hidden space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="card-bg p-6 rounded-2xl">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                                <i class="fa-solid fa-chart-line text-emerald-400"></i> Evoluci&oacute;n Gastos Totales (7 Meses)
+                                <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales (7 Meses)
                             </h3>
                             <button onclick="changeChartRange(-3)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition">
                                 -3 Meses / +3 Meses
@@ -354,7 +385,7 @@
                     <div class="card-bg p-6 rounded-2xl">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                                <i class="fa-solid fa-chart-area text-blue-400"></i> Evoluci&oacute;n por Categor&iacute;a (7 Meses)
+                                <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría (7 Meses)
                             </h3>
                             <button onclick="changeChartRange(-3)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition">
                                 -3 Meses / +3 Meses
@@ -377,7 +408,7 @@
 
                     <div class="card-bg p-6 rounded-2xl">
                         <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-cyan-400"></i> Distribuci&oacute;n del Mes por Categor&iacute;a
+                            <i class="fa-solid fa-chart-pie text-cyan-400"></i> Distribución del Mes por Categoría
                         </h3>
                         <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartDistribucionCategoria"></canvas></div>
                     </div>
@@ -390,26 +421,171 @@
                     </div>
                 </div>
             </div>
+
+            <!-- VISTA 3: GASTOS HORMIGA (PERSONAL / INDIVIDUAL) -->
+            <div id="vistaHormiga" class="hidden space-y-6">
+                
+                <!-- AVISO PRIVACIDAD Y BOTÓN DESTACADO -->
+                <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3 text-amber-300 text-xs font-medium">
+                        <div class="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+                            <i class="fa-solid fa-user-lock text-sm"></i>
+                        </div>
+                        <span>Estás en tu sección personal de Gastos Hormiga. Ningún otro usuario del grupo puede ver tus gastos de esta solapa.</span>
+                    </div>
+                    <!-- BOTÓN CATEGORÍAS HORMIGA DESTACADO -->
+                    <button onclick="openModalCatHormiga()" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider shrink-0">
+                        <i class="fa-solid fa-tags text-slate-950"></i> Categorías Hormiga
+                    </button>
+                </div>
+
+                <!-- METRICAS HORMIGA -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL HORMIGA (MES)</span>
+                        <h2 id="cardHormigaTotal" class="text-2xl font-extrabold text-amber-400 my-1">$ 0,00</h2>
+                    </div>
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">PROMEDIO DIARIO</span>
+                        <h2 id="cardHormigaPromedio" class="text-2xl font-extrabold text-blue-400 my-1">$ 0,00</h2>
+                    </div>
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CANTIDAD DE GASTOS</span>
+                        <h2 id="cardHormigaCantidad" class="text-2xl font-extrabold text-emerald-400 my-1">0 compras</h2>
+                    </div>
+                </div>
+
+                <!-- FORMULARIO RÁPIDO Y LISTADO -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- FORMULARIO HORMIGA -->
+                    <div class="card-bg p-6 rounded-2xl h-fit">
+                        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-plus-circle text-amber-400"></i> Registrar Gasto Hormiga
+                        </h3>
+                        <form onsubmit="handleSaveGastoHormiga(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">¿QUÉ COMPRASTE?</label>
+                                <input type="text" id="hormigaConcepto" required placeholder="Ej: Café, Galletitas, Remis..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO ($)</label>
+                                    <input type="number" step="0.01" id="hormigaMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">FECHA</label>
+                                    <input type="date" id="hormigaFecha" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CATEGORÍA</label>
+                                <select id="hormigaCategoriaSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"></select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MEDIO DE PAGO</label>
+                                <select id="hormigaMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Mercado Pago">Mercado Pago</option>
+                                    <option value="Débito">Débito</option>
+                                    <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                                    <option value="Otros">Otros</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
+                                <i class="fa-solid fa-cookie"></i> Guardar Gasto Hormiga
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- TABLA HORMIGA -->
+                    <div class="lg:col-span-2 card-bg rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between">
+                        <div>
+                            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+                                <h3 class="text-base font-bold text-white">Detalle de Gastos del Mes</h3>
+                                <span id="badgeHormigaMonth" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Octubre 2026</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="px-5 py-3.5">FECHA</th>
+                                            <th class="px-5 py-3.5">DESCRIPCIÓN</th>
+                                            <th class="px-5 py-3.5">CATEGORÍA</th>
+                                            <th class="px-5 py-3.5">MEDIO</th>
+                                            <th class="px-5 py-3.5 text-right">MONTO</th>
+                                            <th class="px-5 py-3.5 text-right">ACCIONES</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tablaHormigaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN GRÁFICOS HORMIGA -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                    <div class="card-bg p-6 rounded-2xl">
+                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Mes Actual)
+                        </h3>
+                        <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartHormigaCategorias"></canvas></div>
+                    </div>
+
+                    <div class="card-bg p-6 rounded-2xl">
+                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
+                        </h3>
+                        <div class="relative h-64 w-full"><canvas id="chartHormigaEvolucion"></canvas></div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
-    <!-- MODAL CONFIG -->
+    <!-- MODAL CATEGORÍAS HORMIGA -->
+    <div id="modalCatHormiga" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold flex items-center gap-2 text-amber-400">
+                    <i class="fa-solid fa-tags"></i> Categorías de Gastos Hormiga
+                </h3>
+                <button type="button" onclick="closeModal('modalCatHormiga')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="space-y-3 mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nuevaCatHormigaNombre" placeholder="Ej: Kiosco, Panadería, Ferretería..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                    <input type="color" id="nuevaCatHormigaColor" value="#f59e0b" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoriaHormiga()" class="w-10 h-10 bg-amber-600 hover:bg-amber-500 text-white rounded-xl flex items-center justify-center" title="Agregar"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+
+            <div id="listaCatHormigaConfig" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIG GENERAL -->
     <div id="modalConfig" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">Gesti&oacute;n de Categor&iacute;as</h3>
+                <h3 class="text-lg font-bold">Gestión de Categorías Generales</h3>
                 <button type="button" onclick="closeModal('modalConfig')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <div class="space-y-3 mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800">
                 <div class="flex items-center gap-2">
-                    <input type="text" id="nuevaCatNombre" placeholder="Nueva categor&iacute;a..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                    <input type="text" id="nuevaCatNombre" placeholder="Nueva categoría..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
                     <input type="color" id="nuevaCatColor" value="#3b82f6" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
                     <button onclick="agregarCategoria()" class="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center" title="Agregar"><i class="fa-solid fa-plus"></i></button>
                 </div>
                 <div class="flex items-center gap-2 pl-1">
                     <input type="checkbox" id="nuevaCatEsTarjeta" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-emerald-500" checked>
-                    <label for="nuevaCatEsTarjeta" class="text-xs font-semibold text-slate-300 cursor-pointer">&iquest;Es tarjeta o comparte vencimiento &uacute;nico en bloque?</label>
+                    <label for="nuevaCatEsTarjeta" class="text-xs font-semibold text-slate-300 cursor-pointer">¿Es tarjeta o comparte vencimiento único en bloque?</label>
                 </div>
             </div>
 
@@ -463,7 +639,7 @@
 
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">CATEGOR&Iacute;A / TARJETA</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">CATEGORÍA / TARJETA</label>
                         <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
                     </div>
                     <div>
@@ -479,7 +655,7 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QU&Eacute; MES EMPIEZA</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QUÉ MES EMPIEZA</label>
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
@@ -492,10 +668,10 @@
                     <div>
                         <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
                             <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
-                            <i class="fa-solid fa-rotate text-emerald-400"></i> D&eacute;bito Autom&aacute;tico / Recurrente
+                            <i class="fa-solid fa-rotate text-emerald-400"></i> Débito Automático / Recurrente
                         </label>
                         <p class="text-[11px] text-slate-400 mt-0.5 ml-7">
-                            Tildalo si este gasto se debita todos los meses. Si es fijo/servicio se propaga sumando un mes a su vencimiento autom&aacute;ticamente.
+                            Tildalo si este gasto se debita todos los meses. Si es fijo/servicio se propaga sumando un mes a su vencimiento automáticamente.
                         </p>
                     </div>
 
@@ -504,7 +680,7 @@
                     <div>
                         <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
                             <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
-                            &iquest;Es una compra en Cuotas?
+                            ¿Es una compra en Cuotas?
                         </label>
                     </div>
 
@@ -520,7 +696,7 @@
                     </div>
                 </div>
 
-                <!-- BOTONES DE ACCI&Oacute;N -->
+                <!-- BOTONES DE ACCIÓN -->
                 <div class="flex justify-end gap-3 pt-2">
                     <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium transition">
                         Cancelar
@@ -545,6 +721,17 @@
             { nombre: "Otros", color: "#64748b", esTarjeta: true }
         ];
 
+        const categoriasHormigaDefault = [
+            { nombre: "Kiosco", color: "#f59e0b" },
+            { nombre: "Panadería", color: "#d97706" },
+            { nombre: "Ferretería", color: "#78716c" },
+            { nombre: "Cafetería", color: "#b45309" },
+            { nombre: "Supermercado Rápido", color: "#10b981" },
+            { nombre: "Transporte / Peaje", color: "#3b82f6" },
+            { nombre: "Propinas", color: "#ec4899" },
+            { nombre: "Varios", color: "#64748b" }
+        ];
+
         window.appState = window.appState || {
             currentMonth: new Date().toISOString().slice(0, 7),
             gastos: [],
@@ -558,6 +745,11 @@
             sortAscending: true
         };
 
+        window.hormigaState = window.hormigaState || {
+            gastos: [],
+            categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault))
+        };
+
         window.filtrosTemporales = [];
         let chartOffsetMonths = 0; 
         let chartInstTotales = null;
@@ -565,6 +757,8 @@
         let chartInstBalance = null;
         let chartInstDistribucion = null;
         let chartInstFijosVsTarjetas = null;
+        let chartInstHormigaCat = null;
+        let chartInstHormigaEvol = null;
 
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -572,16 +766,28 @@
             if (!window.appState.categorias || window.appState.categorias.length === 0) {
                 window.appState.categorias = JSON.parse(JSON.stringify(categoriasDefault));
             }
+            if (!window.hormigaState.categorias || window.hormigaState.categorias.length === 0) {
+                window.hormigaState.categorias = JSON.parse(JSON.stringify(categoriasHormigaDefault));
+            }
+            document.getElementById('hormigaFecha').value = new Date().toISOString().slice(0, 10);
         });
 
         function switchTab(tabName) {
             document.getElementById('vistaPlanilla').classList.toggle('hidden', tabName !== 'planilla');
             document.getElementById('vistaGraficos').classList.toggle('hidden', tabName !== 'graficos');
+            document.getElementById('vistaHormiga').classList.toggle('hidden', tabName !== 'hormiga');
+
             document.getElementById('tabPlanillaBtn').classList.toggle('tab-btn-active', tabName === 'planilla');
             document.getElementById('tabGraficosBtn').classList.toggle('tab-btn-active', tabName === 'graficos');
+            document.getElementById('tabHormigaBtn').classList.toggle('tab-btn-active', tabName === 'hormiga');
+
+            document.getElementById('btnNuevoGastoHeader').classList.toggle('hidden', tabName === 'hormiga');
             
             if (tabName === 'graficos') {
                 setTimeout(() => renderCharts(), 100);
+            }
+            if (tabName === 'hormiga') {
+                renderHormigaApp();
             }
         }
 
@@ -590,6 +796,7 @@
             renderCharts();
         }
 
+        // GESTIÓN DE CATEGORÍAS GENERALES
         function openModalConfig() { renderCategoriasConfigList(); document.getElementById('modalConfig').classList.remove('hidden'); }
         
         function renderCategoriasConfigList() {
@@ -610,7 +817,7 @@
                         <input type="checkbox" id="catBloque_${index}" ${cat.esTarjeta ? 'checked' : ''} onchange="actualizarCatCampo(${index}, 'esTarjeta', this.checked)" class="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
                         <label for="catBloque_${index}" class="text-[11px] text-slate-400 cursor-pointer flex items-center gap-1.5">
                             <i class="fa-solid ${cat.esTarjeta ? 'fa-credit-card text-emerald-400' : 'fa-thumbtack text-slate-400'}"></i>
-                            ${cat.esTarjeta ? 'Vencimiento &uacute;nico en bloque' : 'Vencimiento individual'}
+                            ${cat.esTarjeta ? 'Vencimiento único en bloque' : 'Vencimiento individual'}
                         </label>
                     </div>
                 `;
@@ -654,12 +861,87 @@
         }
 
         function eliminarCategoria(index) {
-            if (window.appState.categorias.length <= 1) return alert("M&iacute;nimo una categor&iacute;a.");
+            if (window.appState.categorias.length <= 1) return alert("Mínimo una categoría.");
             window.appState.categorias.splice(index, 1);
             window.saveDataToCloud();
             renderCategoriasConfigList();
             renderCategoriasSelect();
             renderFiltrosCategoriasCheckboxes();
+        }
+
+        // GESTIÓN DE CATEGORÍAS HORMIGA
+        function openModalCatHormiga() {
+            renderCatHormigaList();
+            document.getElementById('modalCatHormiga').classList.remove('hidden');
+        }
+
+        function renderCatHormigaList() {
+            const container = document.getElementById('listaCatHormigaConfig');
+            container.innerHTML = '';
+            (window.hormigaState.categorias || []).forEach((cat, index) => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800";
+                div.innerHTML = `
+                    <div class="flex items-center gap-2 flex-1">
+                        <input type="color" value="${cat.color}" onchange="actualizarCatHormigaCampo(${index}, 'color', this.value)" class="w-8 h-8 rounded bg-slate-900 border border-slate-800 cursor-pointer p-0.5">
+                        <input type="text" value="${cat.nombre}" onchange="actualizarCatHormigaCampo(${index}, 'nombre', this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    </div>
+                    <button onclick="eliminarCatHormiga(${index})" class="text-rose-400 hover:text-rose-300 p-2" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        window.actualizarCatHormigaCampo = function(index, campo, valor) {
+            if (!window.hormigaState.categorias[index]) return;
+            const nombreAnterior = window.hormigaState.categorias[index].nombre;
+            
+            if (campo === 'nombre') {
+                const nuevoNombre = valor.trim();
+                if (!nuevoNombre) return;
+                (window.hormigaState.gastos || []).forEach(g => {
+                    if (g.categoria === nombreAnterior) g.categoria = nuevoNombre;
+                });
+                window.hormigaState.categorias[index].nombre = nuevoNombre;
+            } else {
+                window.hormigaState.categorias[index][campo] = valor;
+            }
+
+            window.saveHormigaDataToCloud();
+            renderHormigaCategoriasSelect();
+            renderHormigaApp();
+        };
+
+        function agregarCategoriaHormiga() {
+            const nombre = document.getElementById('nuevaCatHormigaNombre').value.trim();
+            const color = document.getElementById('nuevaCatHormigaColor').value;
+            if (!nombre) return;
+            window.hormigaState.categorias.push({ nombre, color });
+            document.getElementById('nuevaCatHormigaNombre').value = '';
+            window.saveHormigaDataToCloud();
+            renderCatHormigaList();
+            renderHormigaCategoriasSelect();
+        }
+
+        function eliminarCatHormiga(index) {
+            if (window.hormigaState.categorias.length <= 1) return alert("Mínimo una categoría.");
+            window.hormigaState.categorias.splice(index, 1);
+            window.saveHormigaDataToCloud();
+            renderCatHormigaList();
+            renderHormigaCategoriasSelect();
+        }
+
+        function renderHormigaCategoriasSelect() {
+            const select = document.getElementById('hormigaCategoriaSelect');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '';
+            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.nombre; opt.innerHTML = cat.nombre;
+                select.appendChild(opt);
+            });
+            if (currentVal) select.value = currentVal;
         }
 
         function renderCategoriasSelect() {
@@ -736,6 +1018,7 @@
             if (month > 12) { month = 1; year++; } if (month < 1) { month = 12; year--; }
             window.appState.currentMonth = `${year}-${String(month).padStart(2, '0')}`;
             renderApp();
+            renderHormigaApp();
         }
 
         function formatMonthDisplay(ymStr) {
@@ -850,7 +1133,7 @@
                             estadoAplicar = 'VENCIDO';
                         }
 
-                        const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'D&eacute;bito Autom&aacute;tico';
+                        const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'Débito Automático';
                         generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
                     }
                 } else {
@@ -870,12 +1153,12 @@
                             estadoAplicar = 'VENCIDO';
                         }
 
-                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'D&eacute;bito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
+                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'Débito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
                     }
                 }
 
                 generatedItems.forEach(gi => {
-                    if (baseEsFijo || catEsFijo || gi.tipo.includes('Recurrente') || gi.tipo.includes('D&eacute;bito Autom&aacute;tico')) totalFijos += gi.monto;
+                    if (baseEsFijo || catEsFijo || gi.tipo.includes('Recurrente') || gi.tipo.includes('Débito Automático')) totalFijos += gi.monto;
                     else totalTarjetas += gi.monto;
                     if (totalesPorCat[gi.categoria] !== undefined) totalesPorCat[gi.categoria] += gi.monto;
                     items.push(gi);
@@ -955,7 +1238,193 @@
             }
         }
 
-        // RENDERIZADO DE GRÁFICOS (Chart.js)
+        // LÓGICA Y RENDERIZADO DE GASTOS HORMIGA
+        function renderHormigaApp() {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const badgeMonthEl = document.getElementById('badgeHormigaMonth');
+            if (badgeMonthEl) badgeMonthEl.innerText = formatMonthDisplay(currentMonth);
+
+            renderHormigaCategoriasSelect();
+
+            const itemsHormiga = (window.hormigaState.gastos || []).filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
+            
+            let totalHormiga = 0;
+            itemsHormiga.forEach(g => totalHormiga += parseFloat(g.monto) || 0);
+
+            const [year, month] = currentMonth.split('-').map(Number);
+            const diasEnMes = new Date(year, month, 0).getDate();
+            const promedioDiario = totalHormiga / diasEnMes;
+
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            document.getElementById('cardHormigaTotal').innerText = fmt(totalHormiga);
+            document.getElementById('cardHormigaPromedio').innerText = fmt(promedioDiario);
+            document.getElementById('cardHormigaCantidad').innerText = `${itemsHormiga.length} compra${itemsHormiga.length === 1 ? '' : 's'}`;
+
+            const tbody = document.getElementById('tablaHormigaCuerpo');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            itemsHormiga.sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+            if (itemsHormiga.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No registraste gastos hormiga en este mes.</td></tr>`;
+            } else {
+                itemsHormiga.forEach(g => {
+                    const catObj = (window.hormigaState.categorias || categoriasHormigaDefault).find(c => c.nombre === g.categoria);
+                    const colorCat = catObj ? catObj.color : '#f59e0b';
+                    
+                    const fechaFmt = g.fecha.split('-').reverse().join('/');
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-900/40 transition-colors">
+                            <td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td>
+                            <td class="px-5 py-3.5 text-white font-bold">${g.concepto}</td>
+                            <td class="px-5 py-3.5"><span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${g.categoria}</span></td>
+                            <td class="px-5 py-3.5 text-slate-400 text-xs">${g.medioPago || 'Efectivo'}</td>
+                            <td class="px-5 py-3.5 text-right font-extrabold text-amber-400">${fmt(g.monto)}</td>
+                            <td class="px-5 py-3.5 text-right">
+                                <button onclick="deleteGastoHormiga('${g.id}')" class="text-slate-400 hover:text-rose-400" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                            </td>
+                        </tr>`;
+                });
+            }
+
+            renderHormigaCharts();
+        }
+
+        // GRÁFICOS HORMIGA (CATEGORÍAS Y EVOLUCIÓN 6 MESES)
+        function renderHormigaCharts() {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const allHormigaGastos = window.hormigaState.gastos || [];
+            const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+
+            // 1. Gráfico por Categoría del Mes Actual
+            const currentItems = allHormigaGastos.filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
+            let catMap = {};
+            catHormigaList.forEach(c => catMap[c.nombre] = 0);
+            
+            currentItems.forEach(g => {
+                if (catMap[g.categoria] !== undefined) {
+                    catMap[g.categoria] += parseFloat(g.monto) || 0;
+                } else {
+                    catMap[g.categoria] = parseFloat(g.monto) || 0;
+                }
+            });
+
+            let catLabels = [];
+            let catData = [];
+            let catColors = [];
+
+            Object.keys(catMap).forEach(cName => {
+                if (catMap[cName] > 0) {
+                    catLabels.push(cName);
+                    catData.push(catMap[cName]);
+                    const found = catHormigaList.find(c => c.nombre === cName);
+                    catColors.push(found ? found.color : '#f59e0b');
+                }
+            });
+
+            const ctxHormigaCat = document.getElementById('chartHormigaCategorias');
+            if (ctxHormigaCat) {
+                if (chartInstHormigaCat) chartInstHormigaCat.destroy();
+                chartInstHormigaCat = new Chart(ctxHormigaCat, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0 }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } } }
+                    }
+                });
+            }
+
+            // 2. Gráfico Evolución Últimos 6 Meses
+            let [cYear, cMonth] = currentMonth.split('-').map(Number);
+            let monthsLabels = [];
+            let totalsByMonth = [];
+
+            for (let i = 5; i >= 0; i--) {
+                let m = cMonth - i;
+                let y = cYear;
+                while (m < 1) { m += 12; y--; }
+                let ymStr = `${y}-${String(m).padStart(2, '0')}`;
+                
+                monthsLabels.push(`${monthNames[m - 1]} ${y}`);
+
+                let totalM = 0;
+                allHormigaGastos.forEach(g => {
+                    if (g.fecha && g.fecha.slice(0, 7) === ymStr) {
+                        totalM += parseFloat(g.monto) || 0;
+                    }
+                });
+                totalsByMonth.push(totalM);
+            }
+
+            const ctxHormigaEvol = document.getElementById('chartHormigaEvolucion');
+            if (ctxHormigaEvol) {
+                if (chartInstHormigaEvol) chartInstHormigaEvol.destroy();
+                chartInstHormigaEvol = new Chart(ctxHormigaEvol, {
+                    type: 'bar',
+                    data: {
+                        labels: monthsLabels,
+                        datasets: [{
+                            label: 'Gasto Hormiga Total',
+                            data: totalsByMonth,
+                            backgroundColor: '#f59e0b',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
+        }
+
+        window.handleSaveGastoHormiga = function(e) {
+            e.preventDefault();
+            const concepto = document.getElementById('hormigaConcepto').value;
+            const monto = parseFloat(document.getElementById('hormigaMonto').value);
+            const fecha = document.getElementById('hormigaFecha').value;
+            const categoria = document.getElementById('hormigaCategoriaSelect').value;
+            const medioPago = document.getElementById('hormigaMedioPago').value;
+
+            if (!concepto || !monto || !fecha) return;
+
+            window.hormigaState.gastos.push({
+                id: Date.now().toString(),
+                concepto,
+                monto,
+                fecha,
+                categoria,
+                medioPago
+            });
+
+            window.saveHormigaDataToCloud();
+            document.getElementById('hormigaConcepto').value = '';
+            document.getElementById('hormigaMonto').value = '';
+            renderHormigaApp();
+        };
+
+        window.deleteGastoHormiga = function(id) {
+            if (confirm('¿Eliminar este gasto hormiga?')) {
+                window.hormigaState.gastos = window.hormigaState.gastos.filter(g => g.id !== id);
+                window.saveHormigaDataToCloud();
+                renderHormigaApp();
+            }
+        };
+
+        // RENDERIZADO DE GRÁFICOS GENERALES
         function renderCharts() {
             let [cYear, cMonth] = window.appState.currentMonth.split('-').map(Number);
             let labelsMonths = [];
@@ -973,7 +1442,6 @@
                 tension: 0.3
             }));
 
-            // Generar 7 meses alrededor del desplazamiento actual
             for (let i = -3 + chartOffsetMonths; i <= 3 + chartOffsetMonths; i++) {
                 let m = cMonth + i;
                 let y = cYear;
@@ -994,7 +1462,6 @@
                 });
             }
 
-            // 1. Gráfico Evolución Gastos Totales
             const ctxTotales = document.getElementById('chartEvolucionTotales');
             if (ctxTotales) {
                 if (chartInstTotales) chartInstTotales.destroy();
@@ -1024,7 +1491,6 @@
                 });
             }
 
-            // 2. Gráfico Evolución por Categoría
             const ctxEvolCat = document.getElementById('chartEvolucionCategorias');
             if (ctxEvolCat) {
                 if (chartInstEvolCat) chartInstEvolCat.destroy();
@@ -1043,7 +1509,6 @@
                 });
             }
 
-            // 3. Gráfico Balance General (Ingreso vs Gastos vs Resto - 7 Meses)
             const ctxBalance = document.getElementById('chartBalanceGeneral');
             if (ctxBalance) {
                 if (chartInstBalance) chartInstBalance.destroy();
@@ -1069,10 +1534,8 @@
                 });
             }
 
-            // Datos del mes actual exacto para gráficos circulares
             const currentCalc = getCalculatedDataForMonth(window.appState.currentMonth);
             
-            // 4. Gráfico Distribución por Categoría (Doughnut)
             const ctxDistribucion = document.getElementById('chartDistribucionCategoria');
             if (ctxDistribucion) {
                 if (chartInstDistribucion) chartInstDistribucion.destroy();
@@ -1102,7 +1565,6 @@
                 });
             }
 
-            // 5. Gráfico Gastos Fijos vs Tarjetas (Pie)
             const ctxFijosVsTarjetas = document.getElementById('chartFijosVsTarjetas');
             if (ctxFijosVsTarjetas) {
                 if (chartInstFijosVsTarjetas) chartInstFijosVsTarjetas.destroy();
@@ -1232,7 +1694,7 @@
         };
 
         window.deleteGasto = function(id) {
-            if (confirm('&iquest;Est&aacute;s seguro de que quer&eacute;s eliminar este gasto?')) {
+            if (confirm('¿Estás seguro de que querés eliminar este gasto?')) {
                 window.appState.gastos = window.appState.gastos.filter(g => g.id !== id);
                 window.saveDataToCloud();
                 renderApp();
