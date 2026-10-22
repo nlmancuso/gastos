@@ -1,4 +1,4 @@
-// notificador.js - Filtra solo vencimientos de hoy y mañana
+// notificador.js - Alertas de Vencimientos con diseño profesional
 const { Resend } = require('resend');
 const https = require('https');
 
@@ -25,7 +25,6 @@ function consultarFirestorePublico() {
   });
 }
 
-// Función auxiliar para formatear fechas a YYYY-MM-DD
 function obtenerFechaFormateada(d) {
   const año = d.getFullYear();
   const mes = String(d.getMonth() + 1).padStart(2, '0');
@@ -35,22 +34,19 @@ function obtenerFechaFormateada(d) {
 
 async function procesarAlertas() {
   try {
-    console.log("Consultando Firestore para grupo_mancusososa...");
+    console.log("Consultando Firestore...");
     const resultado = await consultarFirestorePublico();
     
     let gastosFiltrados = [];
 
-    // Definimos las fechas objetivo: Hoy y Mañana
     const hoyDate = new Date();
     hoyDate.setHours(0, 0, 0, 0);
-    const hoyStr = obtenerFechaFormateada(hoyDate); // Ej: "2026-10-22"
+    const hoyStr = obtenerFechaFormateada(hoyDate);
 
     const mañanaDate = new Date();
     mañanaDate.setDate(hoyDate.getDate() + 1);
     mañanaDate.setHours(0, 0, 0, 0);
-    const mañanaStr = obtenerFechaFormateada(mañanaDate); // Ej: "2026-10-23"
-
-    console.log(`Buscando vencimientos para hoy (${hoyStr}) y mañana (${mañanaStr})...`);
+    const mañanaStr = obtenerFechaFormateada(mañanaDate);
 
     if (resultado && resultado.fields && resultado.fields.appState) {
       const appStateMap = resultado.fields.appState.mapValue.fields;
@@ -83,7 +79,6 @@ async function procesarAlertas() {
           const estado = fields.estado ? fields.estado.stringValue : 'PENDIENTE';
           const startMonth = fields.startMonth ? fields.startMonth.stringValue : '2026-10';
 
-          // Obtenemos la fecha de vencimiento real
           let vencimiento = '';
           const claveExcepcion = `${id}_${startMonth}`;
           
@@ -93,7 +88,6 @@ async function procesarAlertas() {
             vencimiento = fields.vencimiento.stringValue;
           }
 
-          // Filtramos: debe estar pendiente Y su vencimiento debe ser hoy o mañana
           if (estado.toUpperCase() === 'PENDIENTE' && (vencimiento === hoyStr || vencimiento === mañanaStr)) {
             gastosFiltrados.push({ concepto, categoria, monto, vencimiento });
           }
@@ -101,22 +95,62 @@ async function procesarAlertas() {
       }
     }
 
-    // CONDICIÓN: Si no hay gastos para hoy o mañana, NO se envía ningún correo
     if (gastosFiltrados.length === 0) {
-      console.log("No hay gastos que vencer hoy ni mañana. No se enviará correo.");
+      console.log("No hay gastos para hoy ni mañana. No se enviará correo.");
       return;
     }
 
-    // Si hay coincidencias, armamos el correo
-    let htmlContenido = `<h2>🔔 Alerta de Vencimientos: Grupo Mancuso Sosa</h2>`;
-    htmlContenido += `<p>Los siguientes gastos vencen hoy o mañana:</p><ul>`;
-    
+    // Diseño HTML profesional y limpio
+    let htmlContenido = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; padding: 40px 0; color: #1f2937;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Encabezado -->
+          <div style="background-color: #0f172a; padding: 30px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.5px;">🔔 Alerta de Vencimientos</h1>
+            <p style="margin: 8px 0 0 0; font-size: 14px; color: #94a3b8;">Tienes pagos pendientes próximos a vencer</p>
+          </div>
+
+          <!-- Cuerpo -->
+          <div style="padding: 30px;">
+            <p style="margin-top: 0; font-size: 15px; color: #4b5563;">El sistema ha detectado los siguientes movimientos que requieren tu atención:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    `;
+
     gastosFiltrados.forEach(g => {
-      let etiquetaVencimiento = g.vencimiento === hoyStr ? '<b>¡Vence HOY!</b>' : '<b>Vence mañana</b>';
-      htmlContenido += `<li><b>${g.concepto}</b> (${g.categoria}) - Monto: <b>$${g.monto.toLocaleString('es-AR')}</b> - ${etvencimiento = etiquetaVencimiento} (${g.vencimiento})</li>`;
+      const esHoy = g.vencimiento === hoyStr;
+      const badgeColor = esHoy ? '#ef4444' : '#f59e0b';
+      const badgeTexto = esHoy ? 'VENCE HOY' : 'VENCE MAÑANA';
+      
+      htmlContenido += `
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 16px 0;">
+                  <div style="font-size: 16px; font-weight: 600; color: #111827;">${g.concepto}</div>
+                  <div style="font-size: 13px; color: #6b7280; margin-top: 3px;">Categoría: ${g.categoria} | Fecha: ${g.vencimiento}</div>
+                </td>
+                <td style="padding: 16px 0; text-align: right; vertical-align: top;">
+                  <div style="font-size: 16px; font-weight: 700; color: #111827;">$${g.monto.toLocaleString('es-AR')}</div>
+                  <div style="margin-top: 5px;">
+                    <span style="background-color: ${badgeColor}; color: #ffffff; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; display: inline-block;">${badgeTexto}</span>
+                  </div>
+                </td>
+              </tr>
+      `;
     });
-    
-    htmlContenido += `</ul>`;
+
+    htmlContenido += `
+            </table>
+          </div>
+
+          <!-- Pie de página -->
+          <div style="background-color: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb;">
+            Este es un correo automático generado por tu aplicación de control de gastos. No respondas a este mensaje.
+          </div>
+
+        </div>
+      </div>
+    `;
 
     await resend.emails.send({
       from: 'Control de Gastos <onboarding@resend.dev>',
@@ -125,7 +159,7 @@ async function procesarAlertas() {
       html: htmlContenido
     });
 
-    console.log("¡Correo de alertas de vencimiento enviado con éxito!");
+    console.log("¡Correo profesional enviado con éxito!");
   } catch (error) {
     console.error("Error al procesar:", error);
   }
