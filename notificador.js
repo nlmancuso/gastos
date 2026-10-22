@@ -1,4 +1,4 @@
-// notificador.js - Lee appState y cruza con excepcionesVencimiento
+// notificador.js - Filtra solo vencimientos de hoy y mañana
 const { Resend } = require('resend');
 const https = require('https');
 
@@ -25,17 +25,36 @@ function consultarFirestorePublico() {
   });
 }
 
+// Función auxiliar para formatear fechas a YYYY-MM-DD
+function obtenerFechaFormateada(d) {
+  const año = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${año}-${mes}-${dia}`;
+}
+
 async function procesarAlertas() {
   try {
     console.log("Consultando Firestore para grupo_mancusososa...");
     const resultado = await consultarFirestorePublico();
     
-    let gastosPorVencer = [];
+    let gastosFiltrados = [];
+
+    // Definimos las fechas objetivo: Hoy y Mañana
+    const hoyDate = new Date();
+    hoyDate.setHours(0, 0, 0, 0);
+    const hoyStr = obtenerFechaFormateada(hoyDate); // Ej: "2026-10-22"
+
+    const mañanaDate = new Date();
+    mañanaDate.setDate(hoyDate.getDate() + 1);
+    mañanaDate.setHours(0, 0, 0, 0);
+    const mañanaStr = obtenerFechaFormateada(mañanaDate); // Ej: "2026-10-23"
+
+    console.log(`Buscando vencimientos para hoy (${hoyStr}) y mañana (${mañanaStr})...`);
 
     if (resultado && resultado.fields && resultado.fields.appState) {
       const appStateMap = resultado.fields.appState.mapValue.fields;
       
-      // 1. Extraemos las excepciones de vencimiento si existen
       let excepcionesMap = {};
       if (appStateMap.excepcionesVencimiento && appStateMap.excepcionesVencimiento.mapValue && appStateMap.excepcionesVencimiento.mapValue.fields) {
         const rawExcepciones = appStateMap.excepcionesVencimiento.mapValue.fields;
@@ -44,7 +63,6 @@ async function procesarAlertas() {
         }
       }
 
-      // 2. Buscamos el array de gastos
       const gastosField = appStateMap.gastos || appStateMap.items;
       
       if (gastosField && gastosField.arrayValue && gastosField.arrayValue.values) {
@@ -63,10 +81,10 @@ async function procesarAlertas() {
           }
           
           const estado = fields.estado ? fields.estado.stringValue : 'PENDIENTE';
-          const startMonth = fields.startMonth ? fields.startMonth.stringValue : '2026-10'; // Mes actual por defecto
+          const startMonth = fields.startMonth ? fields.startMonth.stringValue : '2026-10';
 
-          // 3. Buscamos si tiene vencimiento registrado en excepciones (ej: id_2026-10)
-          let vencimiento = 'Sin fecha';
+          // Obtenemos la fecha de vencimiento real
+          let vencimiento = '';
           const claveExcepcion = `${id}_${startMonth}`;
           
           if (excepcionesMap[claveExcepcion] && excepcionesMap[claveExcepcion] !== '') {
@@ -75,24 +93,27 @@ async function procesarAlertas() {
             vencimiento = fields.vencimiento.stringValue;
           }
 
-          if (estado.toUpperCase() === 'PENDIENTE') {
-            gastosPorVencer.push({ concepto, categoria, monto, vencimiento });
+          // Filtramos: debe estar pendiente Y su vencimiento debe ser hoy o mañana
+          if (estado.toUpperCase() === 'PENDIENTE' && (vencimiento === hoyStr || vencimiento === mañanaStr)) {
+            gastosFiltrados.push({ concepto, categoria, monto, vencimiento });
           }
         });
       }
     }
 
-    if (gastosPorVencer.length === 0) {
-      console.log("No hay gastos pendientes para notificar.");
+    // CONDICIÓN: Si no hay gastos para hoy o mañana, NO se envía ningún correo
+    if (gastosFiltrados.length === 0) {
+      console.log("No hay gastos que vencer hoy ni mañana. No se enviará correo.");
       return;
     }
 
-    // Armamos el correo con los datos reales
+    // Si hay coincidencias, armamos el correo
     let htmlContenido = `<h2>🔔 Alerta de Vencimientos: Grupo Mancuso Sosa</h2>`;
-    htmlContenido += `<p>Se encontraron los siguientes gastos pendientes:</p><ul>`;
+    htmlContenido += `<p>Los siguientes gastos vencen hoy o mañana:</p><ul>`;
     
-    gastosPorVencer.forEach(g => {
-      htmlContenido += `<li><b>${g.concepto}</b> (${g.categoria}) - Monto: <b>$${g.monto.toLocaleString('es-AR')}</b> - Vence: <b>${g.vencimiento}</b></li>`;
+    gastosFiltrados.forEach(g => {
+      let etiquetaVencimiento = g.vencimiento === hoyStr ? '<b>¡Vence HOY!</b>' : '<b>Vence mañana</b>';
+      htmlContenido += `<li><b>${g.concepto}</b> (${g.categoria}) - Monto: <b>$${g.monto.toLocaleString('es-AR')}</b> - ${etvencimiento = etiquetaVencimiento} (${g.vencimiento})</li>`;
     });
     
     htmlContenido += `</ul>`;
@@ -100,11 +121,11 @@ async function procesarAlertas() {
     await resend.emails.send({
       from: 'Control de Gastos <onboarding@resend.dev>',
       to: [process.env.MY_EMAIL],
-      subject: '📊 Vencimientos Pendientes - Grupo Mancuso Sosa',
+      subject: '⚠️ Atención: Gastos que vencen hoy o mañana',
       html: htmlContenido
     });
 
-    console.log("¡Correo enviado con éxito con las fechas cruzadas!");
+    console.log("¡Correo de alertas de vencimiento enviado con éxito!");
   } catch (error) {
     console.error("Error al procesar:", error);
   }
