@@ -14,7 +14,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -29,23 +29,75 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const docRef = doc(db, "app_data", "usuario_principal");
 
         window.db = db;
-        window.docRef = docRef;
         window.auth = auth;
 
-        // Control de Estado de Autenticación
-        onAuthStateChanged(auth, (user) => {
-            const loginOverlay = document.getElementById('loginOverlay');
-            const appContent = document.getElementById('appContent');
+        let unsubscribeSnapshot = null;
 
+        function showLoading() {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            document.getElementById('appContent').classList.add('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('appContent').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('appContent').classList.remove('hidden');
+        }
+
+        // Control de Estado de Autenticación
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                loginOverlay.classList.add('hidden');
-                appContent.classList.remove('hidden');
+                showLoading();
+
+                // 1. Limpiamos el estado en memoria para evitar ver datos previos
+                window.appState = {
+                    currentMonth: new Date().toISOString().slice(0, 7),
+                    gastos: [],
+                    excepcionesMonto: {},
+                    excepcionesCategoria: {},
+                    sueldos: {},
+                    categorias: JSON.parse(JSON.stringify(categoriasDefault)),
+                    sortColumn: 'concepto',
+                    sortAscending: true
+                };
+
+                // 2. Obtener el grupo asignado al usuario desde Firestore
+                let grupoId = user.uid; 
                 
-                // Cargar datos de la nube
-                onSnapshot(docRef, (docSnap) => {
+                try {
+                    const rolRef = doc(db, "usuarios_roles", user.uid);
+                    const rolSnap = await getDoc(rolRef);
+                    if (rolSnap.exists() && rolSnap.data().grupo) {
+                        grupoId = rolSnap.data().grupo;
+                    }
+                } catch (err) {
+                    console.warn("No se pudo leer la asignación de grupo:", err);
+                }
+
+                // 3. Apuntar la referencia a la base del grupo correspondiente
+                const docRef = doc(db, "app_data", grupoId);
+                window.docRef = docRef;
+                window.currentGrupo = grupoId;
+
+                // Extraemos la parte del mail antes del '@'
+                const userName = user.email ? user.email.split('@')[0] : 'Usuario';
+                const grupoDisplay = document.getElementById('grupoStatus');
+                if (grupoDisplay) {
+                    grupoDisplay.innerText = `👤 Usuario: ${userName}`;
+                }
+
+                if (unsubscribeSnapshot) unsubscribeSnapshot();
+
+                unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         if (data.appState) {
@@ -54,26 +106,28 @@
                     } else {
                         saveDataToCloud();
                     }
+
                     const statusEl = document.getElementById('cloudStatus');
                     if (statusEl) {
                         statusEl.innerText = "☁️ Nube";
-                        statusEl.title = "Sincronizado en la Nube";
                     }
+
                     renderApp();
                     renderCategoriasSelect();
+
+                    showApp();
                 }, (error) => {
                     console.error("Error en nube: ", error);
-                    const statusEl = document.getElementById('cloudStatus');
-                    if (statusEl) {
-                        statusEl.innerText = "⚠️ Local";
-                        statusEl.title = "Modo Sin Conexión";
-                    }
                     renderApp();
                     renderCategoriasSelect();
+                    showApp();
                 });
             } else {
-                loginOverlay.classList.remove('hidden');
-                appContent.classList.add('hidden');
+                showLogin();
+                if (unsubscribeSnapshot) {
+                    unsubscribeSnapshot();
+                    unsubscribeSnapshot = null;
+                }
             }
         });
 
@@ -84,24 +138,28 @@
             const loginError = document.getElementById('loginError');
             loginError.classList.add('hidden');
 
+            showLoading();
+
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
             } catch (error) {
                 console.error("Error al iniciar sesión:", error);
+                showLogin();
                 loginError.innerText = "Correo o contraseña incorrectos.";
                 loginError.classList.remove('hidden');
             }
         };
 
         window.cerrarSesion = function() {
+            showLogin();
             signOut(auth);
         };
 
         window.saveDataToCloud = async function() {
             try {
-                // Forzamos clonación para que Firebase detecte los cambios internos en mapas y objetos
+                if (!window.docRef) return;
                 const cleanState = JSON.parse(JSON.stringify(window.appState));
-                await setDoc(docRef, { appState: cleanState });
+                await setDoc(window.docRef, { appState: cleanState });
                 localStorage.setItem('gastos_app_state_backup', JSON.stringify(cleanState));
             } catch (e) {
                 console.error("Error guardando datos:", e);
@@ -162,6 +220,14 @@
         </div>
     </div>
 
+    <!-- PANTALLA DE CARGA (SPINNER) -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 hidden">
+        <div class="text-center">
+            <div class="inline-block w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+            <p class="text-sm font-semibold text-slate-300 tracking-wide">Cargando tus finanzas...</p>
+        </div>
+    </div>
+
     <!-- CONTENIDO PRINCIPAL DE LA APLICACIÓN -->
     <div id="appContent" class="hidden">
         <!-- Header Principal -->
@@ -174,7 +240,7 @@
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Control de Gastos</h1>
-                        <p class="text-xs text-slate-400 font-medium">Proyección y Finanzas Personales</p>
+                        <p class="text-xs text-slate-400 font-medium" id="grupoStatus">Proyección y Finanzas Personales</p>
                     </div>
                 </div>
 
@@ -184,7 +250,7 @@
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center capitalize">
-                        Noviembre 2026
+                        Octubre 2026
                     </span>
                     <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1 transition text-sm">
                         <i class="fa-solid fa-chevron-right"></i>
@@ -277,7 +343,7 @@
                         <div class="flex items-center gap-3">
                             <h3 class="text-lg font-bold text-white">Planilla de Gastos</h3>
                             <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">
-                                Noviembre 2026
+                                Octubre 2026
                             </span>
                         </div>
                         <!-- Filtro Múltiple por Categoría -->
@@ -485,38 +551,49 @@
                     </label>
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-4">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">A PARTIR DE QUÉ MES EMPIEZA</label>
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <!-- Checkbox de Débito Automático / Recurrente -->
-                <div class="mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                    <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
-                        <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
-                        🔄 Débito Automático / Repetir todos los meses
-                    </label>
-                    <p class="text-[11px] text-slate-400 mt-1 ml-7">
-                        Tildalo si este gasto se debita todos los meses. Si no lo tildás, aparecerá únicamente en el mes seleccionado.
-                    </p>
-                </div>
+                <!-- BLOQUE OPCIONES DE TARJETA / PAGO -->
+                <div class="mb-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                    <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <i class="fa-solid fa-credit-card text-emerald-400 mr-1"></i> Opciones de Tarjeta / Pago
+                    </span>
 
-                <div class="mb-4">
-                    <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
-                        <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
-                        ¿Es una compra en Cuotas?
-                    </label>
-                </div>
-
-                <div id="sectionCuotas" class="hidden grid grid-cols-2 gap-3 mb-5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                    <!-- Checkbox de Débito Automático -->
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CANTIDAD DE CUOTAS</label>
-                        <input type="number" id="gastoCuotas" value="1" min="1" max="60" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
+                            <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
+                            🔄 Débito Automático
+                        </label>
+                        <p class="text-[11px] text-slate-400 mt-0.5 ml-7">
+                            Tildalo si este gasto se debita todos los meses. Si no lo tildás, aparecerá únicamente en el mes seleccionado.
+                        </p>
                     </div>
+
+                    <hr class="border-slate-800">
+
+                    <!-- Checkbox de Cuotas -->
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">VALOR POR CUOTA</label>
-                        <div id="montoCalculadoCuota" class="px-3 py-2 text-sm font-bold text-emerald-400 bg-slate-900 border border-slate-700 rounded-lg">
-                            $ 0,00
+                        <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
+                            <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900">
+                            ¿Es una compra en Cuotas?
+                        </label>
+                    </div>
+
+                    <!-- Campos Desplegables de Cuotas -->
+                    <div id="sectionCuotas" class="hidden grid grid-cols-2 gap-3 pt-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CANTIDAD DE CUOTAS</label>
+                            <input type="number" id="gastoCuotas" value="1" min="1" max="60" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">VALOR POR CUOTA</label>
+                            <div id="montoCalculadoCuota" class="px-3 py-2 text-sm font-bold text-emerald-400 bg-slate-950 border border-slate-700 rounded-lg">
+                                $ 0,00
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -770,7 +847,7 @@
         function getMonthOffset(ymStr, offset) {
             let [year, month] = ymStr.split('-').map(Number);
             month += offset;
-            while (month > 12) { month -= 12; year++; }
+            while (month > 12) { month -= 12; year--; }
             while (month < 1) { month += 12; year--; }
             return `${year}-${String(month).padStart(2, '0')}`;
         }
@@ -828,6 +905,8 @@
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
                 const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
                 const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
+                
+                // Si la categoría contiene 'Fijo' o 'Servicios', se propaga automáticamente como recurrente
                 const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
 
                 let generatedItems = [];
@@ -857,7 +936,7 @@
                     }
                 } else if (isRecurrente) {
                     if (targetMonth >= startYM) {
-                        const tipoStr = baseEsFijo ? 'Recurrente / Mensual' : 'Débito Automático';
+                        const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'Débito Automático';
                         generatedItems.push({
                             id: gasto.id,
                             concepto: gasto.concepto,
@@ -872,14 +951,14 @@
                             id: gasto.id,
                             concepto: gasto.concepto,
                             categoria: categoriaAplicar,
-                            tipo: 'Contado / Único',
+                            tipo: 'Débito',
                             monto: montoAplicar
                         });
                     }
                 }
 
                 generatedItems.forEach(gi => {
-                    if (baseEsFijo || gi.tipo.includes('Recurrente')) {
+                    if (baseEsFijo || catEsFijo || gi.tipo.includes('Recurrente') || gi.tipo.includes('Débito Automático')) {
                         totalFijos += gi.monto;
                     } else {
                         totalTarjetas += gi.monto;
@@ -1204,7 +1283,6 @@
                         if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
                         if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
 
-                        // Asignamos explícitamente para que Firebase detecte el cambio de mapa
                         window.appState.excepcionesMonto = {
                             ...window.appState.excepcionesMonto,
                             [`${id}_${currentMonth}`]: monto
