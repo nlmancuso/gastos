@@ -1,4 +1,4 @@
-// notificador.js - Lectura directa de Firestore para Grupo Mancuso Sosa
+// notificador.js - Envía correo solo si hay vencimientos detectados
 const { Resend } = require('resend');
 const https = require('https');
 
@@ -6,7 +6,6 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 function consultarFirestorePublico() {
   return new Promise((resolve, reject) => {
-    // Usamos tu ID de proyecto exacto: gastos-334ff
     const url = `https://firestore.googleapis.com/v1/projects/gastos-334ff/databases/(default)/documents/app_data/grupo_mancusososa`;
 
     https.get(url, (res) => {
@@ -28,10 +27,9 @@ function consultarFirestorePublico() {
 
 async function procesarAlertas() {
   try {
-    console.log("Iniciando consulta a Firestore para el proyecto gastos-334ff...");
+    console.log("Consultando Firestore para grupo_mancusososa...");
     const resultado = await consultarFirestorePublico();
     
-    let htmlContenido = `<h2>🔔 Alerta de Vencimientos: Grupo Mancuso Sosa</h2>`;
     let gastosPorVencer = [];
 
     if (resultado && resultado.fields && resultado.fields.gastos) {
@@ -39,38 +37,49 @@ async function procesarAlertas() {
       
       arrayGastos.forEach(item => {
         const fields = item.mapValue.fields;
-        const concepto = fields.concepto ? fields.concepto.stringValue : 'Sin concepto';
+        
+        // Mapeamos de forma flexible los nombres de los campos que usa tu interfaz web
+        const concepto = fields.concepto ? fields.concepto.stringValue : (fields.nombre ? fields.nombre.stringValue : 'Sin concepto');
         const categoria = fields.categoria ? fields.categoria.stringValue : 'Sin categoría';
-        const monto = fields.monto ? fields.monto.doubleValue || fields.monto.integerValue : 0;
+        
+        // El monto puede venir como doubleValue o integerValue
+        let monto = 0;
+        if (fields.monto) {
+          monto = fields.monto.doubleValue !== undefined ? fields.monto.doubleValue : (fields.monto.integerValue ? Number(fields.monto.integerValue) : 0);
+        }
+        
         const vencimiento = fields.vencimiento ? fields.vencimiento.stringValue : '';
         const estado = fields.estado ? fields.estado.stringValue : '';
 
-        // Filtramos los que están pendientes
+        // Si está pendiente, lo sumamos al reporte
         if (estado === 'PENDIENTE') {
           gastosPorVencer.push({ concepto, categoria, monto, vencimiento });
         }
       });
     }
 
-    if (gastosPorVencer.length > 0) {
-      htmlContenido += `<p>Se encontraron los siguientes gastos pendientes:</p><ul>`;
-      gastosPorVencer.forEach(g => {
-        htmlContenido += `<li><b>${g.concepto}</b> (${g.categoria}) - Monto: <b>$${g.monto}</b> - Vence: <b>${g.vencimiento}</b></li>`;
-      });
-      htmlContenido += `</ul>`;
-    } else {
-      htmlContenido += `<p>No se detectaron gastos pendientes para este grupo en este momento.</p>`;
+    // CONDICIÓN CLAVE: Si no hay gastos pendientes, terminamos acá y NO enviamos correo
+    if (gastosPorVencer.length === 0) {
+      console.log("No hay gastos pendientes. No se enviará ningún correo.");
+      return;
     }
 
-    // Enviar el correo con Resend
+    // Si hay gastos, armamos el HTML y enviamos
+    let htmlContenido = `<h2>🔔 Alerta de Vencimientos: Grupo Mancuso Sosa</h2>`;
+    htmlContenido += `<p>Se encontraron los siguientes gastos pendientes:</p><ul>`;
+    gastosPorVencer.forEach(g => {
+      htmlContenido += `<li><b>${g.concepto}</b> (${g.categoria}) - Monto: <b>$${g.monto.toLocaleString('es-AR')}</b> - Vence: <b>${g.vencimiento}</b></li>`;
+    });
+    htmlContenido += `</ul>`;
+
     await resend.emails.send({
       from: 'Control de Gastos <onboarding@resend.dev>',
       to: [process.env.MY_EMAIL],
-      subject: '📊 Vencimientos - Grupo Mancuso Sosa',
+      subject: '📊 Vencimientos Pendientes - Grupo Mancuso Sosa',
       html: htmlContenido
     });
 
-    console.log("¡Correo enviado con éxito!");
+    console.log("¡Correo con vencimientos enviado exitosamente!");
   } catch (error) {
     console.error("Error al procesar:", error);
   }
