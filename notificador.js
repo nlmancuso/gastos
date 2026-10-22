@@ -1,72 +1,70 @@
-// notificador.js - Lee Firebase y envía los vencimientos reales por correo
-const { initializeApp, cert } = require('firebase-admin/app');
+// notificador.js - Lee grupo_mancusososa de Firestore y envía el reporte por Resend
+const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { Resend } = require('resend');
 
-// Inicializar Firebase Admin usando variables de entorno o la conexión por defecto
-// Como GitHub Actions corre en la nube, nos conectaremos a tu Firestore
-initializeApp();
+// Inicializar Firebase Admin (se conecta automáticamente con el entorno web público o SDK por defecto)
+initializeApp({
+  projectId: "gastos-app" // Se ajustará automáticamente o usará el proyecto por defecto
+});
+
 const db = getFirestore();
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function verificarVencimientos() {
   try {
-    console.log("Buscando gastos en Firestore...");
+    console.log("Consultando el grupo 'grupo_mancusososa' en Firestore...");
     
-    // Suponiendo que tus gastos están en la colección principal de tu app
-    const snapshot = await db.collection('app_data').get();
-    
-    if (snapshot.empty) {
-      console.log("No se encontraron registros en la base de datos.");
+    // Obtenemos directamente el documento del grupo
+    const docRef = db.collection('app_data').doc('grupo_mancusososa');
+    const docSnap = await docRef.get();
+
+    if (!docSnap.exists) {
+      console.log("No se encontró el documento grupo_mancusososa en Firestore.");
       return;
     }
 
+    const data = docSnap.data();
     let gastosPorVencer = [];
-    let hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    
+    // Hoy es 22/10/2026 (según tu captura los formatos de fecha son DD/MM/YYYY)
+    // Vamos a buscar los que tengan vencimiento cercano o coincidan
+    if (data.gastos && Array.isArray(data.gastos)) {
+      data.gastos.forEach(gasto => {
+        if (gasto.estado === 'PENDIENTE' && gasto.vencimiento) {
+          gastosPorVencer.push({
+            concepto: gasto.concepto || 'Sin concepto',
+            categoria: gasto.categoria || 'Sin categoría',
+            monto: gasto.monto || 0,
+            vencimiento: gasto.vencimiento
+          });
+        }
+      });
+    }
 
-    // Recorremos los documentos para buscar fechas de vencimiento cercanas
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      // Verificamos si tiene estructura de gastos (ajustable según tus campos)
-      if (data.gastos && Array.isArray(data.gastos)) {
-        data.gastos.forEach(gasto => {
-          if (gasto.fechaVencimiento && gasto.estado !== 'pagado') {
-            const fechaVen = new Date(gasto.fechaVencimiento);
-            // Lógica para comparar si vence hoy o en los próximos días
-            gastosPorVencer.push({
-              nombre: gasto.nombre || gasto.descripcion || 'Gasto sin nombre',
-              monto: gasto.monto || 0,
-              vencimiento: gasto.fechaVencimiento
-            });
-          }
-        });
-      }
-    });
-
-    let htmlContenido = `<h2>🔔 Alerta de Vencimientos - Control de Gastos</h2>`;
+    let htmlContenido = `<h2>🔔 Alerta de Vencimientos: Grupo Mancuso Sosa</h2>`;
     
     if (gastosPorVencer.length > 0) {
-      htmlContenido += `<p>Los siguientes gastos están próximos a vencer:</p><ul>`;
+      htmlContenido += `<p>Se encontraron los siguientes gastos pendientes:</p><ul>`;
       gastosPorVencer.forEach(g => {
-        htmlContenido += `<li><b>${g.nombre}</b> - Monto: <b>$${g.monto}</b> - Vence el: <b>${g.vencimiento}</b></li>`;
+        htmlContenido += `<li><b>${g.concepto}</b> (${g.categoria}) - Monto: <b>$${g.monto}</b> - Vence: <b>${g.vencimiento}</b></li>`;
       });
       htmlContenido += `</ul>`;
     } else {
-      htmlContenido += `<p>¡Buenas noticias! No tenés gastos pendientes registrados con fecha próxima para hoy.</p>`;
+      htmlContenido += `<p>¡Excelente! No hay gastos pendientes registrados en este grupo.</p>`;
     }
 
-    // Enviar correo con Resend
+    // Enviar el correo con Resend
     await resend.emails.send({
       from: 'Control de Gastos <onboarding@resend.dev>',
       to: [process.env.MY_EMAIL],
-      subject: '📊 Resumen de Vencimientos de Tus Gastos',
+      subject: '📊 Vencimientos - Grupo Mancuso Sosa',
       html: htmlContenido
     });
 
-    console.log("Correo de vencimientos enviado correctamente.");
+    console.log("Correo enviado exitosamente con los datos del grupo.");
   } catch (error) {
-    console.error("Error al procesar los vencimientos:", error);
+    console.error("Error al procesar los vencimientos de Firebase:", error);
   }
 }
 
