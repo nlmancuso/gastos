@@ -58,6 +58,7 @@
             if (user) {
                 showLoading();
 
+                // Limpiamos la caché local para evitar datos residuales de pruebas anteriores
                 window.appState = {
                     currentMonth: new Date().toISOString().slice(0, 7),
                     gastos: [],
@@ -102,12 +103,13 @@
                 const userName = user.email ? user.email.split('@')[0] : 'Usuario';
                 const grupoDisplay = document.getElementById('grupoStatus');
                 if (grupoDisplay) {
-                    grupoDisplay.innerHTML = `👤 Usuario: ${userName} (${grupoId})`;
+                    grupoDisplay.innerHTML = `👤 ${userName} (${grupoId})`;
                 }
 
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
                 if (unsubscribeHormiga) unsubscribeHormiga();
 
+                // Nos conectamos a Firestore y traemos los datos reales del grupo
                 unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -129,7 +131,7 @@
                     }
 
                     const statusEl = document.getElementById('cloudStatus');
-                    if (statusEl) statusEl.innerHTML = "☁️ Nube";
+                    if (statusEl) statusEl.innerHTML = "☁️ Sincronizado";
 
                     renderApp();
                     renderCategoriasSelect();
@@ -196,6 +198,24 @@
                 await setDoc(window.docHormigaRef, { hormigaState: cleanHormiga });
             } catch (e) {
                 console.error("Error guardando datos hormiga:", e);
+            }
+        };
+
+        window.forzarSincronizacion = async function() {
+            showLoading();
+            try {
+                const docSnap = await getDoc(window.docRef);
+                if (docSnap.exists() && docSnap.data().appState) {
+                    window.appState = { ...window.appState, ...docSnap.data().appState };
+                }
+                renderApp();
+                renderSaldosApp();
+                showApp();
+                alert("¡Sincronización completada con éxito!");
+            } catch (err) {
+                console.error("Error al sincronizar:", err);
+                showApp();
+                alert("Error al intentar sincronizar con la nube.");
             }
         };
     </script>
@@ -287,13 +307,16 @@
                     <button id="btnNuevoGastoHeader" onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
                     </button>
+                    <button onclick="forzarSincronizacion()" title="Forzar Sincronización con la Nube" class="p-2.5 rounded-lg card-bg text-emerald-400 hover:text-emerald-300 transition">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
                     <button onclick="openModalConfig()" title="Configuración Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                         <i class="fa-solid fa-gear"></i>
                     </button>
                     <button onclick="cerrarSesion()" title="Cerrar Sesión" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
-                    <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">☁️ Nube</span>
+                    <span id="cloudStatus" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded border border-slate-800 font-mono">☁️ Sincronizado</span>
                 </div>
             </div>
 
