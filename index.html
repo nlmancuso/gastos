@@ -67,8 +67,8 @@
                     excepcionesEstado: {},
                     sueldos: {},
                     cuentasBancarias: [
-                        { id: '1', nombre: 'Banco Ciudad', saldosPorMes: { "2026-10": { bcoSaldo: 19702.40, mpSaldo: 362000.00 } }, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
-                        { id: '2', nombre: 'Banco Santander', saldosPorMes: { "2026-10": { bcoSaldo: 0, mpSaldo: 0 } }, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
+                        { id: '1', nombre: 'Banco Ciudad', saldosPorMes: {}, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
+                        { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
                     ],
                     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
                     sortColumn: 'concepto',
@@ -102,7 +102,7 @@
                 const userName = user.email ? user.email.split('@')[0] : 'Usuario';
                 const grupoDisplay = document.getElementById('grupoStatus');
                 if (grupoDisplay) {
-                    grupoDisplay.innerHTML = `👤 Usuario: ${userName}`;
+                    grupoDisplay.innerHTML = `👤 Usuario: ${userName} (${grupoId})`;
                 }
 
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -996,7 +996,6 @@
             let tarjetasBancosHtml = '';
 
             (window.appState.cuentasBancarias || []).forEach(cuenta => {
-                // Recuperamos los saldos específicos del mes actual (si no existen, por defecto es 0)
                 const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
                 const bcoSaldo = parseFloat(saldosMes.bcoSaldo) || 0;
                 const mpSaldo = parseFloat(saldosMes.mpSaldo) || 0;
@@ -1055,7 +1054,6 @@
                 const disponibleFinal = totalIngresos - totalDescuentosBanco;
                 totalDisponibleRealSuma += disponibleFinal;
 
-                // Métrica individual del banco
                 tarjetasBancosHtml += `
                     <div class="card-bg p-4 rounded-2xl border border-slate-800 relative">
                         <div class="flex justify-between items-center mb-1">
@@ -1068,7 +1066,6 @@
                     </div>
                 `;
 
-                // Tarjeta de Banco Completa (Grid Inferior)
                 container.innerHTML += `
                     <div class="card-bg p-5 rounded-2xl flex flex-col justify-between shadow-xl border border-slate-800">
                         <div>
@@ -1131,7 +1128,6 @@
         }
 
         window.openModalCuenta = function() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             document.getElementById('cuentaId').value = '';
             document.getElementById('modalCuentaTitulo').innerText = "Nueva Cuenta / Banco";
             document.getElementById('cuentaNombre').value = '';
