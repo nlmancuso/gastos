@@ -23,5 +23,5 @@ jobs:
       - name: Ejecutar script de notificaciones
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          MY_EMAIL: ${{ secrets.MY_EMAIL }}
+          EMAIL_TO: ${{ secrets.MY_EMAIL }}
         run: node notificador.js
