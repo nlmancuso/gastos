@@ -209,7 +209,6 @@
             border-bottom: 1px solid #1e293b;
         }
         .text-green-accent { color: #10b981; }
-        .text-red-accent { color: #f43f5e; }
         .text-blue-accent { color: #6366f1; }
         .tab-btn-active {
             border-bottom: 2px solid #10b981;
@@ -309,7 +308,8 @@
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <!-- VISTA 1: PLANILLA GENERAL -->
             <div id="vistaPlanilla">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <!-- METRICAS SUPERIORES (5 TARJETAS) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                     <div class="card-bg p-5 rounded-2xl relative">
                         <div class="flex justify-between items-center mb-1">
                             <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">INGRESO / SUELDO</span>
@@ -319,14 +319,24 @@
                         </div>
                         <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
                     </div>
+
+                    <!-- GASTOS FIJOS EN COLOR ÁMBAR / NARANJA -->
                     <div class="card-bg p-5 rounded-2xl relative">
                         <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS FIJOS</span>
-                        <h2 id="cardGastosFijos" class="text-2xl font-extrabold text-red-accent my-1">$ 0,00</h2>
+                        <h2 id="cardGastosFijos" class="text-2xl font-extrabold text-amber-500 my-1">$ 0,00</h2>
                     </div>
+
                     <div class="card-bg p-5 rounded-2xl relative">
                         <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">TOTAL TARJETAS</span>
                         <h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2>
                     </div>
+
+                    <!-- GASTOS TOTALES EN ROJO -->
+                    <div class="card-bg p-5 rounded-2xl relative">
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS TOTALES</span>
+                        <h2 id="cardGastosTotales" class="text-2xl font-extrabold text-rose-500 my-1">$ 0,00</h2>
+                    </div>
+
                     <div class="card-bg p-5 rounded-2xl relative">
                         <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">RESTO DISPONIBLE</span>
                         <h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
@@ -848,7 +858,7 @@
                         <input type="checkbox" id="catBloque_${index}" ${cat.esTarjeta ? 'checked' : ''} onchange="actualizarCatCampo(${index}, 'esTarjeta', this.checked)" class="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
                         <label for="catBloque_${index}" class="text-[11px] text-slate-400 cursor-pointer flex items-center gap-1.5">
                             <i class="fa-solid ${cat.esTarjeta ? 'fa-credit-card text-emerald-400' : 'fa-thumbtack text-slate-400'}"></i>
-                            ${cat.esTarjeta ? 'Vencimiento único en bloque' : 'Vencimiento individual'}
+                            ${cat.esTarjeta ? 'Vencimiento único en bloque (Tarjeta)' : 'Vencimiento individual (Gasto Fijo)'}
                         </label>
                     </div>
                 `;
@@ -1086,6 +1096,7 @@
             return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         }
 
+        // LÓGICA DE CÁLCULO DE GASTOS CORREGIDA (ESTRICTA POR CATEGORÍA)
         function getCalculatedDataForMonth(targetMonth) {
             const sueldoActual = getSueldoForMonth(targetMonth);
             let items = [];
@@ -1189,8 +1200,16 @@
                 }
 
                 generatedItems.forEach(gi => {
-                    if (baseEsFijo || catEsFijo || gi.tipo.includes('Recurrente') || gi.tipo.includes('Débito Automático')) totalFijos += gi.monto;
-                    else totalTarjetas += gi.monto;
+                    // Criterio exacto: Buscamos la categoría y evaluamos si esTarjeta
+                    const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === gi.categoria);
+                    const esTarjetaCat = catObj ? catObj.esTarjeta : true;
+
+                    if (!esTarjetaCat) {
+                        totalFijos += gi.monto;
+                    } else {
+                        totalTarjetas += gi.monto;
+                    }
+
                     if (totalesPorCat[gi.categoria] !== undefined) totalesPorCat[gi.categoria] += gi.monto;
                     items.push(gi);
                 });
@@ -1204,6 +1223,7 @@
             document.getElementById('badgeMonth').innerText = formatMonthDisplay(currentMonth);
 
             const { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
+            const totalGastosMes = totalFijos + totalTarjetas;
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             const containerTotales = document.getElementById('containerTotalesCategoria');
@@ -1224,10 +1244,12 @@
                 return typeof vA === 'string' ? (asc ? vA.localeCompare(vB) : vB.localeCompare(vA)) : (asc ? vA - vB : vB - vA);
             });
 
+            // RENDERIZADO DE LAS 5 TARJETAS SUPERIORES CON COLORES CORREGIDOS
             document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
             document.getElementById('cardGastosFijos').innerText = fmt(totalFijos);
             document.getElementById('cardTarjetas').innerText = fmt(totalTarjetas);
-            document.getElementById('cardResto').innerText = fmt(sueldoActual - (totalFijos + totalTarjetas));
+            document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
+            document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
 
             const tbody = document.getElementById('tablaCuerpo');
             tbody.innerHTML = '';
@@ -1324,7 +1346,7 @@
             renderHormigaCharts();
         }
 
-        // GRÁFICOS HORMIGA (CATEGORÍAS Y EVOLUCIÓN 6 MESES)
+        // GRÁFICOS HORMIGA
         function renderHormigaCharts() {
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             const allHormigaGastos = window.hormigaState.gastos || [];
