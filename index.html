@@ -66,6 +66,10 @@
                     excepcionesVencimiento: {},
                     excepcionesEstado: {},
                     sueldos: {},
+                    cuentasBancarias: [
+                        { id: '1', nombre: 'Banco Ciudad', saldosPorMes: { "2026-10": { bcoSaldo: 19702.40, mpSaldo: 362000.00 } }, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
+                        { id: '2', nombre: 'Banco Santander', saldosPorMes: { "2026-10": { bcoSaldo: 0, mpSaldo: 0 } }, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
+                    ],
                     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
                     sortColumn: 'concepto',
                     sortAscending: true
@@ -88,12 +92,10 @@
                     console.warn("No se pudo leer la asignación de grupo:", err);
                 }
 
-                // 1. Conexión a la base grupal (Planilla y Gráficos)
                 const docRef = doc(db, "app_data", grupoId);
                 window.docRef = docRef;
                 window.currentGrupo = grupoId;
 
-                // 2. Conexión a la base PRIVADA del usuario (Gastos Hormiga)
                 const docHormigaRef = doc(db, "app_data_hormiga", user.uid);
                 window.docHormigaRef = docHormigaRef;
 
@@ -106,12 +108,17 @@
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
                 if (unsubscribeHormiga) unsubscribeHormiga();
 
-                // Listener Datos Grupales
                 unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         if (data.appState) {
                             window.appState = { ...window.appState, ...data.appState };
+                            if (!window.appState.cuentasBancarias) {
+                                window.appState.cuentasBancarias = [
+                                    { id: '1', nombre: 'Banco Ciudad', saldosPorMes: {}, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
+                                    { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
+                                ];
+                            }
                             window.appState.categorias = (window.appState.categorias || categoriasDefault).map(c => ({
                                 ...c,
                                 esTarjeta: c.esTarjeta ?? (!c.nombre.toLowerCase().includes('fijo') && !c.nombre.toLowerCase().includes('servicio'))
@@ -129,7 +136,6 @@
                     showApp();
                 });
 
-                // Listener Datos Privados (Gastos Hormiga)
                 unsubscribeHormiga = onSnapshot(docHormigaRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -291,13 +297,16 @@
                 </div>
             </div>
 
-            <!-- NAVEGACIÓN PRINCIPAL ENTRE 3 SOLAPAS -->
+            <!-- NAVEGACIÓN PRINCIPAL ENTRE SOLAPAS -->
             <div class="flex border-b border-slate-800 overflow-x-auto">
                 <button id="tabPlanillaBtn" onclick="switchTab('planilla')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition tab-btn-active flex items-center gap-2 whitespace-nowrap">
                     <i class="fa-solid fa-table-list"></i> Planilla de Gastos
                 </button>
                 <button id="tabGraficosBtn" onclick="switchTab('graficos')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
                     <i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos
+                </button>
+                <button id="tabSaldosBtn" onclick="switchTab('saldos')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos
                 </button>
                 <button id="tabHormigaBtn" onclick="switchTab('hormiga')" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
                     <i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga <span class="text-[10px] bg-amber-950 text-amber-400 px-1.5 py-0.5 rounded border border-amber-800">Privado</span>
@@ -308,7 +317,7 @@
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <!-- VISTA 1: PLANILLA GENERAL -->
             <div id="vistaPlanilla">
-                <!-- METRICAS SUPERIORES (5 TARJETAS) -->
+                <!-- METRICAS SUPERIORES -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                     <div class="card-bg p-5 rounded-2xl relative">
                         <div class="flex justify-between items-center mb-1">
@@ -320,7 +329,6 @@
                         <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
                     </div>
 
-                    <!-- GASTOS FIJOS EN COLOR ÁMBAR / NARANJA -->
                     <div class="card-bg p-5 rounded-2xl relative">
                         <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS FIJOS</span>
                         <h2 id="cardGastosFijos" class="text-2xl font-extrabold text-amber-500 my-1">$ 0,00</h2>
@@ -331,7 +339,6 @@
                         <h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2>
                     </div>
 
-                    <!-- GASTOS TOTALES EN ROJO -->
                     <div class="card-bg p-5 rounded-2xl relative">
                         <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">GASTOS TOTALES</span>
                         <h2 id="cardGastosTotales" class="text-2xl font-extrabold text-rose-500 my-1">$ 0,00</h2>
@@ -379,7 +386,6 @@
 
             <!-- VISTA 2: GRAFICOS GENERALES -->
             <div id="vistaGraficos" class="hidden space-y-6">
-                <!-- SELECTOR DE RANGO POR MES DESDE Y HASTA -->
                 <div class="card-bg p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div class="flex items-center gap-2 text-slate-300 text-sm font-bold">
                         <i class="fa-solid fa-calendar-days text-emerald-400"></i>
@@ -401,7 +407,6 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- GRÁFICO 1: EVOLUCIÓN GASTOS TOTALES + INGRESOS -->
                     <div class="card-bg p-6 rounded-2xl">
                         <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
                             <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales vs. Ingresos
@@ -409,7 +414,6 @@
                         <div class="relative h-64 w-full"><canvas id="chartEvolucionTotales"></canvas></div>
                     </div>
 
-                    <!-- GRÁFICO 2: EVOLUCIÓN POR CATEGORÍA -->
                     <div class="card-bg p-6 rounded-2xl">
                         <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
                             <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
@@ -417,7 +421,6 @@
                         <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
                     </div>
 
-                    <!-- GRÁFICO 3: BALANCE GENERAL -->
                     <div class="card-bg p-6 rounded-2xl md:col-span-2">
                         <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
                             <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto)
@@ -427,10 +430,29 @@
                 </div>
             </div>
 
-            <!-- VISTA 3: GASTOS HORMIGA (PERSONAL / INDIVIDUAL) -->
+            <!-- VISTA 3: SALDOS Y BANCOS -->
+            <div id="vistaSaldos" class="hidden space-y-6">
+                <!-- 1. GESTIÓN DE CUENTAS Y SALDOS -->
+                <div class="card-bg p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-building-columns text-emerald-400"></i> Gestión de Cuentas y Saldos
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta para ver tu disponible real. (Los ítems PAGADOS no se muestran como descuento en curso).</p>
+                    </div>
+                    <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 shrink-0">
+                        <i class="fa-solid fa-plus"></i> Nueva Cuenta / Banco
+                    </button>
+                </div>
+
+                <!-- 2. RECUADROS DE DISPONIBLE REAL Y BANCOS -->
+                <div id="containerResumenDisponibles" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+
+                <div id="containerBancosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+
+            <!-- VISTA 4: GASTOS HORMIGA -->
             <div id="vistaHormiga" class="hidden space-y-6">
-                
-                <!-- AVISO PRIVACIDAD Y BOTÓN DESTACADO -->
                 <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div class="flex items-center gap-3 text-amber-300 text-xs font-medium">
                         <div class="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
@@ -438,13 +460,11 @@
                         </div>
                         <span>Estás en tu sección personal de Gastos Hormiga. Ningún otro usuario del grupo puede ver tus gastos de esta solapa.</span>
                     </div>
-                    <!-- BOTÓN CATEGORÍAS HORMIGA DESTACADO -->
                     <button onclick="openModalCatHormiga()" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider shrink-0">
                         <i class="fa-solid fa-tags text-slate-950"></i> Categorías Hormiga
                     </button>
                 </div>
 
-                <!-- METRICAS HORMIGA -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div class="card-bg p-5 rounded-2xl">
                         <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL HORMIGA (MES)</span>
@@ -460,9 +480,7 @@
                     </div>
                 </div>
 
-                <!-- FORMULARIO RÁPIDO Y LISTADO -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- FORMULARIO HORMIGA -->
                     <div class="card-bg p-6 rounded-2xl h-fit">
                         <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
                             <i class="fa-solid fa-plus-circle text-amber-400"></i> Registrar Gasto Hormiga
@@ -506,7 +524,6 @@
                         </form>
                     </div>
 
-                    <!-- TABLA HORMIGA -->
                     <div class="lg:col-span-2 card-bg rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between">
                         <div>
                             <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
@@ -532,7 +549,6 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN GRÁFICOS HORMIGA -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                     <div class="card-bg p-6 rounded-2xl">
                         <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
@@ -550,6 +566,60 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- MODAL NUEVA/EDITAR CUENTA BANCARIA Y DESCUENTOS -->
+    <div id="modalCuenta" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalCuentaTitulo" class="text-lg font-bold">Configurar Banco / Cuenta</h3>
+                <button type="button" onclick="closeModal('modalCuenta')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form onsubmit="handleSaveCuenta(event)" class="space-y-4 overflow-y-auto pr-1">
+                <input type="hidden" id="cuentaId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">NOMBRE DEL BANCO / CUENTA</label>
+                    <input type="text" id="cuentaNombre" required placeholder="Ej: Banco Ciudad, Santander..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO BANCO ($)</label>
+                        <input type="number" step="0.01" id="cuentaBcoSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO MP ($)</label>
+                        <input type="number" step="0.01" id="cuentaMpSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <!-- SELECCIÓN DE TARJETAS Y DESCUENTOS ASOCIADOS -->
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                            <i class="fa-solid fa-credit-card mr-1"></i> Tarjetas de Crédito
+                        </label>
+                        <p class="text-[11px] text-slate-400">Seleccioná qué tarjetas se debitan en esta cuenta:</p>
+                        <div id="containerCategoriasAsociadas" class="grid grid-cols-2 gap-2 pt-2"></div>
+                    </div>
+
+                    <hr class="border-slate-800">
+
+                    <div>
+                        <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+                            <i class="fa-solid fa-thumbtack mr-1"></i> Gastos Fijos e Ítems Individuales
+                        </label>
+                        <p class="text-[11px] text-slate-400">Seleccioná los ítems fijos/servicios específicos que se pagan por este banco:</p>
+                        <div id="containerGastosFijosAsociados" class="space-y-1.5 pt-2 max-h-40 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('modalCuenta')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg">Guardar Configuración</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- MODAL CATEGORÍAS HORMIGA -->
@@ -653,7 +723,6 @@
                     </div>
                 </div>
 
-                <!-- FECHA DE VENCIMIENTO INICIAL -->
                 <div class="mb-4">
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">FECHA DE VENCIMIENTO (OPCIONAL)</label>
                     <input type="date" id="gastoVencimiento" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -664,7 +733,6 @@
                     <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <!-- BLOQUE OPCIONES DE TARJETA / PAGO -->
                 <div class="mb-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
                     <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                         <i class="fa-solid fa-credit-card text-emerald-400 mr-1"></i> Opciones de Tarjeta / Pago
@@ -675,9 +743,6 @@
                             <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
                             <i class="fa-solid fa-rotate text-emerald-400"></i> Débito Automático / Recurrente
                         </label>
-                        <p class="text-[11px] text-slate-400 mt-0.5 ml-7">
-                            Tildalo si este gasto se debita todos los meses. Si es fijo/servicio se propaga sumando un mes a su vencimiento automáticamente.
-                        </p>
                     </div>
 
                     <hr class="border-slate-800">
@@ -701,7 +766,6 @@
                     </div>
                 </div>
 
-                <!-- BOTONES DE ACCIÓN -->
                 <div class="flex justify-end gap-3 pt-2">
                     <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium transition">
                         Cancelar
@@ -745,6 +809,10 @@
             excepcionesVencimiento: {},
             excepcionesEstado: {},
             sueldos: {},
+            cuentasBancarias: [
+                { id: '1', nombre: 'Banco Ciudad', saldosPorMes: {}, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
+                { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
+            ],
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
             sortColumn: 'concepto',
             sortAscending: true
@@ -774,6 +842,12 @@
             }
             if (!window.hormigaState.categorias || window.hormigaState.categorias.length === 0) {
                 window.hormigaState.categorias = JSON.parse(JSON.stringify(categoriasHormigaDefault));
+            }
+            if (!window.appState.cuentasBancarias || window.appState.cuentasBancarias.length === 0) {
+                window.appState.cuentasBancarias = [
+                    { id: '1', nombre: 'Banco Ciudad', saldosPorMes: {}, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
+                    { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
+                ];
             }
             document.getElementById('hormigaFecha').value = new Date().toISOString().slice(0, 10);
             initChartRangeInputs();
@@ -820,22 +894,316 @@
         function switchTab(tabName) {
             document.getElementById('vistaPlanilla').classList.toggle('hidden', tabName !== 'planilla');
             document.getElementById('vistaGraficos').classList.toggle('hidden', tabName !== 'graficos');
+            document.getElementById('vistaSaldos').classList.toggle('hidden', tabName !== 'saldos');
             document.getElementById('vistaHormiga').classList.toggle('hidden', tabName !== 'hormiga');
 
             document.getElementById('tabPlanillaBtn').classList.toggle('tab-btn-active', tabName === 'planilla');
             document.getElementById('tabGraficosBtn').classList.toggle('tab-btn-active', tabName === 'graficos');
+            document.getElementById('tabSaldosBtn').classList.toggle('tab-btn-active', tabName === 'saldos');
             document.getElementById('tabHormigaBtn').classList.toggle('tab-btn-active', tabName === 'hormiga');
 
-            document.getElementById('btnNuevoGastoHeader').classList.toggle('hidden', tabName === 'hormiga');
+            document.getElementById('btnNuevoGastoHeader').classList.toggle('hidden', tabName === 'hormiga' || tabName === 'saldos');
             
             if (tabName === 'graficos') {
                 if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
                 setTimeout(() => renderCharts(), 100);
             }
+            if (tabName === 'saldos') {
+                renderSaldosApp();
+            }
             if (tabName === 'hormiga') {
                 renderHormigaApp();
             }
         }
+
+        // SALDOS Y BANCOS
+        function renderCategoriasAsociadasCheckboxes(categoriasSeleccionadas = [], gastosFijosSeleccionados = []) {
+            const containerCat = document.getElementById('containerCategoriasAsociadas');
+            const containerFijos = document.getElementById('containerGastosFijosAsociados');
+            if (!containerCat || !containerFijos) return;
+
+            containerCat.innerHTML = '';
+            containerFijos.innerHTML = '';
+
+            const catList = window.appState.categorias || categoriasDefault;
+
+            // 1. Tarjetas de crédito
+            const tarjetas = catList.filter(c => c.esTarjeta);
+            tarjetas.forEach(cat => {
+                const isChecked = categoriasSeleccionadas.includes(cat.nombre);
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-2 p-1.5 bg-slate-950 rounded-lg border border-slate-800";
+                div.innerHTML = `
+                    <input type="checkbox" id="catCheck_${cat.nombre}" value="${cat.nombre}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    <label for="catCheck_${cat.nombre}" class="text-xs text-slate-300 font-semibold cursor-pointer truncate flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${cat.color};"></span>
+                        ${cat.nombre}
+                    </label>
+                `;
+                containerCat.appendChild(div);
+            });
+
+            // 2. Ítems de gastos fijos / servicios individuales
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const calcData = getCalculatedDataForMonth(currentMonth);
+            const itemsFijosActuales = calcData.items.filter(item => {
+                const catObj = catList.find(c => c.nombre === item.categoria);
+                return catObj ? !catObj.esTarjeta : true;
+            });
+
+            if (itemsFijosActuales.length === 0) {
+                containerFijos.innerHTML = '<p class="text-[11px] text-slate-500 italic">No hay gastos fijos registrados en el mes actual.</p>';
+            } else {
+                itemsFijosActuales.forEach(item => {
+                    const isChecked = gastosFijosSeleccionados.includes(item.id);
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between p-1.5 bg-slate-950 rounded-lg border border-slate-800";
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2 truncate">
+                            <input type="checkbox" id="fijoCheck_${item.id}" value="${item.id}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                            <label for="fijoCheck_${item.id}" class="text-xs text-slate-300 font-semibold cursor-pointer truncate">
+                                ${item.concepto} <span class="text-[10px] text-slate-500">(${item.categoria})</span>
+                            </label>
+                        </div>
+                        <span class="text-xs font-bold text-rose-400 shrink-0">$${item.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    `;
+                    containerFijos.appendChild(div);
+                });
+            }
+        }
+
+        function formatFechaVencimientoSimple(fechaStr) {
+            if (!fechaStr) return '';
+            const partes = fechaStr.split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return fechaStr;
+        }
+
+        function renderSaldosApp() {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const calcData = getCalculatedDataForMonth(currentMonth);
+            const container = document.getElementById('containerBancosGrid');
+            const containerResumen = document.getElementById('containerResumenDisponibles');
+            if (!container) return;
+            container.innerHTML = '';
+            if (containerResumen) containerResumen.innerHTML = '';
+
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            let totalDisponibleRealSuma = 0;
+            let tarjetasBancosHtml = '';
+
+            (window.appState.cuentasBancarias || []).forEach(cuenta => {
+                // Recuperamos los saldos específicos del mes actual (si no existen, por defecto es 0)
+                const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
+                const bcoSaldo = parseFloat(saldosMes.bcoSaldo) || 0;
+                const mpSaldo = parseFloat(saldosMes.mpSaldo) || 0;
+                
+                const totalIngresos = bcoSaldo + mpSaldo;
+                const catAsociadas = cuenta.categoriasAsociadas || [];
+                const fijosAsociadosIds = cuenta.gastosFijosAsociados || [];
+
+                let totalesTarjetasEspecificas = {};
+                let vencimientosTarjetas = {};
+                let gastosFijosCuenta = [];
+
+                calcData.items.forEach(item => {
+                    if (item.estado === 'PAGADO') return;
+
+                    const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === item.categoria);
+                    const esTarjeta = catObj ? catObj.esTarjeta : true;
+
+                    if (esTarjeta && catAsociadas.includes(item.categoria)) {
+                        totalesTarjetasEspecificas[item.categoria] = (totalesTarjetasEspecificas[item.categoria] || 0) + item.monto;
+                        if (item.vencimiento && !vencimientosTarjetas[item.categoria]) {
+                            vencimientosTarjetas[item.categoria] = item.vencimiento;
+                        }
+                    } else if (!esTarjeta && fijosAsociadosIds.includes(item.id)) {
+                        gastosFijosCuenta.push(item);
+                    }
+                });
+
+                let tarjetasDesglosadasHtml = '';
+                let sumaTarjetas = 0;
+                Object.entries(totalesTarjetasEspecificas).forEach(([nombreCat, montoCat]) => {
+                    sumaTarjetas += montoCat;
+                    const vencStr = vencimientosTarjetas[nombreCat] ? formatFechaVencimientoSimple(vencimientosTarjetas[nombreCat]) : '';
+                    tarjetasDesglosadasHtml += `
+                        <div class="flex justify-between items-center text-xs text-slate-300 py-1.5 border-b border-slate-800/40 gap-2">
+                            <span class="font-semibold shrink-0">${nombreCat}:</span>
+                            <span class="text-[11px] text-amber-400 font-mono text-center flex-1">${vencStr ? `Venc: ${vencStr}` : ''}</span>
+                            <span class="text-rose-400 font-bold shrink-0">-$${montoCat.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    `;
+                });
+
+                const fijosHtml = gastosFijosCuenta.map(g => {
+                    const vencFmt = g.vencimiento ? formatFechaVencimientoSimple(g.vencimiento) : '';
+                    return `
+                        <div class="flex justify-between items-center text-xs text-slate-400 py-1.5 border-b border-slate-800/40 gap-2">
+                            <span class="truncate shrink-0 max-w-[140px]">- ${g.concepto} (${g.categoria})</span>
+                            <span class="text-[11px] text-amber-400 font-mono text-center flex-1">${vencFmt ? `Venc: ${vencFmt}` : ''}</span>
+                            <span class="text-rose-400 font-semibold shrink-0">-$${g.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    `;
+                }).join('');
+
+                const totalGastosFijos = gastosFijosCuenta.reduce((acc, g) => acc + g.monto, 0);
+                const totalDescuentosBanco = sumaTarjetas + totalGastosFijos;
+                const disponibleFinal = totalIngresos - totalDescuentosBanco;
+                totalDisponibleRealSuma += disponibleFinal;
+
+                // Métrica individual del banco
+                tarjetasBancosHtml += `
+                    <div class="card-bg p-4 rounded-2xl border border-slate-800 relative">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider truncate flex items-center gap-1.5">
+                                <i class="fa-solid fa-building-columns text-emerald-400"></i> ${cuenta.nombre}
+                            </span>
+                        </div>
+                        <h2 class="text-xl font-extrabold my-0.5 ${disponibleFinal >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(disponibleFinal)}</h2>
+                        <span class="text-[10px] text-slate-500 font-medium">Disponible Real</span>
+                    </div>
+                `;
+
+                // Tarjeta de Banco Completa (Grid Inferior)
+                container.innerHTML += `
+                    <div class="card-bg p-5 rounded-2xl flex flex-col justify-between shadow-xl border border-slate-800">
+                        <div>
+                            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                                <h4 class="text-base font-bold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-university text-emerald-400"></i> ${cuenta.nombre}
+                                </h4>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="editCuenta('${cuenta.id}')" class="text-slate-400 hover:text-white text-xs" title="Editar Banco y Descuentos"><i class="fa-solid fa-pen"></i></button>
+                                    <button onclick="deleteCuenta('${cuenta.id}')" class="text-slate-400 hover:text-rose-400 text-xs" title="Eliminar Cuenta"><i class="fa-solid fa-trash-can"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-1.5 text-xs mb-4">
+                                <div class="flex justify-between text-slate-300"><span>Saldo Banco:</span> <strong>${fmt(bcoSaldo)}</strong></div>
+                                <div class="flex justify-between text-slate-300"><span>Saldo Mercado Pago:</span> <strong>${fmt(mpSaldo)}</strong></div>
+                                <div class="flex justify-between text-emerald-400 font-bold pt-1 border-t border-slate-800"><span>Total Saldos:</span> <span>${fmt(totalIngresos)}</span></div>
+                            </div>
+
+                            <div class="space-y-1 mb-4 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Descuentos Aplicados</span>
+                                    <span class="text-[10px] text-slate-500 font-semibold">${formatMonthDisplay(currentMonth)}</span>
+                                </div>
+                                
+                                ${tarjetasDesglosadasHtml}
+                                ${fijosHtml}
+                                ${(!tarjetasDesglosadasHtml && !fijosHtml) 
+                                    ? '<p class="text-[11px] text-slate-500 italic py-1">No hay descuentos pendientes asignados a este banco.</p>' 
+                                    : `<div class="flex justify-between items-center text-xs text-rose-400 font-bold pt-2 mt-1 border-t border-slate-800/80">
+                                        <span>Total Descuentos:</span>
+                                        <span>-$${totalDescuentosBanco.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                                       </div>`
+                                }
+                            </div>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-800 flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-300 uppercase">Disponible Real:</span>
+                            <span class="text-base font-extrabold ${disponibleFinal >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(disponibleFinal)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (containerResumen) {
+                containerResumen.innerHTML = `
+                    ${tarjetasBancosHtml}
+                    <div class="card-bg p-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 relative">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-coins"></i> DISPONIBLE REAL TOTAL
+                            </span>
+                        </div>
+                        <h2 class="text-xl font-black my-0.5 ${totalDisponibleRealSuma >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(totalDisponibleRealSuma)}</h2>
+                        <span class="text-[10px] text-slate-400 font-medium">Suma Cuentas y Bancos</span>
+                    </div>
+                `;
+            }
+        }
+
+        window.openModalCuenta = function() {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            document.getElementById('cuentaId').value = '';
+            document.getElementById('modalCuentaTitulo').innerText = "Nueva Cuenta / Banco";
+            document.getElementById('cuentaNombre').value = '';
+            document.getElementById('cuentaBcoSaldo').value = '';
+            document.getElementById('cuentaMpSaldo').value = '';
+            renderCategoriasAsociadasCheckboxes([], []);
+            document.getElementById('modalCuenta').classList.remove('hidden');
+        };
+
+        window.editCuenta = function(id) {
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const cuenta = (window.appState.cuentasBancarias || []).find(c => c.id === id);
+            if (!cuenta) return;
+            
+            const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
+
+            document.getElementById('cuentaId').value = cuenta.id;
+            document.getElementById('modalCuentaTitulo').innerText = "Configurar Banco y Descuentos";
+            document.getElementById('cuentaNombre').value = cuenta.nombre;
+            document.getElementById('cuentaBcoSaldo').value = saldosMes.bcoSaldo;
+            document.getElementById('cuentaMpSaldo').value = saldosMes.mpSaldo;
+            renderCategoriasAsociadasCheckboxes(cuenta.categoriasAsociadas || [], cuenta.gastosFijosAsociados || []);
+            document.getElementById('modalCuenta').classList.remove('hidden');
+        };
+
+        window.handleSaveCuenta = function(e) {
+            e.preventDefault();
+            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const id = document.getElementById('cuentaId').value;
+            const nombre = document.getElementById('cuentaNombre').value.trim();
+            const bcoSaldo = parseFloat(document.getElementById('cuentaBcoSaldo').value) || 0;
+            const mpSaldo = parseFloat(document.getElementById('cuentaMpSaldo').value) || 0;
+
+            const containerCat = document.getElementById('containerCategoriasAsociadas');
+            const checkboxesCat = containerCat.querySelectorAll('input[type="checkbox"]:checked');
+            const categoriasAsociadas = Array.from(checkboxesCat).map(cb => cb.value);
+
+            const containerFijos = document.getElementById('containerGastosFijosAsociados');
+            const checkboxesFijos = containerFijos.querySelectorAll('input[type="checkbox"]:checked');
+            const gastosFijosAsociados = Array.from(checkboxesFijos).map(cb => cb.value);
+
+            if (!window.appState.cuentasBancarias) window.appState.cuentasBancarias = [];
+
+            if (id) {
+                const idx = window.appState.cuentasBancarias.findIndex(c => c.id === id);
+                if (idx !== -1) {
+                    if (!window.appState.cuentasBancarias[idx].saldosPorMes) {
+                        window.appState.cuentasBancarias[idx].saldosPorMes = {};
+                    }
+                    window.appState.cuentasBancarias[idx].saldosPorMes[currentMonth] = { bcoSaldo, mpSaldo };
+                    window.appState.cuentasBancarias[idx].nombre = nombre;
+                    window.appState.cuentasBancarias[idx].categoriasAsociadas = categoriasAsociadas;
+                    window.appState.cuentasBancarias[idx].gastosFijosAsociados = gastosFijosAsociados;
+                }
+            } else {
+                let saldosPorMes = {};
+                saldosPorMes[currentMonth] = { bcoSaldo, mpSaldo };
+                window.appState.cuentasBancarias.push({ id: Date.now().toString(), nombre, saldosPorMes, categoriasAsociadas, gastosFijosAsociados });
+            }
+
+            window.saveDataToCloud();
+            closeModal('modalCuenta');
+            renderSaldosApp();
+        };
+
+        window.deleteCuenta = function(id) {
+            if (confirm("¿Estás seguro de eliminar esta cuenta?")) {
+                window.appState.cuentasBancarias = (window.appState.cuentasBancarias || []).filter(c => c.id !== id);
+                window.saveDataToCloud();
+                renderSaldosApp();
+            }
+        };
 
         // GESTIÓN DE CATEGORÍAS GENERALES
         function openModalConfig() { renderCategoriasConfigList(); document.getElementById('modalConfig').classList.remove('hidden'); }
@@ -885,6 +1253,7 @@
             renderCategoriasSelect();
             renderFiltrosCategoriasCheckboxes();
             renderApp();
+            renderSaldosApp();
         };
 
         function agregarCategoria() {
@@ -1059,6 +1428,7 @@
             if (month > 12) { month = 1; year++; } if (month < 1) { month = 12; year--; }
             window.appState.currentMonth = `${year}-${String(month).padStart(2, '0')}`;
             renderApp();
+            renderSaldosApp();
             renderHormigaApp();
         }
 
@@ -1096,7 +1466,6 @@
             return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         }
 
-        // LÓGICA DE CÁLCULO DE GASTOS CORREGIDA (ESTRICTA POR CATEGORÍA)
         function getCalculatedDataForMonth(targetMonth) {
             const sueldoActual = getSueldoForMonth(targetMonth);
             let items = [];
@@ -1200,7 +1569,6 @@
                 }
 
                 generatedItems.forEach(gi => {
-                    // Criterio exacto: Buscamos la categoría y evaluamos si esTarjeta
                     const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === gi.categoria);
                     const esTarjetaCat = catObj ? catObj.esTarjeta : true;
 
@@ -1244,7 +1612,6 @@
                 return typeof vA === 'string' ? (asc ? vA.localeCompare(vB) : vB.localeCompare(vA)) : (asc ? vA - vB : vB - vA);
             });
 
-            // RENDERIZADO DE LAS 5 TARJETAS SUPERIORES CON COLORES CORREGIDOS
             document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
             document.getElementById('cardGastosFijos').innerText = fmt(totalFijos);
             document.getElementById('cardTarjetas').innerText = fmt(totalTarjetas);
@@ -1291,7 +1658,6 @@
             }
         }
 
-        // LÓGICA Y RENDERIZADO DE GASTOS HORMIGA
         function renderHormigaApp() {
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             const badgeMonthEl = document.getElementById('badgeHormigaMonth');
@@ -1326,7 +1692,6 @@
                 itemsHormiga.forEach(g => {
                     const catObj = (window.hormigaState.categorias || categoriasHormigaDefault).find(c => c.nombre === g.categoria);
                     const colorCat = catObj ? catObj.color : '#f59e0b';
-                    
                     const fechaFmt = g.fecha.split('-').reverse().join('/');
 
                     tbody.innerHTML += `
@@ -1346,7 +1711,6 @@
             renderHormigaCharts();
         }
 
-        // GRÁFICOS HORMIGA
         function renderHormigaCharts() {
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             const allHormigaGastos = window.hormigaState.gastos || [];
@@ -1475,7 +1839,6 @@
             }
         };
 
-        // RENDERIZADO DE GRÁFICOS GENERALES
         function renderCharts() {
             if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
 
@@ -1520,7 +1883,6 @@
                 if (currM > 12) { currM = 1; currY++; }
             }
 
-            // 1. GRÁFICO EVOLUCIÓN GASTOS TOTALES + INGRESOS
             const ctxTotales = document.getElementById('chartEvolucionTotales');
             if (ctxTotales) {
                 if (chartInstTotales) chartInstTotales.destroy();
@@ -1552,18 +1914,7 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { 
-                            legend: { 
-                                labels: { 
-                                    color: '#cbd5e1', 
-                                    font: { size: 11 },
-                                    usePointStyle: true,
-                                    pointStyle: 'rect',
-                                    boxWidth: 14,
-                                    boxHeight: 10
-                                } 
-                            } 
-                        },
+                        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
                         scales: {
                             x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
                             y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
@@ -1572,7 +1923,6 @@
                 });
             }
 
-            // 2. EVOLUCIÓN POR CATEGORÍA
             const ctxEvolCat = document.getElementById('chartEvolucionCategorias');
             if (ctxEvolCat) {
                 if (chartInstEvolCat) chartInstEvolCat.destroy();
@@ -1582,18 +1932,7 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { 
-                            legend: { 
-                                labels: { 
-                                    color: '#cbd5e1', 
-                                    font: { size: 11 },
-                                    usePointStyle: true,
-                                    pointStyle: 'rect',
-                                    boxWidth: 14,
-                                    boxHeight: 10
-                                } 
-                            } 
-                        },
+                        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
                         scales: {
                             x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
                             y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
@@ -1602,7 +1941,6 @@
                 });
             }
 
-            // 3. BALANCE GENERAL
             const ctxBalance = document.getElementById('chartBalanceGeneral');
             if (ctxBalance) {
                 if (chartInstBalance) chartInstBalance.destroy();
@@ -1652,6 +1990,7 @@
 
             window.saveDataToCloud();
             renderApp();
+            renderSaldosApp();
         };
 
         window.actualizarEstadoGrilla = function(idGastoOrigen, categoriaNombre, nuevoEstado) {
@@ -1677,6 +2016,7 @@
 
             window.saveDataToCloud();
             renderApp();
+            renderSaldosApp();
         };
 
         window.handleSaveSueldo = function(e) {
@@ -1687,6 +2027,7 @@
             window.saveDataToCloud();
             closeModal('modalSueldo');
             renderApp();
+            renderSaldosApp();
         };
 
         window.handleSaveGasto = function(e) {
@@ -1712,6 +2053,7 @@
             window.saveDataToCloud();
             closeModal('modalGasto');
             renderApp();
+            renderSaldosApp();
         };
 
         window.editGasto = function(id) {
@@ -1740,6 +2082,7 @@
                 window.appState.gastos = window.appState.gastos.filter(g => g.id !== id);
                 window.saveDataToCloud();
                 renderApp();
+                renderSaldosApp();
             }
         };
 
