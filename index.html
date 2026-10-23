@@ -14,7 +14,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -58,7 +58,6 @@
             if (user) {
                 showLoading();
 
-                // Limpiamos la caché local para evitar datos residuales de pruebas anteriores
                 window.appState = {
                     currentMonth: new Date().toISOString().slice(0, 7),
                     gastos: [],
@@ -109,7 +108,6 @@
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
                 if (unsubscribeHormiga) unsubscribeHormiga();
 
-                // Nos conectamos a Firestore y traemos los datos reales del grupo
                 unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -201,21 +199,26 @@
             }
         };
 
-        window.forzarSincronizacion = async function() {
-            showLoading();
-            try {
-                const docSnap = await getDoc(window.docRef);
-                if (docSnap.exists() && docSnap.data().appState) {
-                    window.appState = { ...window.appState, ...docSnap.data().appState };
+        window.limpiarDatosNube = async function() {
+            if (confirm("⚠️ ¿Estás seguro de vaciar todos los gastos guardados en la nube para este grupo? Esta acción dejará la planilla limpia de cero.")) {
+                showLoading();
+                try {
+                    window.appState.gastos = [];
+                    window.appState.sueldos = {};
+                    window.appState.excepcionesMonto = {};
+                    window.appState.excepcionesCategoria = {};
+                    window.appState.excepcionesVencimiento = {};
+                    window.appState.excepcionesEstado = {};
+                    await saveDataToCloud();
+                    renderApp();
+                    renderSaldosApp();
+                    showApp();
+                    alert("¡Planilla limpiada correctamente!");
+                } catch (e) {
+                    console.error("Error al limpiar:", e);
+                    showApp();
+                    alert("No se pudo limpiar la base de datos.");
                 }
-                renderApp();
-                renderSaldosApp();
-                showApp();
-                alert("¡Sincronización completada con éxito!");
-            } catch (err) {
-                console.error("Error al sincronizar:", err);
-                showApp();
-                alert("Error al intentar sincronizar con la nube.");
             }
         };
     </script>
@@ -307,8 +310,8 @@
                     <button id="btnNuevoGastoHeader" onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
                     </button>
-                    <button onclick="forzarSincronizacion()" title="Forzar Sincronización con la Nube" class="p-2.5 rounded-lg card-bg text-emerald-400 hover:text-emerald-300 transition">
-                        <i class="fa-solid fa-rotate"></i>
+                    <button onclick="limpiarDatosNube()" title="Limpiar Planilla y Empezar de Cero" class="p-2.5 rounded-lg card-bg text-rose-400 hover:text-rose-300 transition">
+                        <i class="fa-solid fa-trash-can"></i>
                     </button>
                     <button onclick="openModalConfig()" title="Configuración Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                         <i class="fa-solid fa-gear"></i>
@@ -950,7 +953,6 @@
 
             const catList = window.appState.categorias || categoriasDefault;
 
-            // 1. Tarjetas de crédito
             const tarjetas = catList.filter(c => c.esTarjeta);
             tarjetas.forEach(cat => {
                 const isChecked = categoriasSeleccionadas.includes(cat.nombre);
@@ -966,7 +968,6 @@
                 containerCat.appendChild(div);
             });
 
-            // 2. Ítems de gastos fijos / servicios individuales
             const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             const calcData = getCalculatedDataForMonth(currentMonth);
             const itemsFijosActuales = calcData.items.filter(item => {
