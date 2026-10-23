@@ -1,51 +1,96 @@
 import { Resend } from 'resend';
 
-// Inicializar Resend con la API Key de las variables de entorno
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function enviarAlertas() {
     try {
         console.log("Iniciando verificación de vencimientos...");
 
-        // Aquí puedes cargar o simular los gastos próximos a vencer
+        // Aquí definimos los gastos próximos a vencer (puedes ajustarlos o leerlos de tu estructura)
         const gastosPorVencer = [
-            // Ejemplo: { categoria: 'Alquiler', monto: 150000, fechaVencimiento: '2026-10-25', esTarjeta: false }
+            {
+                nombre: 'Supermercado',
+                monto: 600000,
+                categoria: 'Gastos Fijo',
+                fechaVencimiento: '2026-10-24',
+                estadoBadge: 'VENCE MAÑANA',
+                badgeColor: '#f59e0b' // Ambar
+            },
+            {
+                nombre: 'Prueba Fecha',
+                monto: 25000,
+                categoria: 'Gastos Fijo',
+                fechaVencimiento: '2026-10-23',
+                estadoBadge: 'VENCE HOY',
+                badgeColor: '#e11d48' // Rojo
+            }
         ];
 
-        // Lee la variable de entorno que viene desde el YAML y separa los correos por coma o punto y coma
+        // Procesar destinatarios (soporta comas o puntos y comas)
         const rawEmailTo = process.env.EMAIL_TO || '';
         const destinatarios = rawEmailTo.split(/[,;]/).map(email => email.trim()).filter(Boolean);
 
         if (destinatarios.length === 0) {
-            console.error("Error: No hay destinatarios configurados en EMAIL_TO (ni MY_EMAIL).");
+            console.error("Error: No hay destinatarios configurados.");
             process.exit(1);
         }
 
-        // Armado del contenido HTML del correo
+        // Generar el HTML de la lista de gastos detallados
+        const listaGastosHtml = gastosPorVencer.map(gasto => `
+            <div style="padding: 15px 0; border-bottom: 1px solid #eaeaea;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="font-size: 16px; color: #111;">${gasto.nombre}</strong>
+                        <div style="font-size: 13px; color: #666; margin-top: 4px;">
+                            Categoría: ${gasto.categoria} | Fecha: ${gasto.fechaVencimiento}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 16px; font-weight: bold; color: #111;">$${gasto.monto.toLocaleString('es-AR')}</div>
+                        <span style="display: inline-block; background-color: ${gasto.badgeColor}; color: white; font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-top: 4px;">
+                            ${gasto.estadoBadge}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Armado del correo con el diseño oscuro elegante
         const contenidoHtml = `
-            <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                <h2 style="color: #e11d48; text-align: center;">⚠️ Alertas de Vencimiento</h2>
-                <p>Hola, te recordamos que tienes gastos próximos a vencer en tu sistema de control financiero.</p>
-                
-                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-                
-                <p style="font-size: 14px; color: #666; text-align: center;">
-                    Este es un reporte automático generado por tu automatización diaria.
-                </p>
+            <div style="font-family: Arial, sans-serif; background-color: #f4f4f5; padding: 30px; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                    
+                    <!-- Encabezado oscuro -->
+                    <div style="background-color: #0f172a; padding: 30px; text-align: center; color: white;">
+                        <div style="font-size: 28px; margin-bottom: 8px;">🔔</div>
+                        <h2 style="margin: 0; font-size: 22px; font-weight: bold;">Alerta de Vencimientos</h2>
+                        <p style="margin: 8px 0 0 0; font-size: 14px; color: #94a3b8;">Tienes pagos pendientes próximos a vencer</p>
+                    </div>
+
+                    <!-- Cuerpo -->
+                    <div style="padding: 30px;">
+                        <p style="font-size: 14px; color: #475569; margin-top: 0;">El sistema ha detectado los siguientes movimientos que requieren tu atención:</p>
+                        
+                        <div style="margin-top: 20px;">
+                            ${listaGastosHtml}
+                        </div>
+                    </div>
+
+                </div>
             </div>
         `;
 
-        // Envío del correo mediante Resend usando la lista (Array) de destinatarios
+        // Envío a través de Resend con la lista de destinatarios
         const data = await resend.emails.send({
-            from: 'Alertas de Gastos <onboarding@resend.dev>',
+            from: 'Control de Gastos <onboarding@resend.dev>',
             to: destinatarios,
-            subject: `⚠️ Alertas de Vencimiento de Gastos`,
+            subject: `⚠️ Alertas de Vencimiento de Gastos - ${gastosPorVencer.length} pendiente(s)`,
             html: contenidoHtml
         });
 
         console.log("Correo enviado exitosamente:", data);
     } catch (error) {
-        console.error("Error al enviar el correo de alertas:", error);
+        console.error("Error al enviar el correo:", error);
         process.exit(1);
     }
 }
