@@ -14,7 +14,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -71,6 +71,7 @@
                         { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
                     ],
                     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
+                    recurrentesPreferidos: [],
                     sortColumn: 'concepto',
                     sortAscending: true
                 };
@@ -80,16 +81,9 @@
                     categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault))
                 };
 
-                let grupoId = user.uid; 
-                
-                try {
-                    const rolRef = doc(db, "usuarios_roles", user.uid);
-                    const rolSnap = await getDoc(rolRef);
-                    if (rolSnap.exists() && rolSnap.data().grupo) {
-                        grupoId = rolSnap.data().grupo;
-                    }
-                } catch (err) {
-                    console.warn("No se pudo leer la asignación de grupo:", err);
+                let grupoId = "grupo_mancusososa";
+                if (user.email === "nicolaslmancuso@gmail.com") {
+                    grupoId = "grupo_mancusososa";
                 }
 
                 const docRef = doc(db, "app_data", grupoId);
@@ -133,6 +127,7 @@
 
                     renderApp();
                     renderCategoriasSelect();
+                    initRecurrentesDropdown();
                     showApp();
                 });
 
@@ -445,6 +440,46 @@
                             <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
                         </h3>
                         <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
+                    </div>
+
+                    <!-- GRÁFICO RECURRENTES CON MULTISELECCIÓN Y BOTÓN GUARDAR POR DEFECTO -->
+                    <div class="card-bg p-6 rounded-2xl md:col-span-2">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-rotate text-amber-400"></i> Evolución de Gastos Recurrentes y Débitos Automáticos
+                            </h3>
+                            
+                            <!-- DESPLEGABLE MULTISELECCIÓN -->
+                            <div class="relative">
+                                <button onclick="toggleDropdownRecurrentes(event)" class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs font-bold text-white flex items-center gap-2 hover:border-amber-500 transition">
+                                    <i class="fa-solid fa-filter text-amber-400"></i>
+                                    <span id="btnDropdownText">Seleccionar Gastos...</span>
+                                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                                </button>
+
+                                <div id="dropdownRecurrentesMenu" class="hidden absolute right-0 mt-2 w-72 card-bg rounded-2xl shadow-2xl border border-slate-700 p-3 z-30 space-y-2">
+                                    <div class="flex justify-between items-center pb-2 border-b border-slate-800 text-xs">
+                                        <span class="font-bold text-slate-300 uppercase">Elegir para mostrar</span>
+                                        <div class="flex gap-2">
+                                            <button onclick="marcarTodosRecurrentes(true)" class="text-emerald-400 hover:underline font-semibold">Todos</button>
+                                            <span class="text-slate-600">|</span>
+                                            <button onclick="marcarTodosRecurrentes(false)" class="text-rose-400 hover:underline font-semibold">Ninguno</button>
+                                        </div>
+                                    </div>
+                                    <div id="containerCheckboxesRecurrentes" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
+                                    <div class="pt-2 border-t border-slate-800 flex gap-2">
+                                        <button onclick="guardarRecurrentesPorDefecto()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-extrabold py-2 rounded-xl text-xs transition shadow-lg shadow-amber-500/20">
+                                            Guardar por defecto
+                                        </button>
+                                        <button onclick="toggleDropdownRecurrentes(event)" class="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold">
+                                            OK
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="relative h-72 w-full"><canvas id="chartEvolucionRecurrentesIndiv"></canvas></div>
                     </div>
 
                     <div class="card-bg p-6 rounded-2xl md:col-span-2">
@@ -840,6 +875,7 @@
                 { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
             ],
             categorias: JSON.parse(JSON.stringify(categoriasDefault)),
+            recurrentesPreferidos: [],
             sortColumn: 'concepto',
             sortAscending: true
         };
@@ -856,6 +892,7 @@
 
         let chartInstTotales = null;
         let chartInstEvolCat = null;
+        let chartInstRecurrentesIndiv = null;
         let chartInstBalance = null;
         let chartInstHormigaCat = null;
         let chartInstHormigaEvol = null;
@@ -877,6 +914,16 @@
             }
             document.getElementById('hormigaFecha').value = new Date().toISOString().slice(0, 10);
             initChartRangeInputs();
+            initRecurrentesDropdown();
+
+            // Cerrar menú desplegable al hacer clic afuera
+            window.addEventListener('click', (e) => {
+                const menu = document.getElementById('dropdownRecurrentesMenu');
+                const btn = e.target.closest('button');
+                if (menu && !menu.contains(e.target) && (!btn || !btn.getAttribute('onclick')?.includes('toggleDropdownRecurrentes'))) {
+                    menu.classList.add('hidden');
+                }
+            });
         });
 
         function initChartRangeInputs() {
@@ -917,6 +964,96 @@
             }
         }
 
+        function toggleDropdownRecurrentes(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('dropdownRecurrentesMenu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        function initRecurrentesDropdown() {
+            const container = document.getElementById('containerCheckboxesRecurrentes');
+            if (!container) return;
+
+            let mapIdsUnicos = new Map();
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if (g.isRecurrente || baseEsFijo) {
+                    if (!mapIdsUnicos.has(g.id)) {
+                        mapIdsUnicos.set(g.id, g.concepto);
+                    }
+                }
+            });
+
+            let seleccionados = window.appState.recurrentesPreferidos;
+            // Si nunca guardó preferencias, por defecto seleccionamos todos
+            if (!seleccionados || seleccionados.length === 0) {
+                seleccionados = Array.from(mapIdsUnicos.keys());
+            }
+
+            container.innerHTML = '';
+            if (mapIdsUnicos.size === 0) {
+                container.innerHTML = '<p class="text-[11px] text-slate-500 italic p-1">No hay gastos recurrentes registrados.</p>';
+            }
+
+            mapIdsUnicos.forEach((concepto, id) => {
+                const isChecked = seleccionados.includes(id);
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-2 p-1.5 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-700 transition";
+                div.innerHTML = `
+                    <input type="checkbox" id="recCheck_${id}" value="${id}" ${isChecked ? 'checked' : ''} onchange="onRecurrenteCheckboxChange()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                    <label for="recCheck_${id}" class="text-xs text-slate-300 font-semibold cursor-pointer truncate flex-1">${concepto}</label>
+                `;
+                container.appendChild(div);
+            });
+
+            updateDropdownButtonText();
+            renderCharts();
+        }
+
+        function marcarTodosRecurrentes(marcar) {
+            const container = document.getElementById('containerCheckboxesRecurrentes');
+            if (!container) return;
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = marcar);
+            onRecurrenteCheckboxChange();
+        }
+
+        function onRecurrenteCheckboxChange() {
+            updateDropdownButtonText();
+            renderCharts();
+        }
+
+        function updateDropdownButtonText() {
+            const container = document.getElementById('containerCheckboxesRecurrentes');
+            const btnText = document.getElementById('btnDropdownText');
+            if (!container || !btnText) return;
+
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            const marcados = Array.from(checkboxes).filter(cb => cb.checked);
+
+            if (marcados.length === 0) {
+                btnText.innerText = "Ninguno seleccionado";
+            } else if (marcados.length === checkboxes.length) {
+                btnText.innerText = "Todos los recurrentes";
+            } else {
+                btnText.innerText = `${marcados.length} gastos seleccionados`;
+            }
+        }
+
+        function guardarRecurrentesPorDefecto() {
+            const container = document.getElementById('containerCheckboxesRecurrentes');
+            if (!container) return;
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            const marcados = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+
+            window.appState.recurrentesPreferidos = marcados;
+            window.saveDataToCloud();
+            
+            const menu = document.getElementById('dropdownRecurrentesMenu');
+            if (menu) menu.classList.add('hidden');
+            alert("¡Tus preferencias por defecto fueron guardadas con éxito!");
+        }
+
         function switchTab(tabName) {
             document.getElementById('vistaPlanilla').classList.toggle('hidden', tabName !== 'planilla');
             document.getElementById('vistaGraficos').classList.toggle('hidden', tabName !== 'graficos');
@@ -932,6 +1069,7 @@
             
             if (tabName === 'graficos') {
                 if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
+                initRecurrentesDropdown();
                 setTimeout(() => renderCharts(), 100);
             }
             if (tabName === 'saldos') {
@@ -1535,7 +1673,7 @@
                                 estadoAplicar = 'VENCIDO';
                             }
 
-                            generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: `Cuota ${i + 1}/${totalCuotas}`, monto: montoCuota, vencimiento: vencimientoAplicar, estado: estadoAplicar });
+                            generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: `Cuota ${i + 1}/${totalCuotas}`, monto: montoCuota, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false });
                         }
                     }
                 } else if (isRecurrente) {
@@ -1565,7 +1703,7 @@
                         }
 
                         const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'Débito Automático';
-                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
+                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: true });
                     }
                 } else {
                     if (targetMonth === startYM) {
@@ -1584,7 +1722,7 @@
                             estadoAplicar = 'VENCIDO';
                         }
 
-                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'Débito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar });
+                        generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'Débito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false });
                     }
                 }
 
@@ -1885,6 +2023,50 @@
                 tension: 0.3
             }));
 
+            // Obtener IDs seleccionados en el dropdown multiselección
+            const containerCheckboxes = document.getElementById('containerCheckboxesRecurrentes');
+            let idsSeleccionados = new Set();
+            if (containerCheckboxes) {
+                const cbs = containerCheckboxes.querySelectorAll('input[type="checkbox"]:checked');
+                cbs.forEach(cb => idsSeleccionados.add(cb.value));
+            } else {
+                (window.appState.recurrentesPreferidos || []).forEach(id => idsSeleccionados.add(id));
+            }
+
+            let recurrentesIdsUnicos = new Set();
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if (g.isRecurrente || baseEsFijo) {
+                    recurrentesIdsUnicos.add(g.id);
+                }
+            });
+
+            let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16'];
+            let datasetsRecurrentesIndiv = [];
+            let mapIdToDatasetIndex = {};
+
+            let colorIdx = 0;
+            (window.appState.gastos || []).forEach(g => {
+                if (recurrentesIdsUnicos.has(g.id) && mapIdToDatasetIndex[g.id] === undefined) {
+                    if (idsSeleccionados.size === 0 || idsSeleccionados.has(g.id)) {
+                        let color = colorPalette[colorIdx % colorPalette.length];
+                        colorIdx++;
+                        mapIdToDatasetIndex[g.id] = datasetsRecurrentesIndiv.length;
+                        datasetsRecurrentesIndiv.push({
+                            label: g.concepto,
+                            data: [],
+                            borderColor: color,
+                            backgroundColor: color,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointStyle: 'rect',
+                            fill: false,
+                            tension: 0.3
+                        });
+                    }
+                }
+            });
+
             while (currY < endYear || (currY === endYear && currM <= endMonth)) {
                 let ymStr = `${currY}-${String(currM).padStart(2, '0')}`;
                 labelsMonths.push(`${monthNames[currM - 1]} ${currY}`);
@@ -1894,6 +2076,18 @@
                 dataTotales.push(sumaTotalMes);
                 dataIngresos.push(calc.sueldoActual);
                 dataResto.push(calc.sueldoActual - sumaTotalMes);
+
+                let valoresMesRecurrente = new Array(datasetsRecurrentesIndiv.length).fill(0);
+                calc.items.forEach(item => {
+                    if (item.isRecurrente && mapIdToDatasetIndex[item.id] !== undefined) {
+                        let dsIdx = mapIdToDatasetIndex[item.id];
+                        valoresMesRecurrente[dsIdx] += item.monto;
+                    }
+                });
+
+                datasetsRecurrentesIndiv.forEach((ds, idx) => {
+                    ds.data.push(valoresMesRecurrente[idx]);
+                });
 
                 catList.forEach((cat, idx) => {
                     datasetsEvolCat[idx].data.push(calc.totalesPorCat[cat.nombre] || 0);
@@ -1949,6 +2143,24 @@
                 chartInstEvolCat = new Chart(ctxEvolCat, {
                     type: 'line',
                     data: { labels: labelsMonths, datasets: datasetsEvolCat },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
+                        scales: {
+                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
+
+            const ctxRecurrentesIndiv = document.getElementById('chartEvolucionRecurrentesIndiv');
+            if (ctxRecurrentesIndiv) {
+                if (chartInstRecurrentesIndiv) chartInstRecurrentesIndiv.destroy();
+                chartInstRecurrentesIndiv = new Chart(ctxRecurrentesIndiv, {
+                    type: 'line',
+                    data: { labels: labelsMonths, datasets: datasetsRecurrentesIndiv },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
@@ -2071,6 +2283,7 @@
             }
 
             window.saveDataToCloud();
+            initRecurrentesDropdown();
             closeModal('modalGasto');
             renderApp();
             renderSaldosApp();
@@ -2101,6 +2314,7 @@
             if (confirm('¿Estás seguro de que querés eliminar este gasto?')) {
                 window.appState.gastos = window.appState.gastos.filter(g => g.id !== id);
                 window.saveDataToCloud();
+                initRecurrentesDropdown();
                 renderApp();
                 renderSaldosApp();
             }
