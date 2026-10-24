@@ -916,7 +916,6 @@
             initChartRangeInputs();
             initRecurrentesDropdown();
 
-            // Cerrar menú desplegable al hacer clic afuera
             window.addEventListener('click', (e) => {
                 const menu = document.getElementById('dropdownRecurrentesMenu');
                 const btn = e.target.closest('button');
@@ -985,7 +984,6 @@
             });
 
             let seleccionados = window.appState.recurrentesPreferidos;
-            // Si nunca guardó preferencias, por defecto seleccionamos todos
             if (!seleccionados || seleccionados.length === 0) {
                 seleccionados = Array.from(mapIdsUnicos.keys());
             }
@@ -1637,8 +1635,14 @@
                 const excepcionCatKey = `${gasto.id}_${targetMonth}`;
                 const categoriaAplicar = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
                 const startYM = gasto.startMonth || targetMonth;
+                
                 const excepcionMontoKey = `${gasto.id}_${targetMonth}`;
-                const montoAplicar = window.appState.excepcionesMonto?.[excepcionMontoKey] ?? parseFloat(gasto.monto);
+                let montoAplicar = window.appState.excepcionesMonto?.[excepcionMontoKey];
+                if (montoAplicar === undefined) {
+                    montoAplicar = parseFloat(gasto.monto);
+                } else {
+                    montoAplicar = parseFloat(montoAplicar);
+                }
                 
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
                 const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
@@ -1659,7 +1663,9 @@
                                 vencFinal = sumarUnMesAFecha(vencFinal);
                             }
                             const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
-                            const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] ?? vencFinal;
+                            const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] !== undefined
+                                ? window.appState.excepcionesVencimiento[vencExcepcionKey]
+                                : vencFinal;
 
                             const estadoKey = `${gasto.id}_${targetMonth}`;
                             const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
@@ -1687,8 +1693,11 @@
                             vencCalculado = sumarUnMesAFecha(vencCalculado);
                         }
 
+                        // CORRECCIÓN ESTRICTA: Prioridad absoluta para la excepción de vencimiento guardada en este mes exacto
                         const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
-                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] ?? vencCalculado;
+                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] !== undefined 
+                            ? window.appState.excepcionesVencimiento[vencExcepcionKey] 
+                            : vencCalculado;
 
                         const estadoKey = `${gasto.id}_${targetMonth}`;
                         const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
@@ -1708,7 +1717,9 @@
                 } else {
                     if (targetMonth === startYM) {
                         const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
-                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] ?? gasto.vencimiento ?? '';
+                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] !== undefined
+                            ? window.appState.excepcionesVencimiento[vencExcepcionKey]
+                            : (gasto.vencimiento ?? '');
 
                         const estadoKey = `${gasto.id}_${targetMonth}`;
                         const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
@@ -2023,7 +2034,6 @@
                 tension: 0.3
             }));
 
-            // Obtener IDs seleccionados en el dropdown multiselección
             const containerCheckboxes = document.getElementById('containerCheckboxesRecurrentes');
             let idsSeleccionados = new Set();
             if (containerCheckboxes) {
@@ -2266,20 +2276,52 @@
             e.preventDefault();
             const id = document.getElementById('gastoId').value;
             const concepto = document.getElementById('gastoConcepto').value;
-            const monto = parseFloat(document.getElementById('gastoMonto').value);
+            const montoNuevo = parseFloat(document.getElementById('gastoMonto').value);
             const startMonthInput = document.getElementById('gastoStartMonth').value;
             const categoria = document.getElementById('gastoCategoria').value;
-            const vencimiento = document.getElementById('gastoVencimiento').value;
+            const vencimientoNuevo = document.getElementById('gastoVencimiento').value;
             const isRecurrente = document.getElementById('checkRecurrente').checked;
             const cuotas = document.getElementById('checkCuotas').checked ? (parseInt(document.getElementById('gastoCuotas').value) || 1) : 1;
+            const currentMonth = window.appState.currentMonth;
 
             if (id) {
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
                 if (idx !== -1) {
-                    window.appState.gastos[idx] = { id, concepto, monto, startMonth: window.appState.gastos[idx].startMonth, categoria, isRecurrente, cuotas, vencimiento };
+                    const gastoOriginal = window.appState.gastos[idx];
+                    
+                    if (currentMonth > (gastoOriginal.startMonth || currentMonth)) {
+                        let [sY, sM] = (gastoOriginal.startMonth || currentMonth).split('-').map(Number);
+                        let [cY, cM] = currentMonth.split('-').map(Number);
+                        
+                        let loopY = sY, loopM = sM;
+                        while (loopY < cY || (loopY === cY && loopM < cM)) {
+                            let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
+                            if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+                            if (window.appState.excepcionesMonto[`${id}_${mStr}`] === undefined) {
+                                window.appState.excepcionesMonto[`${id}_${mStr}`] = gastoOriginal.monto;
+                            }
+                            if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+                            if (window.appState.excepcionesVencimiento[`${id}_${mStr}`] === undefined) {
+                                window.appState.excepcionesVencimiento[`${id}_${mStr}`] = gastoOriginal.vencimiento;
+                            }
+                            loopM++;
+                            if (loopM > 12) { loopM = 1; loopY++; }
+                        }
+                    }
+
+                    window.appState.gastos[idx] = { 
+                        id, 
+                        concepto, 
+                        monto: montoNuevo, 
+                        startMonth: startMonthInput || gastoOriginal.startMonth, 
+                        categoria, 
+                        isRecurrente, 
+                        cuotas, 
+                        vencimiento: vencimientoNuevo 
+                    };
                 }
             } else {
-                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, startMonth: startMonthInput, categoria, isRecurrente, cuotas, vencimiento });
+                window.appState.gastos.push({ id: Date.now().toString(), concepto, monto: montoNuevo, startMonth: startMonthInput, categoria, isRecurrente, cuotas, vencimiento: vencimientoNuevo });
             }
 
             window.saveDataToCloud();
@@ -2294,9 +2336,17 @@
             if (!gasto) return;
             document.getElementById('gastoId').value = gasto.id;
             document.getElementById('gastoConcepto').value = gasto.concepto;
-            document.getElementById('gastoMonto').value = gasto.monto;
+            
+            const currentMonth = window.appState.currentMonth;
+            const excepcionMontoKey = `${gasto.id}_${currentMonth}`;
+            const montoAMostrar = window.appState.excepcionesMonto?.[excepcionMontoKey] !== undefined ? window.appState.excepcionesMonto[excepcionMontoKey] : gasto.monto;
+
+            const excepcionVencKey = `${gasto.id}_${currentMonth}`;
+            const vencAMostrar = window.appState.excepcionesVencimiento?.[excepcionVencKey] !== undefined ? window.appState.excepcionesVencimiento[excepcionVencKey] : gasto.vencimiento;
+
+            document.getElementById('gastoMonto').value = montoAMostrar;
+            document.getElementById('gastoVencimiento').value = vencAMostrar || '';
             document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
-            document.getElementById('gastoVencimiento').value = gasto.vencimiento || '';
             renderCategoriasSelect();
             document.getElementById('gastoCategoria').value = gasto.categoria;
             document.getElementById('checkRecurrente').checked = !!gasto.isRecurrente;
