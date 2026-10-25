@@ -64,6 +64,7 @@
                     excepcionesMonto: {},
                     excepcionesCategoria: {},
                     excepcionesVencimiento: {},
+                    excepcionesVencimientoGrid: {},
                     excepcionesEstado: {},
                     sueldos: {},
                     cuentasBancarias: [
@@ -203,6 +204,7 @@
                     window.appState.excepcionesMonto = {};
                     window.appState.excepcionesCategoria = {};
                     window.appState.excepcionesVencimiento = {};
+                    window.appState.excepcionesVencimientoGrid = {};
                     window.appState.excepcionesEstado = {};
                     await saveDataToCloud();
                     renderApp();
@@ -868,6 +870,7 @@
             excepcionesMonto: {},
             excepcionesCategoria: {},
             excepcionesVencimiento: {},
+            excepcionesVencimientoGrid: {},
             excepcionesEstado: {},
             sueldos: {},
             cuentasBancarias: [
@@ -1662,10 +1665,11 @@
                             for (let step = 0; step < i; step++) {
                                 vencFinal = sumarUnMesAFecha(vencFinal);
                             }
-                            const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
-                            const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] !== undefined
-                                ? window.appState.excepcionesVencimiento[vencExcepcionKey]
-                                : vencFinal;
+                            // Si hay modificación en grilla para este mes exacto, tiene prioridad absoluta; sino toma el vencimiento propagado
+                            const gridKey = `${gasto.id}_${targetMonth}`;
+                            const vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined
+                                ? window.appState.excepcionesVencimientoGrid[gridKey]
+                                : (window.appState.excepcionesVencimiento?.[gridKey] !== undefined ? window.appState.excepcionesVencimiento[gridKey] : vencFinal);
 
                             const estadoKey = `${gasto.id}_${targetMonth}`;
                             const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
@@ -1693,11 +1697,14 @@
                             vencCalculado = sumarUnMesAFecha(vencCalculado);
                         }
 
-                        // CORRECCIÓN ESTRICTA: Prioridad absoluta para la excepción de vencimiento guardada en este mes exacto
-                        const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
-                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] !== undefined 
-                            ? window.appState.excepcionesVencimiento[vencExcepcionKey] 
-                            : vencCalculado;
+                        // REGLA 1 y 2: Si editó por grilla solo afecta este mes exacto. Si editó por el modal lápiz, se propagó en excepcionesVencimiento.
+                        const gridKey = `${gasto.id}_${targetMonth}`;
+                        let vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey];
+                        if (vencimientoAplicar === undefined) {
+                            vencimientoAplicar = window.appState.excepcionesVencimiento?.[gridKey] !== undefined 
+                                ? window.appState.excepcionesVencimiento[gridKey] 
+                                : vencCalculado;
+                        }
 
                         const estadoKey = `${gasto.id}_${targetMonth}`;
                         const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
@@ -1716,10 +1723,10 @@
                     }
                 } else {
                     if (targetMonth === startYM) {
-                        const vencExcepcionKey = `${gasto.id}_${targetMonth}`;
-                        const vencimientoAplicar = window.appState.excepcionesVencimiento?.[vencExcepcionKey] !== undefined
-                            ? window.appState.excepcionesVencimiento[vencExcepcionKey]
-                            : (gasto.vencimiento ?? '');
+                        const gridKey = `${gasto.id}_${targetMonth}`;
+                        const vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined
+                            ? window.appState.excepcionesVencimientoGrid[gridKey]
+                            : (window.appState.excepcionesVencimiento?.[gridKey] !== undefined ? window.appState.excepcionesVencimiento[gridKey] : (gasto.vencimiento ?? ''));
 
                         const estadoKey = `${gasto.id}_${targetMonth}`;
                         const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
@@ -2211,7 +2218,7 @@
 
         window.actualizarVencimientoGrilla = function(idGastoOrigen, categoriaNombre, nuevaFecha) {
             const currentMonth = window.appState.currentMonth;
-            if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+            if (!window.appState.excepcionesVencimientoGrid) window.appState.excepcionesVencimientoGrid = {};
 
             const catConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaNombre);
             const esEnBloque = catConfig ? catConfig.esTarjeta : false;
@@ -2223,11 +2230,11 @@
                     const startYM = gasto.startMonth || currentMonth;
 
                     if (catAplicada === categoriaNombre && currentMonth >= startYM) {
-                        window.appState.excepcionesVencimiento[`${gasto.id}_${currentMonth}`] = nuevaFecha;
+                        window.appState.excepcionesVencimientoGrid[`${gasto.id}_${currentMonth}`] = nuevaFecha;
                     }
                 });
             } else {
-                window.appState.excepcionesVencimiento[`${idGastoOrigen}_${currentMonth}`] = nuevaFecha;
+                window.appState.excepcionesVencimientoGrid[`${idGastoOrigen}_${currentMonth}`] = nuevaFecha;
             }
 
             window.saveDataToCloud();
@@ -2300,10 +2307,25 @@
                             if (window.appState.excepcionesMonto[`${id}_${mStr}`] === undefined) {
                                 window.appState.excepcionesMonto[`${id}_${mStr}`] = gastoOriginal.monto;
                             }
-                            if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
-                            if (window.appState.excepcionesVencimiento[`${id}_${mStr}`] === undefined) {
-                                window.appState.excepcionesVencimiento[`${id}_${mStr}`] = gastoOriginal.vencimiento;
-                            }
+                            loopM++;
+                            if (loopM > 12) { loopM = 1; loopY++; }
+                        }
+                    }
+
+                    // Propagación hacia adelante del vencimiento base y sus meses subsiguientes
+                    if (vencimientoNuevo !== gastoOriginal.vencimiento) {
+                        if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+                        let [sY, sM] = (startMonthInput || gastoOriginal.startMonth).split('-').map(Number);
+                        let [cY, cM] = currentMonth.split('-').map(Number);
+                        
+                        // Si se edita desde un mes específico, propagamos desde ese mes en adelante sumando un mes exacto
+                        let fechaIterada = vencimientoNuevo;
+                        let loopY = cY, loopM = cM;
+                        
+                        for (let i = 0; i < 36; i++) { // Proyectamos 3 años hacia adelante
+                            let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
+                            window.appState.excepcionesVencimiento[`${id}_${mStr}`] = fechaIterada;
+                            fechaIterada = sumarUnMesAFecha(fechaIterada);
                             loopM++;
                             if (loopM > 12) { loopM = 1; loopY++; }
                         }
@@ -2342,7 +2364,9 @@
             const montoAMostrar = window.appState.excepcionesMonto?.[excepcionMontoKey] !== undefined ? window.appState.excepcionesMonto[excepcionMontoKey] : gasto.monto;
 
             const excepcionVencKey = `${gasto.id}_${currentMonth}`;
-            const vencAMostrar = window.appState.excepcionesVencimiento?.[excepcionVencKey] !== undefined ? window.appState.excepcionesVencimiento[excepcionVencKey] : gasto.vencimiento;
+            const vencAMostrar = window.appState.excepcionesVencimiento?.[excepcionVencKey] !== undefined 
+                ? window.appState.excepcionesVencimiento[excepcionVencKey] 
+                : gasto.vencimiento;
 
             document.getElementById('gastoMonto').value = montoAMostrar;
             document.getElementById('gastoVencimiento').value = vencAMostrar || '';
