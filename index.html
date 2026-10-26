@@ -1639,12 +1639,25 @@
                 const categoriaAplicar = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
                 const startYM = gasto.startMonth || targetMonth;
                 
-                const excepcionMontoKey = `${gasto.id}_${targetMonth}`;
-                let montoAplicar = window.appState.excepcionesMonto?.[excepcionMontoKey];
-                if (montoAplicar === undefined) {
-                    montoAplicar = parseFloat(gasto.monto);
+                // Si existe una excepción de monto específica para este mes, la usamos.
+                // Sino, si el mes es anterior al de inicio no aplica, y si es posterior o igual, busca la última excepción previa o usa el gasto.monto original.
+                let montoAplicar = undefined;
+                if (window.appState.excepcionesMonto?.[excepcionMontoKey] !== undefined) {
+                    montoAplicar = parseFloat(window.appState.excepcionesMonto[excepcionMontoKey]);
                 } else {
-                    montoAplicar = parseFloat(montoAplicar);
+                    // Buscar si hay una excepción histórica configurada en un mes anterior cercano o usar el base
+                    let [tY, tM] = targetMonth.split('-').map(Number);
+                    let foundMonto = null;
+                    for (let i = 0; i < 36; i++) {
+                        let checkYM = `${tY}-${String(tM).padStart(2, '0')}`;
+                        if (window.appState.excepcionesMonto?.[`${gasto.id}_${checkYM}`] !== undefined) {
+                            foundMonto = parseFloat(window.appState.excepcionesMonto[`${gasto.id}_${checkYM}`]);
+                            break;
+                        }
+                        tM--;
+                        if (tM < 1) { tM = 12; tY--; }
+                    }
+                    montoAplicar = foundMonto !== null ? foundMonto : parseFloat(gasto.monto);
                 }
                 
                 const totalCuotas = parseInt(gasto.cuotas) || 1;
@@ -2294,12 +2307,12 @@
                 if (idx !== -1) {
                     const gastoOriginal = window.appState.gastos[idx];
                     
-                    // CORRECCIÓN: Al editar el monto desde el lápiz, SOLO impacta desde el mes actual (currentMonth) hacia adelante.
-                    // Los meses anteriores no se tocan y conservan sus valores históricos.
+                    // Al editar desde el lápiz, impacta desde el mes actual en adelante. 
+                    // Los meses anteriores (estrictamente menores a currentMonth) no se tocan.
                     if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
                     let [cY, cM] = currentMonth.split('-').map(Number);
                     let loopY = cY, loopM = cM;
-                    for (let i = 0; i < 36; i++) { // Proyectamos 3 años de excepciones de monto hacia adelante
+                    for (let i = 0; i < 36; i++) { 
                         let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
                         window.appState.excepcionesMonto[`${id}_${mStr}`] = montoNuevo;
                         loopM++;
@@ -2335,6 +2348,7 @@
                     };
                 }
             } else {
+                // Gasto nuevo: si arranca en un mes posterior o actual, aseguramos que se cree limpio
                 window.appState.gastos.push({ id: Date.now().toString(), concepto, monto: montoNuevo, startMonth: startMonthInput, categoria, isRecurrente, cuotas, vencimiento: vencimientoNuevo });
             }
 
@@ -2352,8 +2366,9 @@
             document.getElementById('gastoConcepto').value = gasto.concepto;
             
             const currentMonth = window.appState.currentMonth;
-            const excepcionMontoKey = `${gasto.id}_${currentMonth}`;
-            const montoAMostrar = window.appState.excepcionesMonto?.[excepcionMontoKey] !== undefined ? window.appState.excepcionesMonto[excepcionMontoKey] : gasto.monto;
+            const calcData = getCalculatedDataForMonth(currentMonth);
+            const itemActual = calcData.items.find(i => i.id === id);
+            const montoAMostrar = itemActual ? itemActual.monto : gasto.monto;
 
             const excepcionVencKey = `${gasto.id}_${currentMonth}`;
             const vencAMostrar = window.appState.excepcionesVencimiento?.[excepcionVencKey] !== undefined 
