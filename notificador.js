@@ -16,9 +16,27 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
+// Función para normalizar cualquier formato de fecha (DD/MM/YYYY o YYYY-MM-DD) a YYYY-MM-DD
+function normalizarFecha(fechaStr) {
+    if (!fechaStr) return '';
+    fechaStr = String(fechaStr).trim();
+    
+    // Si viene en formato DD/MM/YYYY
+    if (fechaStr.includes('/')) {
+        const partes = fechaStr.split('/');
+        if (partes.length === 3) {
+            let [d, m, y] = partes;
+            if (y.length === 2) y = '20' + y;
+            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+    }
+    return fechaStr; // Si ya viene en YYYY-MM-DD
+}
+
 function sumarUnMesAFecha(fechaStr) {
     if (!fechaStr) return '';
-    const partes = fechaStr.split('-');
+    const norm = normalizarFecha(fechaStr);
+    const partes = norm.split('-');
     if (partes.length !== 3) return '';
     let y = parseInt(partes[0]);
     let m = parseInt(partes[1]);
@@ -43,7 +61,7 @@ function obtenerFechasHoyMañana() {
 
 async function enviarAlertas() {
     try {
-        console.log("Conectando a Firebase para calcular vencimientos reales...");
+        console.log("Conectando a Firebase para depurar fechas...");
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
@@ -63,35 +81,27 @@ async function enviarAlertas() {
         const targetMonth = new Date().toISOString().slice(0, 7);
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
+        console.log(`[DEBUG] Fecha HOY esperada: ${hoyStr} | Fecha MAÑANA esperada: ${manianaStr}`);
+
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
             esTarjetaMap[c.nombre] = c.esTarjeta ?? true;
         });
 
-        // Replicamos el motor de cálculo de la web para obtener los ítems del mes con sus vencimientos reales
         let itemsCalculados = [];
         gastosRegistrados.forEach(gasto => {
             const startYM = gasto.startMonth || targetMonth;
             if (targetMonth >= startYM) {
-                const totalCuotas = parseInt(gasto.cuotas) || 1;
-                const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
-                const isRecurrente = gasto.isRecurrente || baseEsFijo;
-
                 let vencCalculado = gasto.vencimiento || '';
                 
-                if (isRecurrente && startYM !== targetMonth) {
-                    const [sY, sM] = startYM.split('-').map(Number);
-                    const [tY, tM] = targetMonth.split('-').map(Number);
-                    const diffMeses = (tY - sY) * 12 + (tM - sM);
-                    for (let step = 0; step < diffMeses; step++) {
-                        vencCalculado = sumarUnMesAFecha(vencCalculado);
-                    }
-                }
-
                 const gridKey = `${gasto.id}_${targetMonth}`;
-                let vencimientoFinal = excepcionesVencGrid[gridKey] !== undefined 
+                let vencimientoCrudo = excepcionesVencGrid[gridKey] !== undefined 
                     ? excepcionesVencGrid[gridKey] 
                     : (excepcionesVenc[gridKey] !== undefined ? excepcionesVenc[gridKey] : vencCalculado);
+
+                let vencimientoFinal = normalizarFecha(vencimientoCrudo);
+
+                console.log(`[Gasto: ${gasto.concepto}] -> Fecha normalizada: ${vencimientoFinal}`);
 
                 const catNombre = gasto.categoria || 'Otros';
                 const esTarjeta = esTarjetaMap[catNombre] ?? true;
@@ -111,7 +121,6 @@ async function enviarAlertas() {
             }
         });
 
-        // Agrupamos las tarjetas en bloque tal como lo pediste
         let resumenFinalList = [];
         let tarjetasAgrupadas = {};
 
@@ -138,7 +147,7 @@ async function enviarAlertas() {
         });
 
         if (resumenFinalList.length === 0) {
-            console.log("No hay vencimientos para hoy ni para mañana según el motor de cálculo.");
+            console.log("No hay vencimientos para hoy ni para mañana tras normalizar fechas.");
             return;
         }
 
@@ -200,7 +209,7 @@ async function enviarAlertas() {
             html: contenidoHtml
         });
 
-        console.log("Correo de alerta enviado exitosamente con datos reales.");
+        console.log("Correo de alerta enviado exitosamente.");
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
