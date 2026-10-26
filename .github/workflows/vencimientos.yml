@@ -1,15 +1,13 @@
-name: Enviar Vencimientos
+name: Enviar Alertas de Vencimiento
 
 on:
-  schedule:
-    - cron: '0 10 * * *' # Este era el horario viejo de GitHub
-  workflow_dispatch: # Permite activarlo manualmente o mediante webhooks externos
+  workflow_dispatch:
 
 jobs:
-  notificar:
-    runs-on: ubuntu-latest
+  enviar-alerta:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout del repositorio
+      - name: Clonar repositorio
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -18,9 +16,10 @@ jobs:
           node-version: '20'
 
       - name: Instalar dependencias
-        run: npm install
+        run: npm install resend firebase
 
       - name: Ejecutar script de notificaciones
-        run: node notificador.js
         env:
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_TO: ${{ secrets.MY_EMAIL }}
+        run: node notificador.js
