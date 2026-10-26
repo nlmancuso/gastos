@@ -43,7 +43,7 @@ function obtenerFechasHoyMañana() {
 
 async function enviarAlertas() {
     try {
-        console.log("Conectando a Firebase para extraer todos los vencimientos (gastos y tarjetas)...");
+        console.log("Conectando a Firebase para extracción sincronizada...");
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
@@ -66,36 +66,41 @@ async function enviarAlertas() {
 
         console.log(`[DEBUG] HOY: ${hoyStr} | MAÑANA: ${manianaStr}`);
 
+        // Detectar nombres de categorías que actúan como tarjetas
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
-            esTarjetaMap[c.nombre] = c.esTarjeta ?? false;
+            const nombreCat = c.nombre || c;
+            esTarjetaMap[nombreCat] = c.esTarjeta ?? true;
         });
 
         let itemsCalculados = [];
 
-        // 1. Procesar gastos de la lista principal
+        // 1. Procesar todos los gastos y buscar sus fechas en cualquier estructura disponible
         gastosRegistrados.forEach(gasto => {
             const startYM = gasto.startMonth || targetMonth;
             if (targetMonth >= startYM) {
                 const gridKey = `${gasto.id}_${targetMonth}`;
-                let vencimientoCrudo = excepcionesVencGrid[gridKey] !== undefined 
-                    ? excepcionesVencGrid[gridKey] 
-                    : (excepcionesVenc[gridKey] !== undefined ? excepcionesVenc[gridKey] : (gasto.vencimiento || ''));
+                let vencimientoCrudo = excepcionesVencGrid[gridKey] 
+                    || excepcionesVenc[gridKey] 
+                    || gasto.vencimiento 
+                    || gasto.fechaVencimiento 
+                    || '';
 
                 let vencimientoFinal = normalizarFecha(vencimientoCrudo);
-                console.log(`[Gasto: ${gasto.concepto}] -> Fecha: ${vencimientoFinal}`);
-
                 const catNombre = gasto.categoria || 'Otros';
                 const esTarjeta = esTarjetaMap[catNombre] ?? false;
                 const monto = parseFloat(gasto.monto) || 0;
 
-                if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
+                console.log(`[Item: ${gasto.concepto || catNombre}] -> Cat: ${catNombre} | Fecha: ${vencimientoFinal} | EsTarjeta: ${esTarjeta}`);
+
+                // Si es un gasto normal que vence hoy o mañana
+                if (!esTarjeta && (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr)) {
                     itemsCalculados.push({
-                        concepto: gasto.concepto,
+                        concepto: gasto.concepto || catNombre,
                         monto: monto,
                         categoria: catNombre,
                         vencimiento: vencimientoFinal,
-                        esTarjeta: esTarjeta,
+                        esTarjeta: false,
                         estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
                         badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
                     });
@@ -103,36 +108,51 @@ async function enviarAlertas() {
             }
         });
 
-        // 2. Procesar las tarjetas (bloques) y sus fechas específicas de vencimiento
-        let totalesPorCategoriaTarjeta = {};
+        // 2. Procesar las tarjetas agrupadas sumando sus ítems y obteniendo su fecha de vencimiento
+        let totalesPorTarjeta = {};
         let fechasTarjetas = {};
 
+        // Recolectar fechas de tarjetas desde las configuraciones o excepciones
         categoriasConfig.forEach(cat => {
-            if (cat.esTarjeta) {
-                const vKey = `${cat.nombre}_${targetMonth}`;
-                let vencTarjetaCrudo = vencimientosTarjetas[vKey] || cat.vencimientoHabitual || '';
-                fechasTarjetas[cat.nombre] = normalizarFecha(vencTarjetaCrudo);
-                totalesPorCategoriaTarjeta[cat.nombre] = 0;
+            const catNombre = cat.nombre || cat;
+            if (cat.esTarjeta || esTarjetaMap[catNombre]) {
+                const vKey = `${catNombre}_${targetMonth}`;
+                let vencTarjetaCrudo = vencimientosTarjetas[vKey] 
+                    || cat.vencimiento 
+                    || cat.vencimientoHabitual 
+                    || '';
+                
+                fechasTarjetas[catNombre] = normalizarFecha(vencTarjetaCrudo);
+                totalesPorTarjeta[catNombre] = 0;
             }
         });
 
-        // Sumar los montos de cada gasto que pertenezca a una categoría de tarjeta
+        // Sumar montos de gastos asociados a cada tarjeta
         gastosRegistrados.forEach(gasto => {
             const startYM = gasto.startMonth || targetMonth;
             if (targetMonth >= startYM) {
                 const catNombre = gasto.categoria || '';
-                if (esTarjetaMap[catNombre]) {
-                    totalesPorCategoriaTarjeta[catNombre] = (totalesPorCategoriaTarjeta[catNombre] || 0) + (parseFloat(gasto.monto) || 0);
+                if (totalesPorTarjeta[catNombre] !== undefined) {
+                    totalesPorTarjeta[catNombre] += parseFloat(gasto.monto) || 0;
                 }
             }
         });
 
-        // Evaluar si las tarjetas vencen hoy o mañana
-        Object.keys(totalesPorCategoriaTarjeta).forEach(catNombre => {
-            const montoTotalCat = totalesPorCategoriaTarjeta[catNombre];
-            const vencFinalCat = fechasTarjetas[catNombre];
+        // Verificar si las tarjetas vencen hoy o mañana
+        Object.keys(totalesPorTarjeta).forEach(catNombre => {
+            const montoTotalCat = totalesPorTarjeta[catNombre];
+            let vencFinalCat = fechasTarjetas[catNombre];
 
-            console.log(`[Tarjeta: ${catNombre}] -> Monto: ${montoTotalCat} | Vence: ${vencFinalCat}`);
+            // Si la tarjeta no tiene fecha específica guardada pero tiene gastos, intentamos buscarla en los ítems de esa categoría
+            if (!vencFinalCat) {
+                gastosRegistrados.forEach(g => {
+                    if (g.categoria === catNombre && (g.vencimiento || g.fechaVencimiento)) {
+                        vencFinalCat = normalizarFecha(g.vencimiento || g.fechaVencimiento);
+                    }
+                });
+            }
+
+            console.log(`[Resumen Tarjeta: ${catNombre}] -> Monto Total: ${montoTotalCat} | Vence Final: ${vencFinalCat}`);
 
             if (montoTotalCat > 0 && (vencFinalCat === hoyStr || vencFinalCat === manianaStr)) {
                 itemsCalculados.push({
@@ -148,7 +168,7 @@ async function enviarAlertas() {
         });
 
         if (itemsCalculados.length === 0) {
-            console.log("No hay vencimientos para hoy ni para mañana.");
+            console.log("No hay vencimientos exactos para hoy ni para mañana.");
             return;
         }
 
@@ -164,7 +184,7 @@ async function enviarAlertas() {
                     <div>
                         <strong style="font-size: 15px; color: #111;">${item.concepto}</strong>
                         <div style="font-size: 12px; color: #666; margin-top: 3px;">
-                            ${item.esTarjeta ? 'Categoría Agrupada' : `Categoría: ${item.categoria}`} | Vence: ${item.vencimiento.split('-').reverse().join('/')}
+                            ${item.esTarjeta ? 'Categoría Agrupada' : `Categoría: ${item.categoria}`} | Vence: ${item.vencimiento ? item.vencimiento.split('-').reverse().join('/') : 'Sin fecha'}
                         </div>
                     </div>
                     <div style="text-align: right;">
@@ -210,7 +230,7 @@ async function enviarAlertas() {
             html: contenidoHtml
         });
 
-        console.log("Correo de alerta enviado exitosamente con tarjetas y gastos incluidos.");
+        console.log("Correo de alerta enviado exitosamente.");
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
