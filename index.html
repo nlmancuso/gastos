@@ -878,6 +878,9 @@
 
         window.filtrosTemporales = [];
         
+        // Memoria para recordar qué categorías están abiertas mientras trabajás
+        window.categoriasAbiertasMap = {};
+
         let customRangeFrom = null;
         let customRangeTo = null;
 
@@ -1045,6 +1048,9 @@
         }
 
         function switchTab(tabName) {
+            if (tabName !== 'planilla') {
+                window.categoriasAbiertasMap = {}; // Limpiar memoria al salir de la planilla
+            }
             document.getElementById('vistaPlanilla').classList.toggle('hidden', tabName !== 'planilla');
             document.getElementById('vistaGraficos').classList.toggle('hidden', tabName !== 'graficos');
             document.getElementById('vistaSaldos').classList.toggle('hidden', tabName !== 'saldos');
@@ -1782,7 +1788,7 @@
             document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
             document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
 
-            // VISTA AGRUPADA POR CATEGORÍA CON ACORDEÓN (CERRADO / COLAPSADO POR DEFECTO)
+            // VISTA AGRUPADA POR CATEGORÍA CON ACORDEÓN Y DRAG AND DROP
             const containerAgrupada = document.getElementById('containerPlanillaAgrupada');
             if (!containerAgrupada) return;
             containerAgrupada.innerHTML = '';
@@ -1796,6 +1802,14 @@
 
             let gruposPorCat = {};
             catList.forEach(c => gruposPorCat[c.nombre] = []);
+            
+            let gastosGlobalesIds = (window.appState.gastos || []).map(g => g.id);
+            itemsFiltrados.sort((a, b) => {
+                let idxA = gastosGlobalesIds.indexOf(a.id);
+                let idxB = gastosGlobalesIds.indexOf(b.id);
+                return idxA - idxB;
+            });
+
             itemsFiltrados.forEach(item => {
                 if (!gruposPorCat[item.categoria]) gruposPorCat[item.categoria] = [];
                 gruposPorCat[item.categoria].push(item);
@@ -1815,6 +1829,9 @@
                 }
 
                 const collapseId = `collapse_${cat.nombre.replace(/\s+/g, '_')}`;
+                
+                // Mantenemos abierto si estaba registrado en la memoria temporal
+                const isOpen = !!window.categoriasAbiertasMap[collapseId];
 
                 let htmlItems = '';
                 gastosCat.forEach(item => {
@@ -1833,8 +1850,16 @@
                     `;
 
                     htmlItems += `
-                        <tr class="hover:bg-slate-900/40 transition-colors">
-                            <td class="px-6 py-3.5 text-white font-bold pl-8">${item.concepto}</td>
+                        <tr draggable="true" 
+                            ondragstart="handleDragStart(event, '${item.id}')" 
+                            ondragover="handleDragOver(event)" 
+                            ondrop="handleDrop(event, '${item.id}')" 
+                            ondragend="handleDragEnd(event)"
+                            class="hover:bg-slate-900/40 transition-colors cursor-grab active:cursor-grabbing">
+                            <td class="px-6 py-3.5 text-white font-bold flex items-center gap-2">
+                                <span class="text-slate-600 hover:text-slate-400 cursor-grab px-1 select-none" title="Arrastrar para reordenar">⋮⋮</span>
+                                ${item.concepto}
+                            </td>
                             <td class="px-6 py-3.5 text-slate-400 text-xs">${item.tipo}</td>
                             <td class="px-6 py-3.5">${vencimientoInputHtml}</td>
                             <td class="px-6 py-3.5 text-right font-extrabold text-white">${fmt(item.monto)}</td>
@@ -1849,10 +1874,10 @@
 
                 containerAgrupada.innerHTML += `
                     <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/60 shadow-md">
-                        <!-- ENCABEZADO DE CATEGORÍA (DESPLEGABLE - CERRADO POR DEFECTO) -->
+                        <!-- ENCABEZADO DE CATEGORÍA -->
                         <div onclick="toggleCategoriaCollapse('${collapseId}', this)" class="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center cursor-pointer select-none hover:bg-slate-900 transition">
                             <div class="flex items-center gap-3">
-                                <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-200" id="icon_${collapseId}" style="transform: rotate(-90deg);"></i>
+                                <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-200" id="icon_${collapseId}" style="transform: ${isOpen ? 'rotate(0deg)' : 'rotate(-90deg)'};"></i>
                                 <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${colorCat};"></span>
                                 <span class="text-sm font-bold text-white">${cat.nombre}</span>
                                 <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono">${gastosCat.length} ítem${gastosCat.length === 1 ? '' : 's'}</span>
@@ -1863,12 +1888,12 @@
                             </div>
                         </div>
 
-                        <!-- CONTENIDO DESPLEGABLE (OCULTO/CERRADO POR DEFECTO) -->
-                        <div id="${collapseId}" class="overflow-x-auto hidden">
+                        <!-- CONTENIDO DESPLEGABLE -->
+                        <div id="${collapseId}" class="overflow-x-auto ${isOpen ? '' : 'hidden'}">
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                        <th class="px-6 py-3 pl-8">CONCEPTO</th>
+                                        <th class="px-6 py-3">CONCEPTO</th>
                                         <th class="px-6 py-3">TIPO / CUOTAS</th>
                                         <th class="px-6 py-3">VENCIMIENTO</th>
                                         <th class="px-6 py-3 text-right">MONTO</th>
@@ -1886,15 +1911,53 @@
             });
         }
 
+        // FUNCIONES DE DRAG AND DROP
+        let draggedGastoId = null;
+
+        window.handleDragStart = function(e, id) {
+            draggedGastoId = id;
+            e.target.classList.add('opacity-40', 'border-dashed', 'border-emerald-500');
+            e.dataTransfer.effectAllowed = 'move';
+        };
+
+        window.handleDragOver = function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        };
+
+        window.handleDrop = function(e, targetId) {
+            e.preventDefault();
+            if (!draggedGastoId || draggedGastoId === targetId) return;
+
+            let gastos = window.appState.gastos || [];
+            const draggedIdx = gastos.findIndex(g => g.id === draggedGastoId);
+            const targetIdx = gastos.findIndex(g => g.id === targetId);
+
+            if (draggedIdx !== -1 && targetIdx !== -1) {
+                const [movedItem] = gastos.splice(draggedIdx, 1);
+                gastos.splice(targetIdx, 0, movedItem);
+                window.appState.gastos = gastos;
+                window.saveDataToCloud();
+                renderApp();
+            }
+        };
+
+        window.handleDragEnd = function(e) {
+            e.target.classList.remove('opacity-40', 'border-dashed', 'border-emerald-500');
+            draggedGastoId = null;
+        };
+
         window.toggleCategoriaCollapse = function(collapseId, headerEl) {
             const content = document.getElementById(collapseId);
             const icon = document.getElementById(`icon_${collapseId}`);
             if (content.classList.contains('hidden')) {
                 content.classList.remove('hidden');
                 if (icon) icon.style.transform = 'rotate(0deg)';
+                window.categoriasAbiertasMap[collapseId] = true;
             } else {
                 content.classList.add('hidden');
                 if (icon) icon.style.transform = 'rotate(-90deg)';
+                delete window.categoriasAbiertasMap[collapseId];
             }
         };
 
@@ -2524,7 +2587,7 @@
         window.closeModal = function(id) {
             document.getElementById(id).classList.add('hidden');
             if (id === 'modalGasto') {
-                document.getElementById('gattId').value = '';
+                document.getElementById('gastoId').value = '';
                 document.getElementById('formGasto').reset();
             }
         };
