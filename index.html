@@ -1665,7 +1665,6 @@
                             for (let step = 0; step < i; step++) {
                                 vencFinal = sumarUnMesAFecha(vencFinal);
                             }
-                            // Si hay modificación en grilla para este mes exacto, tiene prioridad absoluta; sino toma el vencimiento propagado
                             const gridKey = `${gasto.id}_${targetMonth}`;
                             const vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined
                                 ? window.appState.excepcionesVencimientoGrid[gridKey]
@@ -1697,7 +1696,6 @@
                             vencCalculado = sumarUnMesAFecha(vencCalculado);
                         }
 
-                        // REGLA 1 y 2: Si editó por grilla solo afecta este mes exacto. Si editó por el modal lápiz, se propagó en excepcionesVencimiento.
                         const gridKey = `${gasto.id}_${targetMonth}`;
                         let vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey];
                         if (vencimientoAplicar === undefined) {
@@ -2296,33 +2294,27 @@
                 if (idx !== -1) {
                     const gastoOriginal = window.appState.gastos[idx];
                     
-                    if (currentMonth > (gastoOriginal.startMonth || currentMonth)) {
-                        let [sY, sM] = (gastoOriginal.startMonth || currentMonth).split('-').map(Number);
-                        let [cY, cM] = currentMonth.split('-').map(Number);
-                        
-                        let loopY = sY, loopM = sM;
-                        while (loopY < cY || (loopY === cY && loopM < cM)) {
-                            let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
-                            if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
-                            if (window.appState.excepcionesMonto[`${id}_${mStr}`] === undefined) {
-                                window.appState.excepcionesMonto[`${id}_${mStr}`] = gastoOriginal.monto;
-                            }
-                            loopM++;
-                            if (loopM > 12) { loopM = 1; loopY++; }
-                        }
+                    // CORRECCIÓN: Al editar el monto desde el lápiz, SOLO impacta desde el mes actual (currentMonth) hacia adelante.
+                    // Los meses anteriores no se tocan y conservan sus valores históricos.
+                    if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+                    let [cY, cM] = currentMonth.split('-').map(Number);
+                    let loopY = cY, loopM = cM;
+                    for (let i = 0; i < 36; i++) { // Proyectamos 3 años de excepciones de monto hacia adelante
+                        let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
+                        window.appState.excepcionesMonto[`${id}_${mStr}`] = montoNuevo;
+                        loopM++;
+                        if (loopM > 12) { loopM = 1; loopY++; }
                     }
 
                     // Propagación hacia adelante del vencimiento base y sus meses subsiguientes
                     if (vencimientoNuevo !== gastoOriginal.vencimiento) {
                         if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
-                        let [sY, sM] = (startMonthInput || gastoOriginal.startMonth).split('-').map(Number);
                         let [cY, cM] = currentMonth.split('-').map(Number);
                         
-                        // Si se edita desde un mes específico, propagamos desde ese mes en adelante sumando un mes exacto
                         let fechaIterada = vencimientoNuevo;
                         let loopY = cY, loopM = cM;
                         
-                        for (let i = 0; i < 36; i++) { // Proyectamos 3 años hacia adelante
+                        for (let i = 0; i < 36; i++) { 
                             let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
                             window.appState.excepcionesVencimiento[`${id}_${mStr}`] = fechaIterada;
                             fechaIterada = sumarUnMesAFecha(fechaIterada);
