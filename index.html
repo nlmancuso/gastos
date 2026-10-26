@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control de Gastos</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22><path fill=%22%2310b981%22 d=%22M64 32C28.7 32 0 60.7 0 96v320c0 35.3 28.7 64 64 64h384c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm64 192c-17.7 0-32 14.3-32 32s14.3 32 32 32s32-14.3 32-32s-14.3-32-32-32zM416 160c17.7 0 32 14.3 32 32s-14.3 32-32 32s-32-14.3-32-32s14.3-32 32-32z%22/></svg>">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -194,30 +196,6 @@
                 console.error("Error guardando datos hormiga:", e);
             }
         };
-
-        window.limpiarDatosNube = async function() {
-            if (confirm("⚠️ ¿Estás seguro de vaciar todos los gastos guardados en la nube para este grupo? Esta acción dejará la planilla limpia de cero.")) {
-                showLoading();
-                try {
-                    window.appState.gastos = [];
-                    window.appState.sueldos = {};
-                    window.appState.excepcionesMonto = {};
-                    window.appState.excepcionesCategoria = {};
-                    window.appState.excepcionesVencimiento = {};
-                    window.appState.excepcionesVencimientoGrid = {};
-                    window.appState.excepcionesEstado = {};
-                    await saveDataToCloud();
-                    renderApp();
-                    renderSaldosApp();
-                    showApp();
-                    alert("¡Planilla limpiada correctamente!");
-                } catch (e) {
-                    console.error("Error al limpiar:", e);
-                    showApp();
-                    alert("No se pudo limpiar la base de datos.");
-                }
-            }
-        };
     </script>
 
     <style>
@@ -306,9 +284,6 @@
                 <div class="flex items-center gap-2">
                     <button id="btnNuevoGastoHeader" onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-circle-plus"></i> Nuevo Gasto
-                    </button>
-                    <button onclick="limpiarDatosNube()" title="Limpiar Planilla y Empezar de Cero" class="p-2.5 rounded-lg card-bg text-rose-400 hover:text-rose-300 transition">
-                        <i class="fa-solid fa-trash-can"></i>
                     </button>
                     <button onclick="openModalConfig()" title="Configuración Categorías" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition">
                         <i class="fa-solid fa-gear"></i>
@@ -877,8 +852,6 @@
         };
 
         window.filtrosTemporales = [];
-        
-        // Memoria para recordar qué categorías están abiertas mientras trabajás
         window.categoriasAbiertasMap = {};
 
         let customRangeFrom = null;
@@ -1049,7 +1022,7 @@
 
         function switchTab(tabName) {
             if (tabName !== 'planilla') {
-                window.categoriasAbiertasMap = {}; // Limpiar memoria al salir de la planilla
+                window.categoriasAbiertasMap = {};
             }
             document.getElementById('vistaPlanilla').classList.toggle('hidden', tabName !== 'planilla');
             document.getElementById('vistaGraficos').classList.toggle('hidden', tabName !== 'graficos');
@@ -1076,7 +1049,6 @@
             }
         }
 
-        // SALDOS Y BANCOS
         function renderCategoriasAsociadasCheckboxes(categoriasSeleccionadas = [], gastosFijosSeleccionados = []) {
             const containerCat = document.getElementById('containerCategoriasAsociadas');
             const containerFijos = document.getElementById('containerGastosFijosAsociados');
@@ -1359,7 +1331,6 @@
             }
         };
 
-        // GESTIÓN DE CATEGORÍAS GENERALES
         function openModalConfig() { renderCategoriasConfigList(); document.getElementById('modalConfig').classList.remove('hidden'); }
         
         function renderCategoriasConfigList() {
@@ -1433,7 +1404,6 @@
             renderFiltrosCategoriasCheckboxes();
         }
 
-        // GESTIÓN DE CATEGORÍAS HORMIGA
         function openModalCatHormiga() {
             renderCatHormigaList();
             document.getElementById('modalCatHormiga').classList.remove('hidden');
@@ -1788,7 +1758,6 @@
             document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
             document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
 
-            // VISTA AGRUPADA POR CATEGORÍA CON ACORDEÓN Y DRAG AND DROP
             const containerAgrupada = document.getElementById('containerPlanillaAgrupada');
             if (!containerAgrupada) return;
             containerAgrupada.innerHTML = '';
@@ -1829,8 +1798,6 @@
                 }
 
                 const collapseId = `collapse_${cat.nombre.replace(/\s+/g, '_')}`;
-                
-                // Mantenemos abierto si estaba registrado en la memoria temporal
                 const isOpen = !!window.categoriasAbiertasMap[collapseId];
 
                 let htmlItems = '';
@@ -1874,7 +1841,6 @@
 
                 containerAgrupada.innerHTML += `
                     <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/60 shadow-md">
-                        <!-- ENCABEZADO DE CATEGORÍA -->
                         <div onclick="toggleCategoriaCollapse('${collapseId}', this)" class="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center cursor-pointer select-none hover:bg-slate-900 transition">
                             <div class="flex items-center gap-3">
                                 <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-200" id="icon_${collapseId}" style="transform: ${isOpen ? 'rotate(0deg)' : 'rotate(-90deg)'};"></i>
@@ -1888,7 +1854,6 @@
                             </div>
                         </div>
 
-                        <!-- CONTENIDO DESPLEGABLE -->
                         <div id="${collapseId}" class="overflow-x-auto ${isOpen ? '' : 'hidden'}">
                             <table class="w-full text-left border-collapse">
                                 <thead>
@@ -1911,7 +1876,6 @@
             });
         }
 
-        // FUNCIONES DE DRAG AND DROP
         let draggedGastoId = null;
 
         window.handleDragStart = function(e, id) {
@@ -2108,7 +2072,6 @@
                 });
             }
 
-            // GRÁFICO DE LÍNEAS PARA EVOLUCIÓN POR CATEGORÍAS SEPARADAS
             let datasetsCatSeparadas = catHormigaList.map(cat => {
                 let dataPorMes = [];
                 let [currY2, currM2] = currentMonth.split('-').map(Number);
@@ -2183,7 +2146,7 @@
             window.saveHormigaDataToCloud();
             document.getElementById('hormigaConcepto').value = '';
             document.getElementById('hormigaMonto').value = '';
-            document.getElementById('hormigaMedioPago').value = 'Mercado Pago'; // Restablecer al valor por defecto
+            document.getElementById('hormigaMedioPago').value = 'Mercado Pago';
             renderHormigaApp();
         };
 
