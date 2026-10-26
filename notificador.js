@@ -16,9 +16,20 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
+function obtenerFechasHoyMañana() {
+    const hoyDate = new Date();
+    const hoyStr = hoyDate.toISOString().slice(0, 10);
+
+    const manianaDate = new Date();
+    manianaDate.setDate(hoyDate.getDate() + 1);
+    const manianaStr = manianaDate.toISOString().slice(0, 10);
+
+    return { hoyStr, manianaStr };
+}
+
 async function enviarAlertas() {
     try {
-        console.log("Conectando a Firebase para obtener datos actualizados...");
+        console.log("Conectando a Firebase para filtrar vencimientos de hoy y mañana...");
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
@@ -31,42 +42,74 @@ async function enviarAlertas() {
         const dataApp = docSnap.data();
         const appState = dataApp.appState || {};
         const gastosRegistrados = appState.gastos || [];
+        const categoriasConfig = appState.categorias || [];
 
         const mesActual = new Date().toISOString().slice(0, 7);
-        console.log(`Procesando gastos vigentes para el mes: ${mesActual}`);
+        const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
-        // Simulamos o filtramos los ítems activos del mes actual desde Firebase
-        let gastosPorVencer = [];
+        // 1. Mapear configuración de categorías para saber cuáles son tarjetas (en bloque)
+        let esTarjetaMap = {};
+        categoriasConfig.forEach(c => {
+            esTarjetaMap[c.nombre] = c.esTarjeta ?? true;
+        });
+
+        // 2. Procesar ítems del mes actual
+        let itemsProcesados = [];
         gastosRegistrados.forEach(gasto => {
             const startYM = gasto.startMonth || mesActual;
             if (mesActual >= startYM) {
-                let badge = 'PENDIENTE';
-                let color = '#3b82f6';
+                const vencimiento = gasto.vencimiento || '';
                 
-                if (gasto.vencimiento) {
-                    const hoy = new Date().toISOString().slice(0, 10);
-                    if (gasto.vencimiento < hoy) {
-                        badge = 'VENCIDO';
-                        color = '#e11d48';
-                    } else if (gasto.vencimiento === hoy) {
-                        badge = 'VENCE HOY';
-                        color = '#f59e0b';
-                    }
-                }
+                // Solo nos interesan los que vencen HOY o MAÑANA
+                if (vencimiento === hoyStr || vencimiento === manianaStr) {
+                    const catNombre = gasto.categoria || 'Otros';
+                    const esTarjeta = esTarjetaMap[catNombre] ?? true;
 
-                gastosPorVencer.push({
-                    nombre: gasto.concepto,
-                    monto: parseFloat(gasto.monto) || 0,
-                    categoria: gasto.categoria || 'Otros',
-                    fechaVencimiento: gasto.vencimiento || 'Sin fecha',
-                    estadoBadge: badge,
-                    badgeColor: color
-                });
+                    itemsProcesados.push({
+                        id: gasto.id,
+                        concepto: gasto.concepto,
+                        monto: parseFloat(gasto.monto) || 0,
+                        categoria: catNombre,
+                        vencimiento: vencimiento,
+                        esTarjeta: esTarjeta,
+                        estadoBadge: vencimiento === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
+                        badgeColor: vencimiento === hoyStr ? '#e11d48' : '#f59e0b'
+                    });
+                }
             }
         });
 
-        if (gastosPorVencer.length === 0) {
-            console.log("No hay gastos activos para reportar en este periodo.");
+        // 3. Agrupar tarjetas/bloques y mantener individuales los fijos
+        let resumenFinalList = [];
+        let tarjetasAgrupadas = {};
+
+        itemsProcesados.forEach(item => {
+            if (item.esTarjeta) {
+                // Agrupamos por categoría de tarjeta
+                if (!tarjetasAgrupadas[item.categoria]) {
+                    tarjetasAgrupadas[item.categoria] = {
+                        nombre: item.categoria,
+                        monto: 0,
+                        vencimiento: item.vencimiento,
+                        estadoBadge: item.estadoBadge,
+                        badgeColor: item.badgeColor,
+                        esTarjeta: true
+                    };
+                }
+                tarjetasAgrupadas[item.categoria].monto += item.monto;
+            } else {
+                // Gasto fijo / individual va suelto
+                resumenFinalList.push(item);
+            }
+        });
+
+        // Añadimos las tarjetas ya sumadas a la lista final
+        Object.values(tarjetasAgrupadas).forEach(tarjeta => {
+            resumenFinalList.push(tarjeta);
+        });
+
+        if (resumenFinalList.length === 0) {
+            console.log("No hay vencimientos para hoy ni para mañana. No se enviará correo.");
             return;
         }
 
@@ -78,55 +121,35 @@ async function enviarAlertas() {
             process.exit(1);
         }
 
-        const montoTotal = gastosPorVencer.reduce((acc, gasto) => acc + gasto.monto, 0);
-        const cantidadUrgentes = gastosPorVencer.filter(g => g.estadoBadge.includes('HOY') || g.estadoBadge.includes('VENCIDO')).length;
+        const montoTotal = resumenFinalList.reduce((acc, item) => acc + item.monto, 0);
+        const cantidadUrgentes = resumenFinalList.length;
 
-        const categoriasMap = {};
-        gastosPorVencer.forEach(g => {
-            categoriasMap[g.categoria] = (categoriasMap[g.categoria] || 0) + g.monto;
-        });
-
-        const listaGastosHtml = gastosPorVencer.map(gasto => `
+        const listaGastosHtml = resumenFinalList.map(item => `
             <div style="padding: 15px 0; border-bottom: 1px solid #eaeaea;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <strong style="font-size: 15px; color: #111;">${gasto.nombre}</strong>
+                        <strong style="font-size: 15px; color: #111;">${item.esTarjeta ? `💳 Tarjeta / Bloque: ${item.nombre}` : item.concepto}</strong>
                         <div style="font-size: 12px; color: #666; margin-top: 3px;">
-                            Categoría: ${gasto.categoria} | Vence: ${gasto.fechaVencimiento}
+                            ${item.esTarjeta ? 'Categoría Agrupada' : `Categoría: ${item.categoria}`} | Vence: ${item.vencimiento}
                         </div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-size: 15px; font-weight: bold; color: #111;">$${gasto.monto.toLocaleString('es-AR')}</div>
-                        <span style="display: inline-block; background-color: ${gasto.badgeColor}; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-top: 3px;">
-                            ${gasto.estadoBadge}
+                        <div style="font-size: 15px; font-weight: bold; color: #111;">$${item.monto.toLocaleString('es-AR')}</div>
+                        <span style="display: inline-block; background-color: ${item.badgeColor}; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-top: 3px;">
+                            ${item.estadoBadge}
                         </span>
                     </div>
                 </div>
             </div>
         `).join('');
 
-        const barrasCategoriasHtml = Object.entries(categoriasMap).map(([cat, totalCat]) => {
-            const porcentaje = montoTotal > 0 ? Math.round((totalCat / montoTotal) * 100) : 0;
-            return `
-                <div style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #475569; margin-bottom: 4px;">
-                        <span>${cat}</span>
-                        <span>$${totalCat.toLocaleString('es-AR')} (${porcentaje}%)</span>
-                    </div>
-                    <div style="background: #e2e8f0; border-radius: 4px; height: 8px; width: 100%; overflow: hidden;">
-                        <div style="background: #3b82f6; height: 8px; width: ${porcentaje}%; border-radius: 4px;"></div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
         const contenidoHtml = `
             <div style="font-family: Arial, sans-serif; background-color: #f4f4f5; padding: 30px; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
                     <div style="background-color: #0f172a; padding: 25px; text-align: center; color: white;">
                         <div style="font-size: 24px; margin-bottom: 6px;">🔔</div>
-                        <h2 style="margin: 0; font-size: 20px; font-weight: bold;">Reporte de Vencimientos</h2>
-                        <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">Estado actualizado de tus finanzas</p>
+                        <h2 style="margin: 0; font-size: 20px; font-weight: bold;">Alerta de Vencimientos</h2>
+                        <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">Vencimientos para hoy y mañana</p>
                     </div>
                     <div style="background-color: #1e293b; padding: 15px 25px; display: flex; justify-content: space-around; color: white; text-align: center;">
                         <div>
@@ -134,16 +157,12 @@ async function enviarAlertas() {
                             <div style="font-size: 18px; font-weight: bold; margin-top: 4px; color: #38bdf8;">$${montoTotal.toLocaleString('es-AR')}</div>
                         </div>
                         <div style="border-left: 1px solid #334155; padding-left: 20px;">
-                            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Pagos Urgentes</div>
-                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px; color: #f43f5e;">${cantidadUrgentes} pendiente(s)</div>
+                            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Vencimientos</div>
+                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px; color: #f43f5e;">${cantidadUrgentes} alerta(s)</div>
                         </div>
                     </div>
                     <div style="padding: 25px;">
-                        <div style="margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <h4 style="margin: 0 0 12px 0; font-size: 13px; color: #334155; text-transform: uppercase;">Distribución por Categoría</h4>
-                            ${barrasCategoriasHtml}
-                        </div>
-                        <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #334155; text-transform: uppercase;">Detalle de Movimientos</h4>
+                        <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #334155; text-transform: uppercase;">Detalle Urgente</h4>
                         <div>${listaGastosHtml}</div>
                     </div>
                 </div>
@@ -153,11 +172,11 @@ async function enviarAlertas() {
         const data = await resend.emails.send({
             from: 'Control de Gastos <onboarding@resend.dev>',
             to: destinatarios,
-            subject: `📊 Reporte Financiero: $${montoTotal.toLocaleString('es-AR')} por vencer`,
+            subject: `🚨 Alerta de Pagos: $${montoTotal.toLocaleString('es-AR')} vencen hoy/mañana`,
             html: contenidoHtml
         });
 
-        console.log("Correo enviado exitosamente:", data);
+        console.log("Correo de alerta enviado exitosamente:", data);
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
