@@ -64,8 +64,6 @@ async function enviarAlertas() {
         const targetMonth = new Date().toISOString().slice(0, 7);
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
-        console.log(`[DEBUG] HOY: ${hoyStr} | MAÑANA: ${manianaStr}`);
-
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
             const nombreCat = c.nombre || c;
@@ -90,8 +88,6 @@ async function enviarAlertas() {
                 const esTarjeta = esTarjetaMap[catNombre] ?? false;
                 const monto = parseFloat(gasto.monto) || 0;
 
-                console.log(`[Item: ${gasto.concepto || catNombre}] -> Cat: ${catNombre} | Fecha: ${vencimientoFinal} | EsTarjeta: ${esTarjeta}`);
-
                 if (!esTarjeta && (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr)) {
                     itemsCalculados.push({
                         concepto: gasto.concepto || catNombre,
@@ -106,14 +102,13 @@ async function enviarAlertas() {
             }
         });
 
-        // 2. Procesar tarjetas agrupadas leyendo correctamente de vencimientosTarjetas y de la interfaz
+        // 2. Procesar tarjetas agrupadas
         let totalesPorTarjeta = {};
         let fechasTarjetas = {};
 
         categoriasConfig.forEach(cat => {
             const catNombre = cat.nombre || cat;
             if (cat.esTarjeta || esTarjetaMap[catNombre]) {
-                // Buscamos la fecha en las distintas combinaciones posibles de claves de tarjetas
                 let vencTarjetaCrudo = vencimientosTarjetas[catNombre] 
                     || vencimientosTarjetas[`${catNombre}_${targetMonth}`] 
                     || cat.vencimiento 
@@ -125,7 +120,6 @@ async function enviarAlertas() {
             }
         });
 
-        // Sumar montos de gastos asociados a cada tarjeta
         gastosRegistrados.forEach(gasto => {
             const startYM = gasto.startMonth || targetMonth;
             if (targetMonth >= startYM) {
@@ -136,12 +130,10 @@ async function enviarAlertas() {
             }
         });
 
-        // Evaluar tarjetas
         Object.keys(totalesPorTarjeta).forEach(catNombre => {
             const montoTotalCat = totalesPorTarjeta[catNombre];
             let vencFinalCat = fechasTarjetas[catNombre];
 
-            // Si aún no se encontró la fecha de la tarjeta, la buscamos dentro de los ítems de esa categoría
             if (!vencFinalCat) {
                 gastosRegistrados.forEach(g => {
                     if (g.categoria === catNombre) {
@@ -152,11 +144,9 @@ async function enviarAlertas() {
                 });
             }
 
-            console.log(`[Resumen Tarjeta: ${catNombre}] -> Monto Total: ${montoTotalCat} | Vence Final: ${vencFinalCat}`);
-
             if (montoTotalCat > 0 && (vencFinalCat === hoyStr || vencFinalCat === manianaStr)) {
                 itemsCalculados.push({
-                    concepto: `💳 Tarjeta / Bloque: ${catNombre}`,
+                    concepto: `💳 Tarjeta: ${catNombre}`,
                     monto: montoTotalCat,
                     categoria: catNombre,
                     vencimiento: vencFinalCat,
@@ -178,18 +168,19 @@ async function enviarAlertas() {
         const montoTotalGeneral = itemsCalculados.reduce((acc, item) => acc + item.monto, 0);
         const cantidadUrgentes = itemsCalculados.length;
 
+        // Se agregó un padding-right de 15px en el contenedor derecho para separarlo del borde
         const listaGastosHtml = itemsCalculados.map(item => `
-            <div style="padding: 15px 0; border-bottom: 1px solid #eaeaea;">
+            <div style="padding: 15px 5px 15px 0; border-bottom: 1px solid #eaeaea;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
+                    <div style="padding-right: 10px;">
                         <strong style="font-size: 15px; color: #111;">${item.concepto}</strong>
                         <div style="font-size: 12px; color: #666; margin-top: 3px;">
                             ${item.esTarjeta ? 'Categoría Agrupada' : `Categoría: ${item.categoria}`} | Vence: ${item.vencimiento ? item.vencimiento.split('-').reverse().join('/') : 'Sin fecha'}
                         </div>
                     </div>
-                    <div style="text-align: right;">
+                    <div style="text-align: right; min-width: 120px; padding-right: 10px;">
                         <div style="font-size: 15px; font-weight: bold; color: #111;">$${item.monto.toLocaleString('es-AR')}</div>
-                        <span style="display: inline-block; background-color: ${item.badgeColor}; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-top: 3px;">
+                        <span style="display: inline-block; background-color: ${item.badgeColor}; color: white; font-size: 9px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-top: 4px;">
                             ${item.estadoBadge}
                         </span>
                     </div>
@@ -230,7 +221,7 @@ async function enviarAlertas() {
             html: contenidoHtml
         });
 
-        console.log("Correo de alerta enviado exitosamente con todas las tarjetas y gastos.");
+        console.log("Correo de alerta enviado exitosamente con diseño ajustado.");
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
