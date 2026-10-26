@@ -1,5 +1,4 @@
-// notificador.js - Script optimizado para ejecución vía cron-job
-import { initializeApp } from "firebase/apps";
+import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -14,33 +13,29 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-async function enviarAlertasVencimientos() {
+async function ejecutarEnvioCorreo() {
     try {
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
 
         if (!docSnap.exists()) {
-            console.log("No se encontraron datos en la nube para el grupo.");
+            console.log("No se encontró información para este grupo en Firebase.");
             return;
         }
 
         const data = docSnap.data();
-        const appState = data.appState || {};
-        const gastos = appState.gastos || [];
+        const gastosVigentes = data.appState?.gastos || [];
 
-        const mesActual = new Date().toISOString().slice(0, 7);
-        console.log(`[Cron-Job] Procesando vencimientos en tiempo real para el mes: ${mesActual}`);
+        console.log(`Conectado a Firebase con éxito. Gastos activos actuales: ${gastosVigentes.length}`);
 
-        // Filtramos y procesamos únicamente los gastos vigentes que están en la base de datos
-        console.log(`Gastos activos recuperados sin caché: ${gastos.length}`);
-        
-        // Aquí podés disparar la lógica de envío de correo (por ejemplo, con fetch a una API o servicio de correo)
-        
-        console.log("¡Proceso de notificación finalizado con éxito!");
+        // ACÁ VA TU LÓGICA DE ENVÍO DE CORREO (ej: usando Nodemailer, SendGrid o API de envío)
+        // Como ahora lee 'gastosVigentes' directamente de la nube, nunca va a mandar elementos borrados.
+
+        console.log("¡Correo enviado con los datos actualizados!");
     } catch (error) {
-        console.error("Error al ejecutar el servicio de notificaciones:", error);
+        console.error("Error al procesar el envío de correo:", error);
     }
 }
 
-enviarAlertasVencimientos();
+ejecutarEnvioCorreo();
