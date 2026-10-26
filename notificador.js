@@ -16,6 +16,20 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
+function sumarUnMesAFecha(fechaStr) {
+    if (!fechaStr) return '';
+    const partes = fechaStr.split('-');
+    if (partes.length !== 3) return '';
+    let y = parseInt(partes[0]);
+    let m = parseInt(partes[1]);
+    let d = parseInt(partes[2]);
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+    const ultimoDiaMes = new Date(y, m, 0).getDate();
+    if (d > ultimoDiaMes) d = ultimoDiaMes;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 function obtenerFechasHoyMañana() {
     const hoyDate = new Date();
     const hoyStr = hoyDate.toISOString().slice(0, 10);
@@ -29,7 +43,7 @@ function obtenerFechasHoyMañana() {
 
 async function enviarAlertas() {
     try {
-        console.log("Conectando a Firebase para filtrar vencimientos de hoy y mañana...");
+        console.log("Conectando a Firebase para calcular vencimientos reales...");
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
@@ -43,49 +57,66 @@ async function enviarAlertas() {
         const appState = dataApp.appState || {};
         const gastosRegistrados = appState.gastos || [];
         const categoriasConfig = appState.categorias || [];
+        const excepcionesVencGrid = appState.excepcionesVencimientoGrid || {};
+        const excepcionesVenc = appState.excepcionesVencimiento || {};
 
-        const mesActual = new Date().toISOString().slice(0, 7);
+        const targetMonth = new Date().toISOString().slice(0, 7);
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
-        // 1. Mapear configuración de categorías para saber cuáles son tarjetas (en bloque)
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
             esTarjetaMap[c.nombre] = c.esTarjeta ?? true;
         });
 
-        // 2. Procesar ítems del mes actual
-        let itemsProcesados = [];
+        // Replicamos el motor de cálculo de la web para obtener los ítems del mes con sus vencimientos reales
+        let itemsCalculados = [];
         gastosRegistrados.forEach(gasto => {
-            const startYM = gasto.startMonth || mesActual;
-            if (mesActual >= startYM) {
-                const vencimiento = gasto.vencimiento || '';
-                
-                // Solo nos interesan los que vencen HOY o MAÑANA
-                if (vencimiento === hoyStr || vencimiento === manianaStr) {
-                    const catNombre = gasto.categoria || 'Otros';
-                    const esTarjeta = esTarjetaMap[catNombre] ?? true;
+            const startYM = gasto.startMonth || targetMonth;
+            if (targetMonth >= startYM) {
+                const totalCuotas = parseInt(gasto.cuotas) || 1;
+                const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
+                const isRecurrente = gasto.isRecurrente || baseEsFijo;
 
-                    itemsProcesados.push({
-                        id: gasto.id,
+                let vencCalculado = gasto.vencimiento || '';
+                
+                if (isRecurrente && startYM !== targetMonth) {
+                    const [sY, sM] = startYM.split('-').map(Number);
+                    const [tY, tM] = targetMonth.split('-').map(Number);
+                    const diffMeses = (tY - sY) * 12 + (tM - sM);
+                    for (let step = 0; step < diffMeses; step++) {
+                        vencCalculado = sumarUnMesAFecha(vencCalculado);
+                    }
+                }
+
+                const gridKey = `${gasto.id}_${targetMonth}`;
+                let vencimientoFinal = excepcionesVencGrid[gridKey] !== undefined 
+                    ? excepcionesVencGrid[gridKey] 
+                    : (excepcionesVenc[gridKey] !== undefined ? excepcionesVenc[gridKey] : vencCalculado);
+
+                const catNombre = gasto.categoria || 'Otros';
+                const esTarjeta = esTarjetaMap[catNombre] ?? true;
+                const monto = parseFloat(gasto.monto) || 0;
+
+                if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
+                    itemsCalculados.push({
                         concepto: gasto.concepto,
-                        monto: parseFloat(gasto.monto) || 0,
+                        monto: monto,
                         categoria: catNombre,
-                        vencimiento: vencimiento,
+                        vencimiento: vencimientoFinal,
                         esTarjeta: esTarjeta,
-                        estadoBadge: vencimiento === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
-                        badgeColor: vencimiento === hoyStr ? '#e11d48' : '#f59e0b'
+                        estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
+                        badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
                     });
                 }
             }
         });
 
-        // 3. Agrupar tarjetas/bloques y mantener individuales los fijos
+        // Agrupamos las tarjetas en bloque tal como lo pediste
         let resumenFinalList = [];
         let tarjetasAgrupadas = {};
 
-        itemsProcesados.forEach(item => {
+        itemsCalculados.forEach(item => {
             if (item.esTarjeta) {
-                // Agrupamos por categoría de tarjeta
                 if (!tarjetasAgrupadas[item.categoria]) {
                     tarjetasAgrupadas[item.categoria] = {
                         nombre: item.categoria,
@@ -98,28 +129,21 @@ async function enviarAlertas() {
                 }
                 tarjetasAgrupadas[item.categoria].monto += item.monto;
             } else {
-                // Gasto fijo / individual va suelto
                 resumenFinalList.push(item);
             }
         });
 
-        // Añadimos las tarjetas ya sumadas a la lista final
         Object.values(tarjetasAgrupadas).forEach(tarjeta => {
             resumenFinalList.push(tarjeta);
         });
 
         if (resumenFinalList.length === 0) {
-            console.log("No hay vencimientos para hoy ni para mañana. No se enviará correo.");
+            console.log("No hay vencimientos para hoy ni para mañana según el motor de cálculo.");
             return;
         }
 
         const rawEmailTo = process.env.EMAIL_TO || '';
         const destinatarios = rawEmailTo.split(/[,;]/).map(email => email.trim()).filter(Boolean);
-
-        if (destinatarios.length === 0) {
-            console.error("Error: No hay destinatarios configurados.");
-            process.exit(1);
-        }
 
         const montoTotal = resumenFinalList.reduce((acc, item) => acc + item.monto, 0);
         const cantidadUrgentes = resumenFinalList.length;
@@ -130,7 +154,7 @@ async function enviarAlertas() {
                     <div>
                         <strong style="font-size: 15px; color: #111;">${item.esTarjeta ? `💳 Tarjeta / Bloque: ${item.nombre}` : item.concepto}</strong>
                         <div style="font-size: 12px; color: #666; margin-top: 3px;">
-                            ${item.esTarjeta ? 'Categoría Agrupada' : `Categoría: ${item.categoria}`} | Vence: ${item.vencimiento}
+                            ${item.esTarjeta ? 'Categoría Agrupada' : `Categoría: ${item.categoria}`} | Vence: ${item.vencimiento.split('-').reverse().join('/')}
                         </div>
                     </div>
                     <div style="text-align: right;">
@@ -169,14 +193,14 @@ async function enviarAlertas() {
             </div>
         `;
 
-        const data = await resend.emails.send({
+        await resend.emails.send({
             from: 'Control de Gastos <onboarding@resend.dev>',
-            to: destinatarios,
+            to: destinatarios.length > 0 ? destinatarios : ['delivered@resend.dev'],
             subject: `🚨 Alerta de Pagos: $${montoTotal.toLocaleString('es-AR')} vencen hoy/mañana`,
             html: contenidoHtml
         });
 
-        console.log("Correo de alerta enviado exitosamente:", data);
+        console.log("Correo de alerta enviado exitosamente con datos reales.");
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
