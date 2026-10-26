@@ -553,8 +553,8 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MEDIO DE PAGO</label>
                                 <select id="hormigaMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                    <option value="Mercado Pago" selected>Mercado Pago</option>
                                     <option value="Efectivo">Efectivo</option>
-                                    <option value="Mercado Pago">Mercado Pago</option>
                                     <option value="Débito">Débito</option>
                                     <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
                                     <option value="Otros">Otros</option>
@@ -606,6 +606,14 @@
                         </h3>
                         <div class="relative h-64 w-full"><canvas id="chartHormigaEvolucion"></canvas></div>
                     </div>
+                </div>
+
+                <!-- GRÁFICO DE LÍNEAS PARA EVOLUCIÓN POR CATEGORÍAS SEPARADAS -->
+                <div class="card-bg p-6 rounded-2xl">
+                    <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
+                    </h3>
+                    <div class="relative h-72 w-full"><canvas id="chartHormigaEvolucionCategorias"></canvas></div>
                 </div>
             </div>
         </main>
@@ -879,6 +887,7 @@
         let chartInstBalance = null;
         let chartInstHormigaCat = null;
         let chartInstHormigaEvol = null;
+        let chartInstHormigaEvolCat = null;
 
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -2035,6 +2044,58 @@
                     }
                 });
             }
+
+            // GRÁFICO DE LÍNEAS PARA EVOLUCIÓN POR CATEGORÍAS SEPARADAS
+            let datasetsCatSeparadas = catHormigaList.map(cat => {
+                let dataPorMes = [];
+                let [currY2, currM2] = currentMonth.split('-').map(Number);
+                for (let i = 5; i >= 0; i--) {
+                    let m = currM2 - i;
+                    let y = currY2;
+                    while (m < 1) { m += 12; y--; }
+                    let ymStr = `${y}-${String(m).padStart(2, '0')}`;
+                    
+                    let sumaCatMes = 0;
+                    allHormigaGastos.forEach(g => {
+                        if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) {
+                            sumaCatMes += parseFloat(g.monto) || 0;
+                        }
+                    });
+                    dataPorMes.push(sumaCatMes);
+                }
+                return {
+                    label: cat.nombre,
+                    data: dataPorMes,
+                    borderColor: cat.color,
+                    backgroundColor: cat.color,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointStyle: 'rect',
+                    fill: false,
+                    tension: 0.3
+                };
+            });
+
+            const ctxHormigaEvolCat = document.getElementById('chartHormigaEvolucionCategorias');
+            if (ctxHormigaEvolCat) {
+                if (chartInstHormigaEvolCat) chartInstHormigaEvolCat.destroy();
+                chartInstHormigaEvolCat = new Chart(ctxHormigaEvolCat, {
+                    type: 'line',
+                    data: {
+                        labels: monthsLabels,
+                        datasets: datasetsCatSeparadas
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
+                        scales: {
+                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
         }
 
         window.handleSaveGastoHormiga = function(e) {
@@ -2059,6 +2120,7 @@
             window.saveHormigaDataToCloud();
             document.getElementById('hormigaConcepto').value = '';
             document.getElementById('hormigaMonto').value = '';
+            document.getElementById('hormigaMedioPago').value = 'Mercado Pago'; // Restablecer al valor por defecto
             renderHormigaApp();
         };
 
@@ -2462,7 +2524,7 @@
         window.closeModal = function(id) {
             document.getElementById(id).classList.add('hidden');
             if (id === 'modalGasto') {
-                document.getElementById('gastoId').value = '';
+                document.getElementById('gattId').value = '';
                 document.getElementById('formGasto').reset();
             }
         };
