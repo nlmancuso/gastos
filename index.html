@@ -518,19 +518,16 @@
         window.switchTab = function(tabName) {
             currentActiveTab = tabName;
             
-            // Ocultar todas las vistas
             document.getElementById('viewPlanilla').classList.add('hidden');
             document.getElementById('viewAnalisis').classList.add('hidden');
             document.getElementById('viewSaldos').classList.add('hidden');
             document.getElementById('viewHormiga').classList.add('hidden');
 
-            // Quitar clase activa de botones
             document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
             document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
             document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
             document.getElementById('btnTabHormiga').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
 
-            // Mostrar la seleccionada y activar botón
             if (tabName === 'planilla') {
                 document.getElementById('viewPlanilla').classList.remove('hidden');
                 document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
@@ -553,13 +550,11 @@
             }
         };
 
-        // Función unificada que llama el app.js al recibir datos
         function renderApp() {
             const currentMonth = window.appState.currentMonth || '2026-10';
             if(document.getElementById('displayMonthText')) document.getElementById('displayMonthText').innerText = window.formatMonthDisplay(currentMonth);
             if(document.getElementById('badgeMonth')) document.getElementById('badgeMonth').innerText = window.formatMonthDisplay(currentMonth);
 
-            // Renderizar la pestaña activa actual al instante
             if (currentActiveTab === 'planilla') renderPlanillaTab();
             else if (currentActiveTab === 'analisis') renderCharts();
             else if (currentActiveTab === 'saldos') renderSaldosApp();
@@ -798,7 +793,6 @@
             window.saveDataToCloud(); renderApp();
         };
 
-        // GESTIÓN DE CATEGORÍAS GENERALES
         window.openModalCatGeneral = function() { renderCatGeneralList(); document.getElementById('modalCatGeneral').classList.remove('hidden'); };
         function renderCatGeneralList() {
             const container = document.getElementById('listaCatGeneralConfig');
@@ -1148,6 +1142,16 @@
             if (fechaInput) fechaInput.value = new Date().toISOString().slice(0, 10);
         });
 
+        window.sortHormigaData = function(column) {
+            if (window.hormigaState.sortColumn === column) {
+                window.hormigaState.sortAscending = !window.hormigaState.sortAscending;
+            } else {
+                window.hormigaState.sortColumn = column;
+                window.hormigaState.sortAscending = true;
+            }
+            renderHormigaApp();
+        };
+
         function renderHormigaApp() {
             const currentMonth = window.appState.currentMonth || '2026-10';
             const monthText = window.formatMonthDisplay(currentMonth);
@@ -1186,6 +1190,22 @@
                 tbody.innerHTML = ''; let itemsFiltrados = itemsHormiga;
                 const filtrosActivos = window.hormigaState.filtrosCategorias || [];
                 if (filtrosActivos.length > 0) itemsFiltrados = itemsFiltrados.filter(g => filtrosActivos.includes(g.categoria));
+
+                // ORDENAMIENTO DE TABLA
+                const sortCol = window.hormigaState.sortColumn || 'fecha';
+                const sortAsc = window.hormigaState.sortAscending !== false;
+                itemsFiltrados.sort((a, b) => {
+                    let valA = a[sortCol] || '';
+                    let valB = b[sortCol] || '';
+                    if (sortCol === 'monto') {
+                        valA = parseFloat(valA) || 0;
+                        valB = parseFloat(valB) || 0;
+                    }
+                    if (valA < valB) return sortAsc ? -1 : 1;
+                    if (valA > valB) return sortAsc ? 1 : -1;
+                    return 0;
+                });
+
                 if (itemsFiltrados.length === 0) tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan.</td></tr>`;
                 else {
                     itemsFiltrados.forEach(g => {
@@ -1246,18 +1266,30 @@
             const ctxHormigaEvol = document.getElementById('chartHormigaEvolucion');
             if (ctxHormigaEvol) { if (chartInstHormigaEvol) chartInstHormigaEvol.destroy(); chartInstHormigaEvol = new Chart(ctxHormigaEvol, { type: 'bar', data: { labels: monthsLabels, datasets: [{ label: 'Gasto Hormiga Total', data: totalsByMonth, backgroundColor: '#f59e0b', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
 
-            let datasetsCatSeparadas = catHormigaList.map(cat => {
-                let dataPorMes = []; let [currY2, currM2] = currentMonth.split('-').map(Number);
-                for (let i = 5; i >= 0; i--) {
-                    let m = currM2 - i, y = currY2; while (m < 1) { m += 12; y--; }
-                    let ymStr = `${y}-${String(m).padStart(2, '0')}`; let sumaCatMes = 0;
-                    allHormigaGastos.forEach(g => { if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) sumaCatMes += parseFloat(g.monto) || 0; });
-                    dataPorMes.push(sumaCatMes);
-                }
-                return { label: cat.nombre, data: dataPorMes, borderColor: cat.color, backgroundColor: cat.color, borderWidth: 2, fill: false, tension: 0.3 };
-            });
+            // FILTROS APLICADOS AL GRÁFICO DE EVOLUCIÓN POR CATEGORÍA
+            const filtrosHormigaActivos = window.hormigaState.filtrosCategorias || [];
+            let datasetsCatSeparadas = catHormigaList
+                .filter(cat => filtrosHormigaActivos.length === 0 || filtrosHormigaActivos.includes(cat.nombre))
+                .map(cat => {
+                    let dataPorMes = []; let [currY2, currM2] = currentMonth.split('-').map(Number);
+                    for (let i = 5; i >= 0; i--) {
+                        let m = currM2 - i, y = currY2; while (m < 1) { m += 12; y--; }
+                        let ymStr = `${y}-${String(m).padStart(2, '0')}`; let sumaCatMes = 0;
+                        allHormigaGastos.forEach(g => { if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) sumaCatMes += parseFloat(g.monto) || 0; });
+                        dataPorMes.push(sumaCatMes);
+                    }
+                    return { label: cat.nombre, data: dataPorMes, borderColor: cat.color, backgroundColor: cat.color, borderWidth: 2, fill: false, tension: 0.3 };
+                });
+
             const ctxHormigaEvolCat = document.getElementById('chartHormigaEvolucionCategorias');
-            if (ctxHormigaEvolCat) { if (chartInstHormigaEvolCat) chartInstHormigaEvolCat.destroy(); chartInstHormigaEvolCat = new Chart(ctxHormigaEvolCat, { type: 'line', data: { labels: monthsLabels, datasets: datasetsCatSeparadas }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1' } } } } }); }
+            if (ctxHormigaEvolCat) { 
+                if (chartInstHormigaEvolCat) chartInstHormigaEvolCat.destroy(); 
+                chartInstHormigaEvolCat = new Chart(ctxHormigaEvolCat, { 
+                    type: 'line', 
+                    data: { labels: monthsLabels, datasets: datasetsCatSeparadas }, 
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+                }); 
+            }
         }
 
         window.handleSaveGastoHormiga = function(e) {
