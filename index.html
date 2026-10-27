@@ -60,8 +60,14 @@
             if (user) {
                 showLoading();
 
+                // Obtener fecha local correcta (Evita desfase de UTC)
+                const dLocal = new Date();
+                const localYear = dLocal.getFullYear();
+                const localMonth = String(dLocal.getMonth() + 1).padStart(2, '0');
+                const currentLocalMonthStr = `${localYear}-${localMonth}`;
+
                 window.appState = {
-                    currentMonth: new Date().toISOString().slice(0, 7),
+                    currentMonth: currentLocalMonthStr,
                     gastos: [],
                     excepcionesMonto: {},
                     excepcionesCategoria: {},
@@ -827,8 +833,14 @@
             { nombre: "Varios", color: "#64748b" }
         ];
 
+        // Obtener mes local inicial seguro
+        const dInit = new Date();
+        const initYear = dInit.getFullYear();
+        const initMonth = String(dInit.getMonth() + 1).padStart(2, '0');
+        const defaultLocalMonth = `${initYear}-${initMonth}`;
+
         window.appState = window.appState || {
-            currentMonth: new Date().toISOString().slice(0, 7),
+            currentMonth: defaultLocalMonth,
             gastos: [],
             excepcionesMonto: {},
             excepcionesCategoria: {},
@@ -894,7 +906,7 @@
         });
 
         function initChartRangeInputs() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             let [cYear, cMonth] = currentMonth.split('-').map(Number);
             
             let mFrom = cMonth - 3, yFrom = cYear;
@@ -1074,7 +1086,7 @@
                 containerCat.appendChild(div);
             });
 
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const calcData = getCalculatedDataForMonth(currentMonth);
             const itemsFijosActuales = calcData.items.filter(item => {
                 const catObj = catList.find(c => c.nombre === item.categoria);
@@ -1112,7 +1124,7 @@
         }
 
         function renderSaldosApp() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const calcData = getCalculatedDataForMonth(currentMonth);
             const container = document.getElementById('containerBancosGrid');
             const containerResumen = document.getElementById('containerResumenDisponibles');
@@ -1268,7 +1280,7 @@
         };
 
         window.editCuenta = function(id) {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const cuenta = (window.appState.cuentasBancarias || []).find(c => c.id === id);
             if (!cuenta) return;
             
@@ -1285,7 +1297,7 @@
 
         window.handleSaveCuenta = function(e) {
             e.preventDefault();
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const id = document.getElementById('cuentaId').value;
             const nombre = document.getElementById('cuentaNombre').value.trim();
             const bcoSaldo = parseFloat(document.getElementById('cuentaBcoSaldo').value) || 0;
@@ -1735,7 +1747,7 @@
         }
 
         function renderApp() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             document.getElementById('displayMonthText').innerText = formatMonthDisplay(currentMonth);
             document.getElementById('badgeMonth').innerText = formatMonthDisplay(currentMonth);
 
@@ -1926,7 +1938,7 @@
         };
 
         function renderHormigaApp() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const badgeMonthEl = document.getElementById('badgeHormigaMonth');
             if (badgeMonthEl) badgeMonthEl.innerText = formatMonthDisplay(currentMonth);
 
@@ -1979,7 +1991,7 @@
         }
 
         function renderHormigaCharts() {
-            const currentMonth = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
+            const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const allHormigaGastos = window.hormigaState.gastos || [];
             const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
 
