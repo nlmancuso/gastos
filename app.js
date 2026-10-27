@@ -22,13 +22,12 @@ let unsubscribeSnapshot = null;
 let unsubscribeHormiga = null;
 
 const categoriasDefault = [
-    { nombre: "Gasto Fijo", color: "#ef4444", esTarjeta: false },
-    { nombre: "Servicios", color: "#f97316", esTarjeta: false },
-    { nombre: "Visa Santander", color: "#3b82f6", esTarjeta: true },
-    { nombre: "Mastercard", color: "#8b5cf6", esTarjeta: true },
-    { nombre: "AMEX", color: "#10b981", esTarjeta: true },
-    { nombre: "Mercado Pago", color: "#06b6d4", esTarjeta: true },
-    { nombre: "Otros", color: "#64748b", esTarjeta: true }
+    { nombre: "Gastos Fijo", color: "#10b981", esTarjeta: false, vencimientoUnicoEnBloque: false },
+    { nombre: "Servicios", color: "#f97316", esTarjeta: false, vencimientoUnicoEnBloque: false },
+    { nombre: "Santander Visa", color: "#ef4444", esTarjeta: true, vencimientoUnicoEnBloque: true },
+    { nombre: "Ciudad Visa", color: "#3b82f6", esTarjeta: true, vencimientoUnicoEnBloque: true },
+    { nombre: "Mercado Pago", color: "#f59e0b", esTarjeta: true, vencimientoUnicoEnBloque: true },
+    { nombre: "Santander Amex", color: "#f97316", esTarjeta: true, vencimientoUnicoEnBloque: true }
 ];
 
 const categoriasHormigaDefault = [
@@ -54,10 +53,7 @@ window.appState = window.appState || {
     excepcionesVencimientoGrid: {},
     excepcionesEstado: {},
     sueldos: {},
-    cuentasBancarias: [
-        { id: '1', nombre: 'Banco Ciudad', saldosPorMes: {}, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
-        { id: '2', nombre: 'Banco Santander', saldosPorMes: {}, categoriasAsociadas: ["Santander Visa", "Mercado Pago", "Santander Amex"], gastosFijosAsociados: [] }
-    ],
+    cuentasBancarias: [],
     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
     recurrentesPreferidos: [],
     sortColumn: 'concepto',
@@ -74,17 +70,14 @@ window.hormigaState = window.hormigaState || {
 };
 
 window.filtrosTemporales = [];
-window.categoriasAbiertasMap = {};
+window.categoriasAbiertasMap = {}; // Por defecto undefined (cerrados)
 window.filtrosGraficoTotales = [];
 window.filtrosGraficoEvolCat = [];
 window.filtrosGraficoBalance = [];
-window.filtrosGraficoHormigaEvolCat = [];
-window.filtrosGraficoHormigaCat = [];
 window.filtrosRecurrentesGrid = [];
 
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-// FUNCIONES DE CONTROL DE PANTALLAS EXPORTADAS A WINDOW
 window.showLoading = function() {
     const login = document.getElementById('loginOverlay');
     const loading = document.getElementById('loadingOverlay');
@@ -112,18 +105,13 @@ window.showApp = function() {
     if (appContent) appContent.classList.remove('hidden');
 };
 
-// MANEJO DE INICIO DE SESIÓN EXPORTADO
 window.handleLogin = async function(e) {
     if (e) e.preventDefault();
     const emailEl = document.getElementById('loginEmail');
     const passEl = document.getElementById('loginPassword');
     const loginError = document.getElementById('loginError');
 
-    if (!emailEl || !passEl) {
-        alert("Error: No se encontraron los campos del formulario.");
-        return;
-    }
-
+    if (!emailEl || !passEl) return;
     const email = emailEl.value.trim();
     const pass = passEl.value;
 
@@ -147,7 +135,6 @@ window.cerrarSesion = function() {
     signOut(auth);
 };
 
-// ESCUCHADOR DE ESTADO DE AUTENTICACIÓN
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.showLoading();
@@ -179,9 +166,6 @@ onAuthStateChanged(auth, async (user) => {
             } else {
                 window.saveDataToCloud();
             }
-            const statusEl = document.getElementById('cloudStatus');
-            if (statusEl) statusEl.innerHTML = "☁️ Sincronizado";
-
             triggerPageRenders();
             window.showApp();
         });
@@ -295,6 +279,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
         }
         
         const totalCuotas = parseInt(gasto.cuotas) || 1;
+        const catObjConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaAplicar);
         const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
         const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
         const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
