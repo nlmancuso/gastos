@@ -2,6 +2,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+// Agregá esto al inicio de app.js para evitar el pantallazo del login
+if (auth.currentUser) {
+    const loginOverlay = document.getElementById('loginOverlay');
+    if (loginOverlay) loginOverlay.classList.add('hidden');
+}
+
 const firebaseConfig = {
     apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
     authDomain: "gastos-334ff.firebaseapp.com",
