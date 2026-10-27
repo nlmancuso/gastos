@@ -12,6 +12,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Script Compartido -->
     <script type="module" src="app.js"></script>
+    
+    <!-- PREFETCH PARA NAVEGACIÓN INSTÁNTANEA -->
+    <link rel="prefetch" href="index.html">
+    <link rel="prefetch" href="app.js">
+
     <style>
         body { background-color: #0b1120; color: #f1f5f9; font-family: ui-sans-serif, system-ui, sans-serif; }
         .card-bg { background-color: #111827; border: 1px solid #1e293b; }
@@ -226,7 +231,6 @@
         </section>
 
         <!-- ==================== SECCIÓN 4: GASTOS HORMIGA ==================== -->
-       <!-- ==================== SECCIÓN 4: GASTOS HORMIGA ==================== -->
         <section id="viewHormiga" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
             <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-3 text-amber-300 text-xs font-medium">
@@ -308,7 +312,7 @@
                 </div>
             </div>
 
-            <!-- TABLA DE DETALLE DE GASTOS CON ORDENAMIENTO POR COLUMNAS -->
+            <!-- TABLA DE DETALLE DE GASTOS HORMIGA CON ORDENAMIENTO -->
             <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
                 <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -357,7 +361,6 @@
                 </div>
             </div>
 
-            <!-- GRÁFICO CON SUS FILTROS DE PÍLDORAS PROPIOS -->
             <div class="card-bg p-6 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
@@ -863,17 +866,46 @@
             (window.appState.categorias || []).forEach(c => { const opt = document.createElement('option'); opt.value = c.nombre; opt.innerHTML = c.nombre; selectCat.appendChild(opt); });
             document.getElementById('modalGasto').classList.remove('hidden');
         };
+
         window.editGasto = function(id) {
             const gasto = (window.appState.gastos || []).find(g => g.id === id);
             if (!gasto) return;
-            document.getElementById('gastoId').value = gasto.id; document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
-            document.getElementById('gastoConcepto').value = gasto.concepto; document.getElementById('gastoMonto').value = gasto.monto;
-            document.getElementById('gastoCuotas').value = gasto.cuotas || 1; document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
-            document.getElementById('gastoVencimiento').value = gasto.vencimiento || ''; document.getElementById('gastoIsRecurrente').checked = !!gasto.isRecurrente;
+            const currentActiveMonth = window.appState.currentMonth || '2026-10';
+
+            document.getElementById('gastoId').value = gasto.id; 
+            document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
+            document.getElementById('gastoConcepto').value = gasto.concepto; 
+            
+            // Cargar monto y vencimiento desde las excepciones del mes si existen, o del original
+            const montoActual = window.appState.excepcionesMonto?.[`${id}_${currentActiveMonth}`] !== undefined 
+                ? window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] 
+                : gasto.monto;
+            const vencActual = window.appState.excepcionesVencimiento?.[`${id}_${currentActiveMonth}`] !== undefined 
+                ? window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] 
+                : (gasto.vencimiento || '');
+
+            document.getElementById('gastoMonto').value = montoActual;
+            document.getElementById('gastoCuotas').value = gasto.cuotas || 1; 
+            document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
+            document.getElementById('gastoVencimiento').value = vencActual; 
+            document.getElementById('gastoIsRecurrente').checked = !!gasto.isRecurrente;
+
             const selectCat = document.getElementById('gastoCategoria'); selectCat.innerHTML = '';
-            (window.appState.categorias || []).forEach(c => { const opt = document.createElement('option'); opt.value = c.nombre; opt.innerHTML = c.nombre; if (c.nombre === gasto.categoria) opt.selected = true; selectCat.appendChild(opt); });
+            const catActual = window.appState.excepcionesCategoria?.[`${id}_${currentActiveMonth}`] !== undefined
+                ? window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`]
+                : gasto.categoria;
+
+            (window.appState.categorias || []).forEach(c => { 
+                const opt = document.createElement('option'); 
+                opt.value = c.nombre; 
+                opt.innerHTML = c.nombre; 
+                if (c.nombre === catActual) opt.selected = true; 
+                selectCat.appendChild(opt); 
+            });
+
             document.getElementById('modalGasto').classList.remove('hidden');
         };
+
         window.handleSaveGasto = function(e) {
             e.preventDefault();
             const id = document.getElementById('gastoId').value;
@@ -884,14 +916,48 @@
             const startMonth = document.getElementById('gastoStartMonth').value;
             const vencimiento = document.getElementById('gastoVencimiento').value;
             const isRecurrente = document.getElementById('gastoIsRecurrente').checked;
+
+            const currentActiveMonth = window.appState.currentMonth || '2026-10';
+
             if (!window.appState.gastos) window.appState.gastos = [];
+
             if (id) {
+                if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+                if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+                if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
+
+                window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] = monto;
+                window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] = vencimiento;
+                window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`] = categoria;
+
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
-                if (idx !== -1) window.appState.gastos[idx] = { ...window.appState.gastos[idx], concepto, monto, cuotas, categoria, startMonth, vencimiento, isRecurrente };
-            } else { window.appState.gastos.push({ id: Date.now().toString(), concepto, monto, cuotas, categoria, startMonth, vencimiento, isRecurrente }); }
-            window.saveDataToCloud(); window.closeModal('modalGasto'); renderApp();
+                if (idx !== -1) {
+                    window.appState.gastos[idx].concepto = concepto;
+                    window.appState.gastos[idx].cuotas = cuotas;
+                    window.appState.gastos[idx].isRecurrente = isRecurrente;
+                }
+            } else {
+                const nuevoGasto = { id: Date.now().toString(), concepto, monto, cuotas, categoria, startMonth, vencimiento, isRecurrente };
+                window.appState.gastos.push(nuevoGasto);
+            }
+
+            window.saveDataToCloud();
+            window.closeModal('modalGasto');
+            renderApp();
         };
-        window.deleteGasto = function(id) { if (confirm("¿Estás seguro de eliminar este gasto?")) { window.appState.gastos = (window.appState.gastos || []).filter(g => g.id !== id); window.saveDataToCloud(); renderApp(); } };
+
+        window.deleteGasto = function(id) {
+            if (confirm("¿Estás seguro de eliminar este gasto a partir de este mes? Los meses anteriores se mantendrán intactos.")) {
+                const currentActiveMonth = window.appState.currentMonth || '2026-10';
+                
+                if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
+                window.appState.excepcionesEliminacion[id] = currentActiveMonth;
+
+                window.saveDataToCloud();
+                renderApp();
+            }
+        };
+
         window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 
         // ---------------- SCRIPT ANÁLISIS & GRÁFICOS ----------------
@@ -1165,14 +1231,14 @@
             renderHormigaApp();
         };
 
-function renderHormigaApp() {
+        function renderHormigaApp() {
             const currentMonth = window.appState.currentMonth || '2026-10';
             const monthText = window.formatMonthDisplay(currentMonth);
             if(document.getElementById('badgeHormigaMonth')) document.getElementById('badgeHormigaMonth').innerText = monthText;
             if(document.getElementById('badgeHormigaMonthCat')) document.getElementById('badgeHormigaMonthCat').innerText = monthText;
             
             renderHormigaCategoriasSelect();
-            renderFiltrosHormigaEvolCatCheckboxes(); // <--- Agregado para pintar los filtros del gráfico
+            renderFiltrosHormigaEvolCatCheckboxes();
 
             const itemsHormiga = (window.hormigaState.gastos || []).filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
             const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
@@ -1233,14 +1299,6 @@ function renderHormigaApp() {
             renderHormigaCharts();
         }
 
-        function renderFiltrosHormigaEvolCatCheckboxes() {
-            const container = document.getElementById('containerFiltrosHormigaEvolCat'); if (!container) return; container.innerHTML = '';
-            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
-                const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
-                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
-            });
-        }
-
         function renderHormigaCategoriasSelect() {
             const select = document.getElementById('hormigaCategoriaSelect');
             if (select) {
@@ -1257,6 +1315,15 @@ function renderHormigaApp() {
                 container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
             });
         }
+
+        function renderFiltrosHormigaEvolCatCheckboxes() {
+            const container = document.getElementById('containerFiltrosHormigaEvolCat'); if (!container) return; container.innerHTML = '';
+            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
+                const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
+                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
+            });
+        }
+
         window.toggleFiltroHormigaCategoria = function(checkbox) {
             const catNombre = checkbox.value; const catList = window.hormigaState.categorias || categoriasHormigaDefault;
             if (!window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0) window.hormigaState.filtrosCategorias = catList.map(c => c.nombre);
@@ -1289,7 +1356,6 @@ function renderHormigaApp() {
             const ctxHormigaEvol = document.getElementById('chartHormigaEvolucion');
             if (ctxHormigaEvol) { if (chartInstHormigaEvol) chartInstHormigaEvol.destroy(); chartInstHormigaEvol = new Chart(ctxHormigaEvol, { type: 'bar', data: { labels: monthsLabels, datasets: [{ label: 'Gasto Hormiga Total', data: totalsByMonth, backgroundColor: '#f59e0b', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
 
-            // FILTROS APLICADOS AL GRÁFICO DE EVOLUCIÓN POR CATEGORÍA
             const filtrosHormigaActivos = window.hormigaState.filtrosCategorias || [];
             let datasetsCatSeparadas = catHormigaList
                 .filter(cat => filtrosHormigaActivos.length === 0 || filtrosHormigaActivos.includes(cat.nombre))
