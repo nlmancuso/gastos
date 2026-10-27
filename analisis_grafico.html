@@ -12,6 +12,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Script Compartido -->
     <script type="module" src="app.js"></script>
+    
+    <!-- PREFETCH PARA NAVEGACIÓN RÁPIDA -->
+    <link rel="prefetch" href="index.html">
+    <link rel="prefetch" href="analisis_grafico.html">
+    <link rel="prefetch" href="saldo_banco.html">
+    <link rel="prefetch" href="gasto_hormiga.html">
+
     <style>
         body { background-color: #0b1120; color: #f1f5f9; font-family: ui-sans-serif, system-ui, sans-serif; }
         .card-bg { background-color: #111827; border: 1px solid #1e293b; }
@@ -29,11 +36,11 @@
             <form id="formLogin" onsubmit="window.handleLogin(event)" class="space-y-4 text-left">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electrónico</label>
-                    <input type="email" id="loginEmail" required placeholder="tucorreo@email.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none">
+                    <input type="email" id="loginEmail" required placeholder="tucorreo@email.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label>
-                    <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none">
+                    <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none">
                 </div>
                 <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
                     <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
@@ -64,7 +71,7 @@
                 <a href="index.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</a>
                 <a href="analisis_grafico.html" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</a>
                 <a href="saldo_banco.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</a>
-                <a href="gasto_hormiga.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga</a>
+                <a href="gasto_hormiga.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga <span class="bg-amber-500/20 text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-mono">Privado</span></a>
             </div>
         </header>
 
@@ -90,6 +97,7 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- GRÁFICO 1 -->
                 <div class="card-bg p-6 rounded-2xl space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
@@ -106,6 +114,7 @@
                     <div class="relative h-64 w-full"><canvas id="chartEvolucionTotales"></canvas></div>
                 </div>
 
+                <!-- GRÁFICO 2 -->
                 <div class="card-bg p-6 rounded-2xl space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
@@ -122,6 +131,7 @@
                     <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
                 </div>
 
+                <!-- GRÁFICO 3 -->
                 <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
@@ -138,6 +148,7 @@
                     <div class="relative h-72 w-full"><canvas id="chartEvolucionRecurrentesIndiv"></canvas></div>
                 </div>
 
+                <!-- GRÁFICO 4 -->
                 <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
@@ -466,13 +477,14 @@
                 datasetsTotales.push({ label: 'Ingresos / Sueldo', data: dataIngresos, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
             }
 
+            // SE OCULTA LA LEYENDA NATIVA DE CHART.JS (`legend: { display: false }`) PARA EVITAR EL DOBLE FILTRO
             const ctxTotales = document.getElementById('chartEvolucionTotales');
             if (ctxTotales) {
                 if (chartInstTotales) chartInstTotales.destroy();
                 chartInstTotales = new Chart(ctxTotales, {
                     type: 'line',
                     data: { labels: labelsMonths, datasets: datasetsTotales },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                 });
             }
 
@@ -482,7 +494,7 @@
                 chartInstEvolCat = new Chart(ctxEvolCat, {
                     type: 'line',
                     data: { labels: labelsMonths, datasets: datasetsEvolCat },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                 });
             }
 
@@ -492,7 +504,7 @@
                 chartInstRecurrentesIndiv = new Chart(ctxRecurrentesIndiv, {
                     type: 'line',
                     data: { labels: labelsMonths, datasets: datasetsRecurrentesIndiv },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                 });
             }
 
@@ -507,7 +519,7 @@
                 chartInstBalance = new Chart(ctxBalance, {
                     type: 'bar',
                     data: { labels: labelsMonths, datasets: datasetsBalance },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                 });
             }
         }
