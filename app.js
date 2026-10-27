@@ -161,6 +161,38 @@ onAuthStateChanged(auth, async (user) => {
         window.currentGrupo = grupoId;
         window.docHormigaRef = doc(db, "app_data_hormiga", user.uid);
 
+        if (unsubscribeHormiga) unsubscribeHormiga();
+
+        unsubscribeHormiga = onSnapshot(window.docHormigaRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.hormigaState) {
+                    window.hormigaState = { ...window.hormigaState, ...data.hormigaState };
+                } else {
+                    window.hormigaState = {
+                        gastos: [],
+                        categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
+                        sortColumn: 'fecha',
+                        sortAscending: false,
+                        filtrosCategorias: [],
+                        filtrosHormigaCatGrafico: []
+                    };
+                }
+            } else {
+                // Si no existe para este UID, inicializamos limpio para este usuario
+                window.hormigaState = {
+                    gastos: [],
+                    categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
+                    sortColumn: 'fecha',
+                    sortAscending: false,
+                    filtrosCategorias: [],
+                    filtrosHormigaCatGrafico: []
+                };
+                window.saveHormigaDataToCloud();
+            }
+            triggerPageRenders();
+        });
+
         const userName = user.email ? user.email.split('@')[0] : 'Usuario';
         const grupoDisplay = document.getElementById('grupoStatus');
         if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName} (${grupoId})`;
@@ -209,7 +241,7 @@ window.saveHormigaDataToCloud = async function() {
     try {
         if (!window.docHormigaRef) return;
         await setDoc(window.docHormigaRef, { hormigaState: JSON.parse(JSON.stringify(window.hormigaState)) });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error guardando hormiga:", e); }
 };
 
 function triggerPageRenders() {
