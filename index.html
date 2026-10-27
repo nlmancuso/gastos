@@ -926,9 +926,29 @@
                 if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
                 if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
 
+                // Guardamos la excepción para el mes actual
                 window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] = monto;
                 window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] = vencimiento;
                 window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`] = categoria;
+
+                // Propagamos la nueva fecha sumando un mes sucesivamente para los meses FUTUROS a partir del actual
+                let [currY, currM] = currentActiveMonth.split('-').map(Number);
+                let fechaPropagada = vencimiento;
+
+                for (let i = 1; i <= 36; i++) { // Calculamos hacia adelante por 3 años de margen
+                    currM++;
+                    if (currM > 12) { currM = 1; currY++; }
+                    let nextMonthStr = `${currY}-${String(currM).padStart(2, '0')}`;
+                    
+                    // Sumamos un mes a la fecha anterior usando tu función auxiliar
+                    if (fechaPropagada) {
+                        fechaPropagada = window.sumarUnMesAFecha(fechaPropagada);
+                        window.appState.excepcionesVencimiento[`${id}_${nextMonthStr}`] = fechaPropagada;
+                    }
+                    // También propagamos el monto y categoría si no tenían otra excepción propia
+                    window.appState.excepcionesMonto[`${id}_${nextMonthStr}`] = monto;
+                    window.appState.excepcionesCategoria[`${id}_${nextMonthStr}`] = categoria;
+                }
 
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
                 if (idx !== -1) {
