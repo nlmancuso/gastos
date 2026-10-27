@@ -17,6 +17,7 @@
         .text-green-accent { color: #10b981; }
         .text-blue-accent { color: #6366f1; }
         .tab-btn-active { border-bottom: 2px solid #10b981; color: #10b981; font-weight: 700; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
     </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -64,7 +65,10 @@
                     <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center">Cargando...</span>
                     <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
+                    <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Nuevo Gasto
+                    </button>
                     <button onclick="cerrarSesion()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400" title="Cerrar Sesión"><i class="fa-solid fa-right-from-bracket"></i></button>
                 </div>
             </div>
@@ -87,15 +91,77 @@
                 <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">RESTO</span><h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2></div>
             </div>
             
-            <!-- TABLA -->
-            <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
-                <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-white">Planilla Agrupada</h3>
-                    <span id="badgeMonth" class="text-xs bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full">...</span>
+            <!-- CABECERA PLANILLA CON FILTROS SUPERIORES -->
+            <div class="card-bg p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>Planilla de Gastos (Agrupada)</span>
+                    </h3>
+                    <span id="badgeMonth" class="text-xs font-semibold bg-slate-900 text-slate-300 px-3 py-1 rounded-full border border-slate-800">...</span>
                 </div>
-                <div id="containerPlanillaAgrupada" class="p-4 space-y-4"></div>
+                <div class="flex items-center gap-3 text-xs font-semibold">
+                    <span class="text-slate-400">Filtrar:</span>
+                    <button onclick="marcarTodosFiltros(true)" class="text-emerald-400 hover:underline">Todos</button>
+                    <span class="text-slate-600">|</span>
+                    <button onclick="marcarTodosFiltros(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                </div>
             </div>
+
+            <!-- FILTROS DE CATEGORÍAS (PILLS SUPERIORES) -->
+            <div id="containerFiltrosCategoriasPills" class="flex flex-wrap items-center gap-2"></div>
+
+            <!-- CONTENEDOR DE TABLAS AGRUPADAS -->
+            <div id="containerPlanillaAgrupada" class="space-y-4"></div>
         </main>
+    </div>
+
+    <!-- MODAL GASTO -->
+    <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalGastoTitulo" class="text-lg font-bold">Nuevo Gasto</h3>
+                <button type="button" onclick="closeModal('modalGasto')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="handleSaveGasto(event)" class="space-y-4">
+                <input type="hidden" id="gastoId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CONCEPTO</label>
+                    <input type="text" id="gastoConcepto" required placeholder="Ej: Supermercado, Luz..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO ($)</label>
+                        <input type="number" step="0.01" id="gastoMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CUOTAS</label>
+                        <input type="number" min="1" id="gastoCuotas" value="1" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CATEGORÍA</label>
+                        <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MES DE INICIO</label>
+                        <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">FECHA DE VENCIMIENTO BASE</label>
+                    <input type="date" id="gastoVencimiento" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
+                </div>
+                <div class="flex items-center gap-2 pt-2">
+                    <input type="checkbox" id="gastoIsRecurrente" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-600 cursor-pointer">
+                    <label for="gastoIsRecurrente" class="text-xs text-slate-300 font-semibold cursor-pointer">Gasto Recurrente / Fijo mensual automático</label>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeModal('modalGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
@@ -114,79 +180,265 @@
             if(document.getElementById('cardGastosTotales')) document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
             if(document.getElementById('cardResto')) document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
 
+            renderFiltrosCategoriasPills();
             renderPlanillaAgrupadaTabla(items);
         }
+
+        function renderFiltrosCategoriasPills() {
+            const container = document.getElementById('containerFiltrosCategoriasPills');
+            if (!container) return;
+            container.innerHTML = '';
+            const catList = window.appState.categorias || [];
+
+            if (window.filtrosTemporales === undefined) window.filtrosTemporales = [];
+
+            catList.forEach(cat => {
+                const isChecked = window.filtrosTemporales.length === 0 || window.filtrosTemporales.includes(cat.nombre);
+                const label = document.createElement('label');
+                label.className = `cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold border transition inline-flex items-center gap-2 ${isChecked ? 'bg-slate-900 text-white border-slate-700 shadow-md' : 'bg-slate-950/60 text-slate-500 border-slate-900'}`;
+                label.innerHTML = `
+                    <input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroCategoriaPill(this)" class="hidden">
+                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color};"></span>
+                    ${cat.nombre}
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        window.toggleFiltroCategoriaPill = function(checkbox) {
+            const catNombre = checkbox.value;
+            const catList = window.appState.categorias || [];
+            if (window.filtrosTemporales.length === 0) {
+                window.filtrosTemporales = catList.map(c => c.nombre);
+            }
+            if (checkbox.checked) {
+                if (!window.filtrosTemporales.includes(catNombre)) window.filtrosTemporales.push(catNombre);
+            } else {
+                window.filtrosTemporales = window.filtrosTemporales.filter(c => c !== catNombre);
+            }
+            if (window.filtrosTemporales.length === catList.length) window.filtrosTemporales = [];
+            renderApp();
+        };
+
+        window.marcarTodosFiltros = function(marcar) {
+            window.filtrosTemporales = marcar ? [] : ['__NINGUNA__'];
+            renderApp();
+        };
 
         function renderPlanillaAgrupadaTabla(items) {
             const container = document.getElementById('containerPlanillaAgrupada');
             if (!container) return;
             container.innerHTML = '';
 
-            if (items.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-6">No hay gastos registrados para este mes.</p>';
+            const filtrosActivos = window.filtrosTemporales || [];
+            let itemsFiltrados = items.filter(item => filtrosActivos.length === 0 || filtrosActivos.includes(item.categoria));
+
+            if (itemsFiltrados.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-8 card-bg rounded-2xl">No hay gastos que coincidan con los filtros seleccionados.</p>';
                 return;
             }
 
             let grupos = {};
-            items.forEach(item => {
+            itemsFiltrados.forEach(item => {
                 if (!grupos[item.categoria]) grupos[item.categoria] = [];
                 grupos[item.categoria].push(item);
             });
 
             const catList = window.appState.categorias || [];
+            const currentMonth = window.appState.currentMonth || '2026-10';
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 
             Object.entries(grupos).forEach(([categoria, gastosCat]) => {
                 const catObj = catList.find(c => c.nombre === categoria);
                 const colorCat = catObj ? catObj.color : '#64748b';
                 const totalCat = gastosCat.reduce((acc, g) => acc + g.monto, 0);
+                const isAbierto = window.categoriasAbiertasMap[categoria] !== false;
 
-                let rowsHtml = gastosCat.map(g => {
-                    const vencFmt = g.vencimiento ? window.formatFechaVencimientoSimple(g.vencimiento) : '-';
-                    const estadoClass = g.estado === 'PAGADO' ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800' : (g.estado === 'VENCIDO' ? 'bg-rose-950/60 text-rose-400 border-rose-800' : 'bg-slate-900 text-slate-400 border-slate-800');
-                    
-                    return `
-                        <tr class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs">
-                            <td class="px-5 py-3 text-white font-bold">${g.concepto}</td>
-                            <td class="px-5 py-3 text-slate-400">${g.tipo}</td>
-                            <td class="px-5 py-3 text-amber-400 font-mono">${vencFmt}</td>
-                            <td class="px-5 py-3 text-right font-extrabold text-white">${fmt(g.monto)}</td>
-                            <td class="px-5 py-3 text-center">
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${estadoClass}">${g.estado}</span>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
+                // Buscar si alguna tarjeta tiene fecha de vencimiento general
+                let vencimientoGrupo = '';
+                gastosCat.forEach(g => {
+                    if (g.vencimiento && !vencimientoGrupo) vencimientoGrupo = g.vencimiento;
+                });
+                const vencimientoFmt = vencimientoGrupo ? window.formatFechaVencimientoSimple(vencimientoGrupo) : '';
+
+                let rowsHtml = '';
+                if (isAbierto) {
+                    rowsHtml = gastosCat.map(g => {
+                        const gridKey = `${g.id}_${currentMonth}`;
+                        const vencimientoVal = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined 
+                            ? window.appState.excepcionesVencimientoGrid[gridKey] 
+                            : (g.vencimiento || '');
+
+                        const estadoVal = g.estado || 'PENDIENTE';
+
+                        return `
+                            <tr class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs">
+                                <td class="px-5 py-3 text-white font-bold flex items-center gap-2">
+                                    <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${colorCat};"></span>
+                                    ${g.concepto}
+                                </td>
+                                <td class="px-5 py-3 text-slate-400">${g.tipo}</td>
+                                <td class="px-5 py-3">
+                                    <input type="date" value="${vencimientoVal}" onchange="actualizarVencimientoGrid('${g.id}', '${currentMonth}', this.value)" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none">
+                                </td>
+                                <td class="px-5 py-3 text-right font-extrabold text-white">${fmt(g.monto)}</td>
+                                <td class="px-5 py-3 text-center">
+                                    <select onchange="actualizarEstadoGasto('${g.id}', '${currentMonth}', this.value)" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-bold ${estadoVal === 'PAGADO' ? 'text-emerald-400' : (estadoVal === 'VENCIDO' ? 'text-rose-400' : 'text-amber-450 text-amber-500')} focus:outline-none cursor-pointer">
+                                        <option value="PENDIENTE" ${estadoVal === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
+                                        <option value="PAGADO" ${estadoVal === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
+                                        <option value="VENCIDO" ${estadoVal === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
+                                    </select>
+                                </td>
+                                <td class="px-5 py-3 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button onclick="editGasto('${g.id}')" class="text-slate-400 hover:text-white p-1" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                                        <button onclick="deleteGasto('${g.id}')" class="text-slate-400 hover:text-rose-400 p-1" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
 
                 container.innerHTML += `
-                    <div class="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden mb-4">
-                        <div class="px-4 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-                            <span class="text-xs font-bold text-white flex items-center gap-2 uppercase tracking-wider">
+                    <div class="card-bg rounded-2xl overflow-hidden shadow-xl border border-slate-800 mb-4">
+                        <div class="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center cursor-pointer select-none" onclick="toggleCategoriaAcordeon('${categoria}')">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-chevron-${isAbierto ? 'down' : 'right'} text-xs text-slate-400"></i>
                                 <span class="w-3 h-3 rounded-full" style="background-color: ${colorCat};"></span>
-                                ${categoria}
-                            </span>
-                            <span class="text-xs font-extrabold text-white">Total: ${fmt(totalCat)}</span>
+                                <span class="text-sm font-bold text-white">${categoria}</span>
+                                <span class="text-[11px] bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-semibold">${gastosCat.length} ítem${gastosCat.length === 1 ? '' : 's'}</span>
+                                ${vencimientoFmt ? `<span class="text-[11px] bg-amber-950/60 text-amber-400 border border-amber-800/60 px-2.5 py-0.5 rounded-full font-mono"><i class="fa-solid fa-calendar-days mr-1"></i>Venc: ${vencimientoFmt}</span>` : ''}
+                            </div>
+                            <span class="text-sm font-extrabold text-emerald-400">TOTAL: ${fmt(totalCat)}</span>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60 bg-slate-950/50">
-                                        <th class="px-5 py-2">Concepto</th>
-                                        <th class="px-5 py-2">Tipo</th>
-                                        <th class="px-5 py-2">Vencimiento</th>
-                                        <th class="px-5 py-2 text-right">Monto</th>
-                                        <th class="px-5 py-2 text-center">Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-800/40">
-                                    ${rowsHtml}
-                                </tbody>
-                            </table>
-                        </div>
+                        ${isAbierto ? `
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="px-5 py-3">CONCEPTO</th>
+                                            <th class="px-5 py-3">TIPO / CUOTAS</th>
+                                            <th class="px-5 py-3">VENCIMIENTO</th>
+                                            <th class="px-5 py-3 text-right">MONTO</th>
+                                            <th class="px-5 py-3 text-center">ESTADO</th>
+                                            <th class="px-5 py-3 text-right">ACCIONES</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800/60 text-sm font-medium">
+                                        ${rowsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             });
         }
+
+        window.toggleCategoriaAcordeon = function(catNombre) {
+            if (window.categoriasAbiertasMap[catNombre] === undefined) window.categoriasAbiertasMap[catNombre] = false;
+            else window.categoriasAbiertasMap[catNombre] = !window.categoriasAbiertasMap[catNombre];
+            renderApp();
+        };
+
+        window.actualizarVencimientoGrid = function(gastoId, monthStr, nuevaFecha) {
+            if (!window.appState.excepcionesVencimientoGrid) window.appState.excepcionesVencimientoGrid = {};
+            window.appState.excepcionesVencimientoGrid[`${gastoId}_${monthStr}`] = nuevaFecha;
+            window.saveDataToCloud();
+        };
+
+        window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
+            if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
+            window.appState.excepcionesEstado[`${gastoId}_${monthStr}`] = nuevoEstado;
+            window.saveDataToCloud();
+            renderApp();
+        };
+
+        window.openModalGasto = function() {
+            document.getElementById('gastoId').value = '';
+            document.getElementById('modalGastoTitulo').innerText = "Nuevo Gasto";
+            document.getElementById('gastoConcepto').value = '';
+            document.getElementById('gastoMonto').value = '';
+            document.getElementById('gastoCuotas').value = '1';
+            document.getElementById('gastoStartMonth').value = window.appState.currentMonth || '2026-10';
+            document.getElementById('gastoVencimiento').value = '';
+            document.getElementById('gastoIsRecurrente').checked = false;
+            
+            const selectCat = document.getElementById('gastoCategoria');
+            selectCat.innerHTML = '';
+            (window.appState.categorias || []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.nombre; opt.innerHTML = c.nombre;
+                selectCat.appendChild(opt);
+            });
+
+            document.getElementById('modalGasto').classList.remove('hidden');
+        };
+
+        window.editGasto = function(id) {
+            const gasto = (window.appState.gastos || []).find(g => g.id === id);
+            if (!gasto) return;
+            document.getElementById('gastoId').value = gasto.id;
+            document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
+            document.getElementById('gastoConcepto').value = gasto.concepto;
+            document.getElementById('gastoMonto').value = gasto.monto;
+            document.getElementById('gastoCuotas').value = gasto.cuotas || 1;
+            document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
+            document.getElementById('gastoVencimiento').value = gasto.vencimiento || '';
+            document.getElementById('gastoIsRecurrente').checked = !!gasto.isRecurrente;
+
+            const selectCat = document.getElementById('gastoCategoria');
+            selectCat.innerHTML = '';
+            (window.appState.categorias || []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.nombre; opt.innerHTML = c.nombre;
+                if (c.nombre === gasto.categoria) opt.selected = true;
+                selectCat.appendChild(opt);
+            });
+
+            document.getElementById('modalGasto').classList.remove('hidden');
+        };
+
+        window.handleSaveGasto = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('gastoId').value;
+            const concepto = document.getElementById('gastoConcepto').value.trim();
+            const monto = parseFloat(document.getElementById('gastoMonto').value) || 0;
+            const cuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
+            const categoria = document.getElementById('gastoCategoria').value;
+            const startMonth = document.getElementById('gastoStartMonth').value;
+            const vencimiento = document.getElementById('gastoVencimiento').value;
+            const isRecurrente = document.getElementById('gastoIsRecurrente').checked;
+
+            if (!window.appState.gastos) window.appState.gastos = [];
+
+            if (id) {
+                const idx = window.appState.gastos.findIndex(g => g.id === id);
+                if (idx !== -1) {
+                    window.appState.gastos[idx] = { ...window.appState.gastos[idx], concepto, monto, cuotas, categoria, startMonth, vencimiento, isRecurrente };
+                }
+            } else {
+                const nuevoGasto = { id: Date.now().toString(), concepto, monto, cuotas, categoria, startMonth, vencimiento, isRecurrente };
+                window.appState.gastos.push(nuevoGasto);
+            }
+
+            window.saveDataToCloud();
+            window.closeModal('modalGasto');
+            renderApp();
+        };
+
+        window.deleteGasto = function(id) {
+            if (confirm("¿Estás seguro de eliminar este gasto?")) {
+                window.appState.gastos = (window.appState.gastos || []).filter(g => g.id !== id);
+                window.saveDataToCloud();
+                renderApp();
+            }
+        };
+
+        window.closeModal = function(id) {
+            document.getElementById(id).classList.add('hidden');
+        };
     </script>
 </body>
 </html>
