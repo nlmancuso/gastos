@@ -226,6 +226,7 @@
         </section>
 
         <!-- ==================== SECCIÓN 4: GASTOS HORMIGA ==================== -->
+       <!-- ==================== SECCIÓN 4: GASTOS HORMIGA ==================== -->
         <section id="viewHormiga" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
             <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-3 text-amber-300 text-xs font-medium">
@@ -307,6 +308,7 @@
                 </div>
             </div>
 
+            <!-- TABLA DE DETALLE DE GASTOS CON ORDENAMIENTO POR COLUMNAS -->
             <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
                 <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -327,11 +329,11 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
-                                <th onclick="sortHormigaData('fecha')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">FECHA</th>
-                                <th onclick="sortHormigaData('concepto')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">DESCRIPCIÓN</th>
-                                <th onclick="sortHormigaData('categoria')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">CATEGORÍA</th>
-                                <th onclick="sortHormigaData('medioPago')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">MEDIO</th>
-                                <th onclick="sortHormigaData('monto')" class="px-5 py-3.5 text-right bg-slate-900 cursor-pointer hover:text-white">MONTO</th>
+                                <th onclick="sortHormigaData('fecha')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">FECHA <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('concepto')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">DESCRIPCIÓN <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('categoria')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">CATEGORÍA <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('medioPago')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">MEDIO <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('monto')" class="px-5 py-3.5 text-right bg-slate-900 cursor-pointer hover:text-white">MONTO <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
                                 <th class="px-5 py-3.5 text-right bg-slate-900">ACCIONES</th>
                             </tr>
                         </thead>
@@ -354,10 +356,21 @@
                     <div class="relative h-64 w-full"><canvas id="chartHormigaEvolucion"></canvas></div>
                 </div>
             </div>
+
+            <!-- GRÁFICO CON SUS FILTROS DE PÍLDORAS PROPIOS -->
             <div class="card-bg p-6 rounded-2xl space-y-4">
-                <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
-                </h3>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
+                    </h3>
+                    <div class="flex items-center gap-2 text-xs font-semibold">
+                        <span class="text-slate-400">Filtrar:</span>
+                        <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
+                        <span class="text-slate-600">|</span>
+                        <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaEvolCat"></div>
                 <div class="relative h-72 w-full"><canvas id="chartHormigaEvolucionCategorias"></canvas></div>
             </div>
         </section>
