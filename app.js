@@ -78,6 +78,12 @@ window.filtrosRecurrentesGrid = [];
 
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+window.guardarNuevoOrdenItems = function(categoria, nuevosIdsOrdenados) {
+    if (!window.appState.ordenItemsCategoria) window.appState.ordenItemsCategoria = {};
+    window.appState.ordenItemsCategoria[categoria] = nuevosIdsOrdenados;
+    window.saveDataToCloud();
+};
+
 window.showLoading = function() {
     const login = document.getElementById('loginOverlay');
     const loading = document.getElementById('loadingOverlay');
