@@ -2,8 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-
-
 const firebaseConfig = {
     apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
     authDomain: "gastos-334ff.firebaseapp.com",
@@ -46,7 +44,6 @@ const categoriasHormigaDefault = [
 const dInit = new Date();
 const defaultLocalMonth = `${dInit.getFullYear()}-${String(dInit.getMonth() + 1).padStart(2, '0')}`;
 
-// Agregá esto al inicio de app.js para evitar el pantallazo del login
 if (auth.currentUser) {
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) loginOverlay.classList.add('hidden');
@@ -60,6 +57,7 @@ window.appState = window.appState || {
     excepcionesVencimiento: {},
     excepcionesVencimientoGrid: {},
     excepcionesEstado: {},
+    excepcionesEliminacion: {},
     sueldos: {},
     cuentasBancarias: [],
     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
@@ -78,7 +76,7 @@ window.hormigaState = window.hormigaState || {
 };
 
 window.filtrosTemporales = [];
-window.categoriasAbiertasMap = {}; // Por defecto undefined (cerrados)
+window.categoriasAbiertasMap = {};
 window.filtrosGraficoTotales = [];
 window.filtrosGraficoEvolCat = [];
 window.filtrosGraficoBalance = [];
@@ -271,6 +269,11 @@ window.getCalculatedDataForMonth = function(targetMonth) {
     const hoyStr = new Date().toISOString().slice(0, 10);
 
     (window.appState.gastos || []).forEach(gasto => {
+        const mesEliminacion = window.appState.excepcionesEliminacion?.[gasto.id];
+        if (mesEliminacion && targetMonth >= mesEliminacion) {
+            return;
+        }
+
         const excepcionCatKey = `${gasto.id}_${targetMonth}`;
         const categoriaAplicar = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
         const startYM = gasto.startMonth || targetMonth;
@@ -309,6 +312,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
                 if (mStr === targetMonth) {
                     let vencFinal = gasto.vencimiento || '';
                     for (let step = 0; step < i; step++) vencFinal = window.sumarUnMesAFecha(vencFinal);
+                    
                     const gridKey = `${gasto.id}_${targetMonth}`;
                     const vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined
                         ? window.appState.excepcionesVencimientoGrid[gridKey]
@@ -326,11 +330,16 @@ window.getCalculatedDataForMonth = function(targetMonth) {
                 const [sY, sM] = startYM.split('-').map(Number);
                 const [tY, tM] = targetMonth.split('-').map(Number);
                 const diffMeses = (tY - sY) * 12 + (tM - sM);
+                
                 let vencCalculado = gasto.vencimiento || '';
                 for (let step = 0; step < diffMeses; step++) vencCalculado = window.sumarUnMesAFecha(vencCalculado);
 
                 const gridKey = `${gasto.id}_${targetMonth}`;
-                let vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKey] : (window.appState.excepcionesVencimiento?.[gridKey] !== undefined ? window.appState.excepcionesVencimiento[gridKey] : vencCalculado);
+                let vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined 
+                    ? window.appState.excepcionesVencimientoGrid[gridKey] 
+                    : (window.appState.excepcionesVencimiento?.[`${gasto.id}_${targetMonth}`] !== undefined 
+                        ? window.appState.excepcionesVencimiento[`${gasto.id}_${targetMonth}`] 
+                        : vencCalculado);
 
                 const estadoKey = `${gasto.id}_${targetMonth}`;
                 const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
