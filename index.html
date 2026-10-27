@@ -18,6 +18,7 @@
         .text-blue-accent { color: #6366f1; }
         .tab-btn-active { border-bottom: 2px solid #10b981; color: #10b981; font-weight: 700; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+        .dragging { opacity: 0.4; background-color: #1e293b !important; }
     </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -72,7 +73,7 @@
                     <button onclick="openModalCatGeneral()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition" title="Configurar Categorías"><i class="fa-solid fa-gear text-sm"></i></button>
                     <button onclick="cerrarSesion()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition" title="Cerrar Sesión"><i class="fa-solid fa-right-from-bracket text-sm"></i></button>
                     <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></i></span> Sincronizado
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronizado
                     </div>
                 </div>
             </div>
@@ -98,7 +99,7 @@
                 <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">RESTO DISPONIBLE</span><h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2></div>
             </div>
             
-            <!-- PLANILLA DE GASTOS AGRUPADA (CONTENEDOR ÚNICO CON CABECERA, FILTROS Y TABLAS) -->
+            <!-- PLANILLA DE GASTOS AGRUPADA -->
             <div class="card-bg p-5 rounded-2xl shadow-xl space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-slate-800">
                     <div class="flex items-center gap-3">
@@ -313,6 +314,21 @@
                 grupos[item.categoria].push(item);
             });
 
+            // Aplicar orden guardado (si existe)
+            const ordenGuardado = window.appState.ordenItemsCategoria || {};
+            Object.keys(grupos).forEach(cat => {
+                if (ordenGuardado[cat]) {
+                    const idsOrden = ordenGuardado[cat];
+                    grupos[cat].sort((a, b) => {
+                        let idxA = idsOrden.indexOf(a.id);
+                        let idxB = idsOrden.indexOf(b.id);
+                        if (idxA === -1) idxA = 999;
+                        if (idxB === -1) idxB = 999;
+                        return idxA - idxB;
+                    });
+                }
+            });
+
             const catList = window.appState.categorias || [];
             const currentMonth = window.appState.currentMonth || '2026-10';
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
@@ -343,9 +359,9 @@
                         const estadoVal = g.estado || 'PENDIENTE';
 
                         return `
-                            <tr class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs">
+                            <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event, '${categoria}')" data-id="${g.id}" class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs cursor-default">
                                 <td class="px-5 py-3 text-white font-bold flex items-center gap-2">
-                                    <span class="text-slate-600 cursor-grab"><i class="fa-solid fa-grip-vertical"></i></span>
+                                    <span class="text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing p-1"><i class="fa-solid fa-grip-vertical"></i></span>
                                     ${g.concepto}
                                 </td>
                                 <td class="px-5 py-3 text-slate-400">${g.tipo}</td>
@@ -406,6 +422,42 @@
                 `;
             });
         }
+
+        // DRAG AND DROP HANDLERS PARA REORDENAR CON LOS PUNTITOS
+        let draggedRowId = null;
+
+        window.dragStart = function(e) {
+            draggedRowId = e.currentTarget.getAttribute('data-id');
+            e.currentTarget.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        };
+
+        window.dragOver = function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        };
+
+        window.dropItem = function(e, categoria) {
+            e.preventDefault();
+            const targetRow = e.target.closest('tr');
+            if (!targetRow) return;
+            const targetRowId = targetRow.getAttribute('data-id');
+            if (!draggedRowId || draggedRowId === targetRowId) return;
+
+            const tbody = targetRow.parentNode;
+            const rows = Array.from(tbody.querySelectorAll('tr[data-id]'));
+            
+            let nuevosIds = rows.map(r => r.getAttribute('data-id'));
+            const fromIdx = nuevosIds.indexOf(draggedRowId);
+            const toIdx = nuevosIds.indexOf(targetRowId);
+
+            if (fromIdx !== -1 && toIdx !== -1) {
+                nuevosIds.splice(fromIdx, 1);
+                nuevosIds.splice(toIdx, 0, draggedRowId);
+                window.guardarNuevoOrdenItems(categoria, nuevosIds);
+                renderApp();
+            }
+        };
 
         window.toggleCategoriaAcordeon = function(catNombre) {
             window.categoriasAbiertasMap[catNombre] = !window.categoriasAbiertasMap[catNombre];
