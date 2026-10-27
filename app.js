@@ -2,11 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-// Agregá esto al inicio de app.js para evitar el pantallazo del login
-if (auth.currentUser) {
-    const loginOverlay = document.getElementById('loginOverlay');
-    if (loginOverlay) loginOverlay.classList.add('hidden');
-}
+
 
 const firebaseConfig = {
     apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
@@ -49,6 +45,12 @@ const categoriasHormigaDefault = [
 
 const dInit = new Date();
 const defaultLocalMonth = `${dInit.getFullYear()}-${String(dInit.getMonth() + 1).padStart(2, '0')}`;
+
+// Agregá esto al inicio de app.js para evitar el pantallazo del login
+if (auth.currentUser) {
+    const loginOverlay = document.getElementById('loginOverlay');
+    if (loginOverlay) loginOverlay.classList.add('hidden');
+}
 
 window.appState = window.appState || {
     currentMonth: defaultLocalMonth,
