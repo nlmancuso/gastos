@@ -400,7 +400,7 @@
     </div>
 
     <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-        <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
                 <h3 id="modalGastoTitulo" class="text-lg font-bold">Nuevo Gasto</h3>
                 <button type="button" onclick="closeModal('modalGasto')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
@@ -408,40 +408,57 @@
             <form onsubmit="handleSaveGasto(event)" class="space-y-4">
                 <input type="hidden" id="gastoId">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CONCEPTO</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre del Concepto</label>
                     <input type="text" id="gastoConcepto" required placeholder="Ej: Supermercado, Luz..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO ($)</label>
-                        <input type="number" step="0.01" id="gastoMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CUOTAS</label>
-                        <input type="number" min="1" id="gastoCuotas" value="1" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CATEGORÍA</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría / Tarjeta</label>
                         <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white"></select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MES DE INICIO</label>
-                        <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Monto ($)</label>
+                        <input type="number" step="0.01" id="gastoMonto" oninput="actualizarCalculoCuotasModal()" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">FECHA DE VENCIMIENTO BASE</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha de Vencimiento (Opcional)</label>
                     <input type="date" id="gastoVencimiento" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
                 </div>
-                <div class="flex items-center gap-2 pt-2">
-                    <input type="checkbox" id="gastoIsRecurrente" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-600 cursor-pointer">
-                    <label for="gastoIsRecurrente" class="text-xs text-slate-300 font-semibold cursor-pointer">Gasto Recurrente / Fijo mensual automático</label>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">A partir de qué mes empieza</label>
+                    <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
                 </div>
+
+                <!-- SECCIÓN OPCIONES DE TARJETA / PAGO -->
+                <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-credit-card"></i> Opciones de Tarjeta / Pago
+                    </span>
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" id="gastoIsRecurrente" class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-emerald-600 cursor-pointer">
+                        <label for="gastoIsRecurrente" class="text-xs text-slate-300 font-semibold cursor-pointer flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate text-emerald-400"></i> Débito Automático / Recurrente
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" id="gastoEsCuotasCheck" onchange="toggleCuotasInputModal(this.checked)" class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-emerald-600 cursor-pointer">
+                        <label for="gastoEsCuotasCheck" class="text-xs text-slate-300 font-semibold cursor-pointer">
+                            ¿Es una compra en Cuotas?
+                        </label>
+                    </div>
+                    <div id="containerCuotasInput" class="space-y-2 pt-2 hidden">
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Cantidad de Cuotas</label>
+                        <input type="number" min="1" id="gastoCuotas" value="1" oninput="actualizarCalculoCuotasModal()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white">
+                        <div id="infoCuotaCalculada" class="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-xs text-emerald-400 font-semibold hidden flex items-center gap-2">
+                            <i class="fa-solid fa-lightbulb"></i> <span id="textoCuotaCalculada">Valor de cada cuota: $ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex justify-end gap-2 pt-3">
-                    <button type="button" onclick="closeModal('modalGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancelar</button>
-                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg">Guardar Gasto</button>
+                    <button type="button" onclick="closeModal('modalGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg">Guardar Gasto</button>
                 </div>
             </form>
         </div>
@@ -857,13 +874,27 @@
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
 
-        window.openModalGasto = function() {
-            document.getElementById('gastoId').value = ''; document.getElementById('modalGastoTitulo').innerText = "Nuevo Gasto";
-            document.getElementById('gastoConcepto').value = ''; document.getElementById('gastoMonto').value = '';
-            document.getElementById('gastoCuotas').value = '1'; document.getElementById('gastoStartMonth').value = window.appState.currentMonth || '2026-10';
-            document.getElementById('gastoVencimiento').value = ''; document.getElementById('gastoIsRecurrente').checked = false;
-            const selectCat = document.getElementById('gastoCategoria'); selectCat.innerHTML = '';
-            (window.appState.categorias || []).forEach(c => { const opt = document.createElement('option'); opt.value = c.nombre; opt.innerHTML = c.nombre; selectCat.appendChild(opt); });
+       window.openModalGasto = function() {
+            document.getElementById('gastoId').value = ''; 
+            document.getElementById('modalGastoTitulo').innerText = "Nuevo Gasto";
+            document.getElementById('gastoConcepto').value = ''; 
+            document.getElementById('gastoMonto').value = '';
+            document.getElementById('gastoCuotas').value = '1'; 
+            document.getElementById('gastoStartMonth').value = window.appState.currentMonth || '2026-10';
+            document.getElementById('gastoVencimiento').value = ''; 
+            document.getElementById('gastoIsRecurrente').checked = false;
+            document.getElementById('gastoEsCuotasCheck').checked = false;
+            document.getElementById('containerCuotasInput').classList.add('hidden');
+            document.getElementById('infoCuotaCalculada').classList.add('hidden');
+            
+            const selectCat = document.getElementById('gastoCategoria'); 
+            selectCat.innerHTML = '';
+            (window.appState.categorias || []).forEach(c => { 
+                const opt = document.createElement('option'); 
+                opt.value = c.nombre; 
+                opt.innerHTML = c.nombre; 
+                selectCat.appendChild(opt); 
+            });
             document.getElementById('modalGasto').classList.remove('hidden');
         };
 
@@ -876,7 +907,6 @@
             document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
             document.getElementById('gastoConcepto').value = gasto.concepto; 
             
-            // Cargar monto y vencimiento desde las excepciones del mes si existen, o del original
             const montoActual = window.appState.excepcionesMonto?.[`${id}_${currentActiveMonth}`] !== undefined 
                 ? window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] 
                 : gasto.monto;
@@ -885,10 +915,20 @@
                 : (gasto.vencimiento || '');
 
             document.getElementById('gastoMonto').value = montoActual;
-            document.getElementById('gastoCuotas').value = gasto.cuotas || 1; 
+            const cuotasVal = parseInt(gasto.cuotas) || 1;
+            document.getElementById('gastoCuotas').value = cuotasVal; 
             document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
             document.getElementById('gastoVencimiento').value = vencActual; 
             document.getElementById('gastoIsRecurrente').checked = !!gasto.isRecurrente;
+            
+            const esCuotas = cuotasVal > 1;
+            document.getElementById('gastoEsCuotasCheck').checked = esCuotas;
+            if (esCuotas) {
+                document.getElementById('containerCuotasInput').classList.remove('hidden');
+                actualizarCalculoCuotasModal();
+            } else {
+                document.getElementById('containerCuotasInput').classList.add('hidden');
+            }
 
             const selectCat = document.getElementById('gastoCategoria'); selectCat.innerHTML = '';
             const catActual = window.appState.excepcionesCategoria?.[`${id}_${currentActiveMonth}`] !== undefined
@@ -979,6 +1019,36 @@
         };
 
         window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
+
+        function toggleCuotasInputModal(isCuotas) {
+            const container = document.getElementById('containerCuotasInput');
+            if (!container) return;
+            if (isCuotas) {
+                container.classList.remove('hidden');
+                if (document.getElementById('gastoCuotas').value < 2) document.getElementById('gastoCuotas').value = 2;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('gastoCuotas').value = 1;
+            }
+            actualizarCalculoCuotasModal();
+        }
+
+        function actualizarCalculoCuotasModal() {
+            const montoTotal = parseFloat(document.getElementById('gastoMonto').value) || 0;
+            const cantCuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
+            const infoBox = document.getElementById('infoCuotaCalculada');
+            const textoBox = document.getElementById('textoCuotaCalculada');
+            const isCuotasChecked = document.getElementById('gastoEsCuotasCheck').checked;
+
+            if (isCuotasChecked && cantCuotas > 1 && montoTotal > 0) {
+                const valorCuota = montoTotal / cantCuotas;
+                const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (textoBox) textoBox.innerText = `Valor de cada cuota: ${fmt(valorCuota)} (${cantCuotas} cuotas)`;
+                if (infoBox) infoBox.classList.remove('hidden');
+            } else {
+                if (infoBox) infoBox.classList.add('hidden');
+            }
+        }
 
         // ---------------- SCRIPT ANÁLISIS & GRÁFICOS ----------------
         let customRangeFrom = null; let customRangeTo = null;
