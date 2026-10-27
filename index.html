@@ -89,7 +89,8 @@
                     categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
                     sortColumn: 'fecha',
                     sortAscending: false,
-                    filtrosCategorias: []
+                    filtrosCategorias: [],
+                    filtrosHormigaCatGrafico: []
                 };
 
                 let grupoId = "grupo_mancusososa";
@@ -144,7 +145,7 @@
 
                     renderApp();
                     renderCategoriasSelect();
-                    initRecurrentesDropdown();
+                    initRecurrentesCheckboxesList();
                     showApp();
                 });
 
@@ -156,6 +157,7 @@
                             if (window.hormigaState.sortColumn === undefined) window.hormigaState.sortColumn = 'fecha';
                             if (window.hormigaState.sortAscending === undefined) window.hormigaState.sortAscending = false;
                             if (window.hormigaState.filtrosCategorias === undefined) window.hormigaState.filtrosCategorias = [];
+                            if (window.hormigaState.filtrosHormigaCatGrafico === undefined) window.hormigaState.filtrosHormigaCatGrafico = [];
                         }
                     } else {
                         saveHormigaDataToCloud();
@@ -367,12 +369,20 @@
 
                 <!-- TABLA PRINCIPAL (AGRUPADA POR CATEGORÍA) -->
                 <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
-                    <div class="px-6 py-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div class="flex items-center gap-3">
-                            <h3 class="text-lg font-bold text-white">Planilla de Gastos (Agrupada)</h3>
-                            <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
+                    <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-lg font-bold text-white">Planilla de Gastos (Agrupada)</h3>
+                                <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosPlanilla(true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosPlanilla(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosCategoria"></div>
+                        <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosCategoria"></div>
                     </div>
 
                     <div id="containerPlanillaAgrupada" class="p-4 space-y-4"></div>
@@ -402,64 +412,71 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="card-bg p-6 rounded-2xl">
-                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales vs. Ingresos
-                        </h3>
+                    <!-- GRÁFICO 1 -->
+                    <div class="card-bg p-6 rounded-2xl space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales vs. Ingresos
+                            </h3>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Mostrar:</span>
+                                <button onclick="marcarTodosGrafico('Totales', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('Totales', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoTotales"></div>
                         <div class="relative h-64 w-full"><canvas id="chartEvolucionTotales"></canvas></div>
                     </div>
 
-                    <div class="card-bg p-6 rounded-2xl">
-                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
-                        </h3>
+                    <!-- GRÁFICO 2 -->
+                    <div class="card-bg p-6 rounded-2xl space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
+                            </h3>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosGrafico('EvolCat', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('EvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoEvolCat"></div>
                         <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
                     </div>
 
-                    <!-- GRÁFICO RECURRENTES CON MULTISELECCIÓN Y BOTÓN GUARDAR POR DEFECTO -->
-                    <div class="card-bg p-6 rounded-2xl md:col-span-2">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <!-- GRÁFICO 3: RECURRENTES (ESTILO UNIFICADO CON FILTROS EN LÍNEA) -->
+                    <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                             <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                                 <i class="fa-solid fa-rotate text-amber-400"></i> Evolución de Gastos Recurrentes y Débitos Automáticos
                             </h3>
-                            
-                            <!-- DESPLEGABLE MULTISELECCIÓN -->
-                            <div class="relative">
-                                <button onclick="toggleDropdownRecurrentes(event)" class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs font-bold text-white flex items-center gap-2 hover:border-amber-500 transition">
-                                    <i class="fa-solid fa-filter text-amber-400"></i>
-                                    <span id="btnDropdownText">Seleccionar Gastos...</span>
-                                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
-                                </button>
-
-                                <div id="dropdownRecurrentesMenu" class="hidden absolute right-0 mt-2 w-72 card-bg rounded-2xl shadow-2xl border border-slate-700 p-3 z-30 space-y-2">
-                                    <div class="flex justify-between items-center pb-2 border-b border-slate-800 text-xs">
-                                        <span class="font-bold text-slate-300 uppercase">Elegir para mostrar</span>
-                                        <div class="flex gap-2">
-                                            <button onclick="marcarTodosRecurrentes(true)" class="text-emerald-400 hover:underline font-semibold">Todos</button>
-                                            <span class="text-slate-600">|</span>
-                                            <button onclick="marcarTodosRecurrentes(false)" class="text-rose-400 hover:underline font-semibold">Ninguno</button>
-                                        </div>
-                                    </div>
-                                    <div id="containerCheckboxesRecurrentes" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
-                                    <div class="pt-2 border-t border-slate-800 flex gap-2">
-                                        <button onclick="guardarRecurrentesPorDefecto()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-extrabold py-2 rounded-xl text-xs transition shadow-lg shadow-amber-500/20">
-                                            Guardar por defecto
-                                        </button>
-                                        <button onclick="toggleDropdownRecurrentes(event)" class="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold">
-                                            OK
-                                        </button>
-                                    </div>
-                                </div>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosRecurrentesGrid(true)" class="text-amber-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosRecurrentesGrid(false)" class="text-rose-400 hover:underline">Ninguno</button>
                             </div>
                         </div>
-
+                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosRecurrentesGrid"></div>
                         <div class="relative h-72 w-full"><canvas id="chartEvolucionRecurrentesIndiv"></canvas></div>
                     </div>
 
-                    <div class="card-bg p-6 rounded-2xl md:col-span-2">
-                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto)
-                        </h3>
+                    <!-- GRÁFICO 4 -->
+                    <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto)
+                            </h3>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Mostrar:</span>
+                                <button onclick="marcarTodosGrafico('Balance', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('Balance', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoBalance"></div>
                         <div class="relative h-64 w-full"><canvas id="chartBalanceGeneral"></canvas></div>
                     </div>
                 </div>
@@ -467,22 +484,19 @@
 
             <!-- VISTA 3: SALDOS Y BANCOS -->
             <div id="vistaSaldos" class="hidden space-y-6">
-                <!-- 1. GESTIÓN DE CUENTAS Y SALDOS -->
                 <div class="card-bg p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                         <h3 class="text-base font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-building-columns text-emerald-400"></i> Gestión de Cuentas y Saldos
                         </h3>
-                        <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta para ver tu disponible real. (Los ítems PAGADOS no se muestran como descuento en curso).</p>
+                        <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta para ver tu disponible real.</p>
                     </div>
                     <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 shrink-0">
                         <i class="fa-solid fa-plus"></i> Nueva Cuenta / Banco
                     </button>
                 </div>
 
-                <!-- 2. RECUADROS DE DISPONIBLE REAL Y BANCOS -->
                 <div id="containerResumenDisponibles" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
-
                 <div id="containerBancosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
 
@@ -559,7 +573,6 @@
                         </form>
                     </div>
 
-                    <!-- CUADRO: TOTALES POR CATEGORÍA DEL MES -->
                     <div class="lg:col-span-2 card-bg p-6 rounded-2xl flex flex-col justify-between">
                         <div>
                             <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
@@ -573,13 +586,18 @@
                     </div>
                 </div>
 
-                <!-- CUADRO DE DETALLE DE GASTOS DEL MES (CON FILTROS MULTILÍNEA Y ORDENAMIENTO) -->
                 <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
                     <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-3">
                                 <h3 class="text-base font-bold text-white">Detalle de Gastos del Mes</h3>
                                 <span id="badgeHormigaMonth" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaCat"></div>
@@ -612,10 +630,20 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                    <div class="card-bg p-6 rounded-2xl">
-                        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
-                        </h3>
+                    <!-- GRÁFICO TARTA HORMIGA (AHORA CON FILTROS UNIFICADOS Y TODOS/NINGUNO) -->
+                    <div class="card-bg p-6 rounded-2xl space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
+                            </h3>
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosGrafico('HormigaCat', true)" class="text-amber-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('HormigaCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoHormigaCat"></div>
                         <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartHormigaCategorias"></canvas></div>
                     </div>
 
@@ -627,18 +655,27 @@
                     </div>
                 </div>
 
-                <!-- GRÁFICO DE LÍNEAS PARA EVOLUCIÓN POR CATEGORÍAS SEPARADAS -->
-                <div class="card-bg p-6 rounded-2xl">
-                    <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
-                    </h3>
+                <!-- GRÁFICO DE LÍNEAS HORMIGA -->
+                <div class="card-bg p-6 rounded-2xl space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
+                        </h3>
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Filtrar:</span>
+                            <button onclick="marcarTodosGrafico('HormigaEvolCat', true)" class="text-amber-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosGrafico('HormigaEvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoHormigaEvolCat"></div>
                     <div class="relative h-72 w-full"><canvas id="chartHormigaEvolucionCategorias"></canvas></div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- MODAL NUEVA/EDITAR CUENTA BANCARIA Y DESCUENTOS -->
+    <!-- MODALES -->
     <div id="modalCuenta" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
@@ -663,23 +700,18 @@
                     </div>
                 </div>
 
-                <!-- SELECCIÓN DE TARJETAS Y DESCUENTOS ASOCIADOS -->
                 <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
                     <div>
                         <label class="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
                             <i class="fa-solid fa-credit-card mr-1"></i> Tarjetas de Crédito
                         </label>
-                        <p class="text-[11px] text-slate-400">Seleccioná qué tarjetas se debitan en esta cuenta:</p>
                         <div id="containerCategoriasAsociadas" class="grid grid-cols-2 gap-2 pt-2"></div>
                     </div>
-
                     <hr class="border-slate-800">
-
                     <div>
                         <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
                             <i class="fa-solid fa-thumbtack mr-1"></i> Gastos Fijos e Ítems Individuales
                         </label>
-                        <p class="text-[11px] text-slate-400">Seleccioná los ítems fijos/servicios específicos que se pagan por este banco:</p>
                         <div id="containerGastosFijosAsociados" class="space-y-1.5 pt-2 max-h-40 overflow-y-auto pr-1"></div>
                     </div>
                 </div>
@@ -692,7 +724,6 @@
         </div>
     </div>
 
-    <!-- MODAL CATEGORÍAS HORMIGA -->
     <div id="modalCatHormiga" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -714,7 +745,6 @@
         </div>
     </div>
 
-    <!-- MODAL CONFIG GENERAL -->
     <div id="modalConfig" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -738,14 +768,11 @@
         </div>
     </div>
 
-    <!-- MODAL SUELDO -->
     <div id="modalSueldo" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold">Modificar Sueldo / Ingreso</h3>
-                <button type="button" onclick="closeModal('modalSueldo')" class="text-slate-400 hover:text-white text-lg">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <button type="button" onclick="closeModal('modalSueldo')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form onsubmit="handleSaveSueldo(event)">
                 <div class="mb-4">
@@ -753,25 +780,18 @@
                     <input type="number" step="0.01" id="sueldoMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-sm font-medium transition">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition text-sm">
-                        Guardar
-                    </button>
+                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-sm font-medium transition">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition text-sm">Guardar</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL NUEVO/EDITAR GASTO -->
     <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
             <div class="flex justify-between items-center mb-5">
                 <h3 id="modalGastoTitulo" class="text-lg font-bold">Nuevo Gasto</h3>
-                <button type="button" onclick="closeModal('modalGasto')" class="text-slate-400 hover:text-white text-lg">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <button type="button" onclick="closeModal('modalGasto')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
             <form id="formGasto" onsubmit="handleSaveGasto(event)">
@@ -807,23 +827,19 @@
                     <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                         <i class="fa-solid fa-credit-card text-emerald-400 mr-1"></i> Opciones de Tarjeta / Pago
                     </span>
-
                     <div>
                         <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
                             <input type="checkbox" id="checkRecurrente" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
                             <i class="fa-solid fa-rotate text-emerald-400"></i> Débito Automático / Recurrente
                         </label>
                     </div>
-
                     <hr class="border-slate-800">
-
                     <div>
                         <label class="flex items-center gap-3 cursor-pointer select-none text-sm font-semibold text-white">
                             <input type="checkbox" id="checkCuotas" onchange="toggleCuotasFields()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500">
                             ¿Es una compra en Cuotas?
                         </label>
                     </div>
-
                     <div id="sectionCuotas" class="hidden pt-1 space-y-2">
                         <div>
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CANTIDAD DE CUOTAS</label>
@@ -837,18 +853,14 @@
                 </div>
 
                 <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium transition">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 text-sm font-bold shadow-lg shadow-emerald-950/50 transition">
-                        Guardar Gasto
-                    </button>
+                    <button type="button" onclick="closeModal('modalGasto')" class="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 text-sm font-medium transition">Cancelar</button>
+                    <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 text-sm font-bold shadow-lg shadow-emerald-950/50 transition">Guardar Gasto</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- LOGIC SCRIPT -->
+    <!-- SCRIPT -->
     <script>
         const categoriasDefault = [
             { nombre: "Gasto Fijo", color: "#ef4444", esTarjeta: false },
@@ -900,11 +912,19 @@
             categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
             sortColumn: 'fecha',
             sortAscending: false,
-            filtrosCategorias: []
+            filtrosCategorias: [],
+            filtrosHormigaCatGrafico: []
         };
 
         window.filtrosTemporales = [];
         window.categoriasAbiertasMap = {};
+
+        window.filtrosGraficoTotales = [];
+        window.filtrosGraficoEvolCat = [];
+        window.filtrosGraficoBalance = [];
+        window.filtrosGraficoHormigaEvolCat = [];
+        window.filtrosGraficoHormigaCat = [];
+        window.filtrosRecurrentesGrid = [];
 
         let customRangeFrom = null;
         let customRangeTo = null;
@@ -934,15 +954,7 @@
             }
             document.getElementById('hormigaFecha').value = new Date().toISOString().slice(0, 10);
             initChartRangeInputs();
-            initRecurrentesDropdown();
-
-            window.addEventListener('click', (e) => {
-                const menu = document.getElementById('dropdownRecurrentesMenu');
-                const btn = e.target.closest('button');
-                if (menu && !menu.contains(e.target) && (!btn || !btn.getAttribute('onclick')?.includes('toggleDropdownRecurrentes'))) {
-                    menu.classList.add('hidden');
-                }
-            });
+            initRecurrentesCheckboxesList();
         });
 
         function initChartRangeInputs() {
@@ -983,14 +995,9 @@
             }
         }
 
-        function toggleDropdownRecurrentes(e) {
-            e.stopPropagation();
-            const menu = document.getElementById('dropdownRecurrentesMenu');
-            if (menu) menu.classList.toggle('hidden');
-        }
-
-        function initRecurrentesDropdown() {
-            const container = document.getElementById('containerCheckboxesRecurrentes');
+        // Listado de Recurrentes Grid (Con filtros en línea y diseño unificado)
+        function initRecurrentesCheckboxesList() {
+            const container = document.getElementById('containerFiltrosRecurrentesGrid');
             if (!container) return;
 
             let mapIdsUnicos = new Map();
@@ -1003,74 +1010,71 @@
                 }
             });
 
-            let seleccionados = window.appState.recurrentesPreferidos;
-            if (!seleccionados || seleccionados.length === 0) {
-                seleccionados = Array.from(mapIdsUnicos.keys());
+            if (window.filtrosRecurrentesGrid.length === 0 && window.appState.recurrentesPreferidos?.length > 0) {
+                window.filtrosRecurrentesGrid = [...window.appState.recurrentesPreferidos];
             }
 
             container.innerHTML = '';
             if (mapIdsUnicos.size === 0) {
                 container.innerHTML = '<p class="text-[11px] text-slate-500 italic p-1">No hay gastos recurrentes registrados.</p>';
+                return;
             }
+
+            let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16'];
+            let colorIdx = 0;
 
             mapIdsUnicos.forEach((concepto, id) => {
-                const isChecked = seleccionados.includes(id);
-                const div = document.createElement('div');
-                div.className = "flex items-center gap-2 p-1.5 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-700 transition";
-                div.innerHTML = `
-                    <input type="checkbox" id="recCheck_${id}" value="${id}" ${isChecked ? 'checked' : ''} onchange="onRecurrenteCheckboxChange()" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 cursor-pointer">
-                    <label for="recCheck_${id}" class="text-xs text-slate-300 font-semibold cursor-pointer truncate flex-1">${concepto}</label>
-                `;
-                container.appendChild(div);
+                const isChecked = window.filtrosRecurrentesGrid.length === 0 || window.filtrosRecurrentesGrid.includes(id);
+                let color = colorPalette[colorIdx % colorPalette.length];
+                colorIdx++;
+
+                const label = document.createElement('label');
+                label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                label.innerHTML = `<input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroRecurrenteGrid(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>${concepto}`;
+                container.appendChild(label);
             });
 
-            updateDropdownButtonText();
             renderCharts();
         }
 
-        function marcarTodosRecurrentes(marcar) {
-            const container = document.getElementById('containerCheckboxesRecurrentes');
-            if (!container) return;
-            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = marcar);
-            onRecurrenteCheckboxChange();
-        }
+        window.toggleFiltroRecurrenteGrid = function(checkbox) {
+            const id = checkbox.value;
+            let mapIdsUnicos = [];
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if (g.isRecurrente || baseEsFijo) {
+                    if (!mapIdsUnicos.includes(g.id)) mapIdsUnicos.push(g.id);
+                }
+            });
 
-        function onRecurrenteCheckboxChange() {
-            updateDropdownButtonText();
-            renderCharts();
-        }
-
-        function updateDropdownButtonText() {
-            const container = document.getElementById('containerCheckboxesRecurrentes');
-            const btnText = document.getElementById('btnDropdownText');
-            if (!container || !btnText) return;
-
-            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-            const marcados = Array.from(checkboxes).filter(cb => cb.checked);
-
-            if (marcados.length === 0) {
-                btnText.innerText = "Ninguno seleccionado";
-            } else if (marcados.length === checkboxes.length) {
-                btnText.innerText = "Todos los recurrentes";
-            } else {
-                btnText.innerText = `${marcados.length} gastos seleccionados`;
+            if (window.filtrosRecurrentesGrid.length === 0) {
+                window.filtrosRecurrentesGrid = [...mapIdsUnicos];
             }
-        }
 
-        function guardarRecurrentesPorDefecto() {
-            const container = document.getElementById('containerCheckboxesRecurrentes');
-            if (!container) return;
-            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-            const marcados = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+            if (checkbox.checked) {
+                if (!window.filtrosRecurrentesGrid.includes(id)) window.filtrosRecurrentesGrid.push(id);
+            } else {
+                window.filtrosRecurrentesGrid = window.filtrosRecurrentesGrid.filter(i => i !== id);
+            }
 
-            window.appState.recurrentesPreferidos = marcados;
-            window.saveDataToCloud();
-            
-            const menu = document.getElementById('dropdownRecurrentesMenu');
-            if (menu) menu.classList.add('hidden');
-            alert("¡Tus preferencias por defecto fueron guardadas con éxito!");
-        }
+            if (window.filtrosRecurrentesGrid.length === mapIdsUnicos.length) {
+                window.filtrosRecurrentesGrid = [];
+            }
+
+            initRecurrentesCheckboxesList();
+        };
+
+        window.marcarTodosRecurrentesGrid = function(marcar) {
+            let mapIdsUnicos = [];
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if (g.isRecurrente || baseEsFijo) {
+                    if (!mapIdsUnicos.includes(g.id)) mapIdsUnicos.push(g.id);
+                }
+            });
+            window.filtrosRecurrentesGrid = marcar ? [] : ['__NINGUNO__'];
+            initRecurrentesCheckboxesList();
+        };
 
         function switchTab(tabName) {
             if (tabName !== 'planilla') {
@@ -1090,7 +1094,8 @@
             
             if (tabName === 'graficos') {
                 if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
-                initRecurrentesDropdown();
+                initRecurrentesCheckboxesList();
+                renderFiltrosGraficosCheckboxes();
                 setTimeout(() => renderCharts(), 100);
             }
             if (tabName === 'saldos') {
@@ -1110,7 +1115,6 @@
             containerFijos.innerHTML = '';
 
             const catList = window.appState.categorias || categoriasDefault;
-
             const tarjetas = catList.filter(c => c.esTarjeta);
             tarjetas.forEach(cat => {
                 const isChecked = categoriasSeleccionadas.includes(cat.nombre);
@@ -1173,7 +1177,6 @@
             if (containerResumen) containerResumen.innerHTML = '';
 
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
             let totalDisponibleRealSuma = 0;
             let tarjetasBancosHtml = '';
 
@@ -1192,7 +1195,6 @@
 
                 calcData.items.forEach(item => {
                     if (item.estado === 'PAGADO') return;
-
                     const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === item.categoria);
                     const esTarjeta = catObj ? catObj.esTarjeta : true;
 
@@ -1256,27 +1258,24 @@
                                     <i class="fa-solid fa-university text-emerald-400"></i> ${cuenta.nombre}
                                 </h4>
                                 <div class="flex items-center gap-2">
-                                    <button onclick="editCuenta('${cuenta.id}')" class="text-slate-400 hover:text-white text-xs" title="Editar Banco y Descuentos"><i class="fa-solid fa-pen"></i></button>
-                                    <button onclick="deleteCuenta('${cuenta.id}')" class="text-slate-400 hover:text-rose-400 text-xs" title="Eliminar Cuenta"><i class="fa-solid fa-trash-can"></i></button>
+                                    <button onclick="editCuenta('${cuenta.id}')" class="text-slate-400 hover:text-white text-xs" title="Editar Banco"><i class="fa-solid fa-pen"></i></button>
+                                    <button onclick="deleteCuenta('${cuenta.id}')" class="text-slate-400 hover:text-rose-400 text-xs" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
                                 </div>
                             </div>
-
                             <div class="space-y-1.5 text-xs mb-4">
                                 <div class="flex justify-between text-slate-300"><span>Saldo Banco:</span> <strong>${fmt(bcoSaldo)}</strong></div>
                                 <div class="flex justify-between text-slate-300"><span>Saldo Mercado Pago:</span> <strong>${fmt(mpSaldo)}</strong></div>
                                 <div class="flex justify-between text-emerald-400 font-bold pt-1 border-t border-slate-800"><span>Total Saldos:</span> <span>${fmt(totalIngresos)}</span></div>
                             </div>
-
                             <div class="space-y-1 mb-4 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
                                 <div class="flex justify-between items-center mb-2">
                                     <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Descuentos Aplicados</span>
                                     <span class="text-[10px] text-slate-500 font-semibold">${formatMonthDisplay(currentMonth)}</span>
                                 </div>
-                                
                                 ${tarjetasDesglosadasHtml}
                                 ${fijosHtml}
                                 ${(!tarjetasDesglosadasHtml && !fijosHtml) 
-                                    ? '<p class="text-[11px] text-slate-500 italic py-1">No hay descuentos pendientes asignados a este banco.</p>' 
+                                    ? '<p class="text-[11px] text-slate-500 italic py-1">No hay descuentos pendientes.</p>' 
                                     : `<div class="flex justify-between items-center text-xs text-rose-400 font-bold pt-2 mt-1 border-t border-slate-800/80">
                                         <span>Total Descuentos:</span>
                                         <span>-$${totalDescuentosBanco.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
@@ -1284,7 +1283,6 @@
                                 }
                             </div>
                         </div>
-
                         <div class="pt-3 border-t border-slate-800 flex justify-between items-center">
                             <span class="text-xs font-bold text-slate-300 uppercase">Disponible Real:</span>
                             <span class="text-base font-extrabold ${disponibleFinal >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(disponibleFinal)}</span>
@@ -1323,9 +1321,7 @@
             const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const cuenta = (window.appState.cuentasBancarias || []).find(c => c.id === id);
             if (!cuenta) return;
-            
             const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
-
             document.getElementById('cuentaId').value = cuenta.id;
             document.getElementById('modalCuentaTitulo').innerText = "Configurar Banco y Descuentos";
             document.getElementById('cuentaNombre').value = cuenta.nombre;
@@ -1356,9 +1352,7 @@
             if (id) {
                 const idx = window.appState.cuentasBancarias.findIndex(c => c.id === id);
                 if (idx !== -1) {
-                    if (!window.appState.cuentasBancarias[idx].saldosPorMes) {
-                        window.appState.cuentasBancarias[idx].saldosPorMes = {};
-                    }
+                    if (!window.appState.cuentasBancarias[idx].saldosPorMes) window.appState.cuentasBancarias[idx].saldosPorMes = {};
                     window.appState.cuentasBancarias[idx].saldosPorMes[currentMonth] = { bcoSaldo, mpSaldo };
                     window.appState.cuentasBancarias[idx].nombre = nombre;
                     window.appState.cuentasBancarias[idx].categoriasAsociadas = categoriasAsociadas;
@@ -1414,18 +1408,14 @@
         window.actualizarCatCampo = function(index, campo, valor) {
             if (!window.appState.categorias[index]) return;
             const nombreAnterior = window.appState.categorias[index].nombre;
-            
             if (campo === 'nombre') {
                 const nuevoNombre = valor.trim();
                 if (!nuevoNombre) return;
-                (window.appState.gastos || []).forEach(g => {
-                    if (g.categoria === nombreAnterior) g.categoria = nuevoNombre;
-                });
+                (window.appState.gastos || []).forEach(g => { if (g.categoria === nombreAnterior) g.categoria = nuevoNombre; });
                 window.appState.categorias[index].nombre = nuevoNombre;
             } else {
                 window.appState.categorias[index][campo] = valor;
             }
-
             window.saveDataToCloud();
             renderCategoriasSelect();
             renderFiltrosCategoriasCheckboxes();
@@ -1481,18 +1471,14 @@
         window.actualizarCatHormigaCampo = function(index, campo, valor) {
             if (!window.hormigaState.categorias[index]) return;
             const nombreAnterior = window.hormigaState.categorias[index].nombre;
-            
             if (campo === 'nombre') {
                 const nuevoNombre = valor.trim();
                 if (!nuevoNombre) return;
-                (window.hormigaState.gastos || []).forEach(g => {
-                    if (g.categoria === nombreAnterior) g.categoria = nuevoNombre;
-                });
+                (window.hormigaState.gastos || []).forEach(g => { if (g.categoria === nombreAnterior) g.categoria = nuevoNombre; });
                 window.hormigaState.categorias[index].nombre = nuevoNombre;
             } else {
                 window.hormigaState.categorias[index][campo] = valor;
             }
-
             window.saveHormigaDataToCloud();
             renderHormigaCategoriasSelect();
             renderHormigaApp();
@@ -1537,9 +1523,8 @@
         function renderFiltrosHormigaCatCheckboxes() {
             const container = document.getElementById('containerFiltrosHormigaCat');
             if (!container) return;
-            container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1.5 self-center">Filtrar:</span>`;
+            container.innerHTML = '';
             const catList = window.hormigaState.categorias || categoriasHormigaDefault;
-            
             catList.forEach(cat => {
                 const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
                 const label = document.createElement('label');
@@ -1552,23 +1537,21 @@
         window.toggleFiltroHormigaCategoria = function(checkbox) {
             const catNombre = checkbox.value;
             const catList = window.hormigaState.categorias || categoriasHormigaDefault;
-            
             if (!window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0) {
                 window.hormigaState.filtrosCategorias = catList.map(c => c.nombre);
             }
-
             if (checkbox.checked) {
-                if (!window.hormigaState.filtrosCategorias.includes(catNombre)) {
-                    window.hormigaState.filtrosCategorias.push(catNombre);
-                }
+                if (!window.hormigaState.filtrosCategorias.includes(catNombre)) window.hormigaState.filtrosCategorias.push(catNombre);
             } else {
                 window.hormigaState.filtrosCategorias = window.hormigaState.filtrosCategorias.filter(c => c !== catNombre);
             }
+            if (window.hormigaState.filtrosCategorias.length === catList.length) window.hormigaState.filtrosCategorias = [];
+            renderFiltrosHormigaCatCheckboxes();
+            renderHormigaApp();
+        };
 
-            if (window.hormigaState.filtrosCategorias.length === catList.length) {
-                window.hormigaState.filtrosCategorias = [];
-            }
-
+        window.marcarTodosHormiga = function(marcar) {
+            window.hormigaState.filtrosCategorias = marcar ? [] : ['__NINGUNA__'];
             renderFiltrosHormigaCatCheckboxes();
             renderHormigaApp();
         };
@@ -1600,7 +1583,7 @@
         function renderFiltrosCategoriasCheckboxes() {
             const container = document.getElementById('containerFiltrosCategoria');
             if (!container) return;
-            container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1.5 self-center">Filtrar:</span>`;
+            container.innerHTML = '';
             const catList = window.appState.categorias || categoriasDefault;
             catList.forEach(cat => {
                 const isChecked = window.filtrosTemporales.length === 0 || window.filtrosTemporales.includes(cat.nombre);
@@ -1622,12 +1605,158 @@
             renderApp();
         }
 
+        window.marcarTodosPlanilla = function(marcar) {
+            window.filtrosTemporales = marcar ? [] : ['__NINGUNA__'];
+            renderFiltrosCategoriasCheckboxes();
+            renderApp();
+        };
+
+        // Renderizado de filtros unificados para gráficos
+        function renderFiltrosGraficosCheckboxes() {
+            const catList = window.appState.categorias || categoriasDefault;
+
+            // 1. Totales
+            const contTotales = document.getElementById('containerFiltrosGraficoTotales');
+            if (contTotales) {
+                contTotales.innerHTML = '';
+                const itemsTotales = [
+                    { nombre: "Gastos Totales", color: "#f43f5e" },
+                    { nombre: "Ingresos / Sueldo", color: "#10b981" }
+                ];
+                itemsTotales.forEach(item => {
+                    const isChecked = window.filtrosGraficoTotales.length === 0 || window.filtrosGraficoTotales.includes(item.nombre);
+                    const label = document.createElement('label');
+                    label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                    label.innerHTML = `<input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Totales', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}`;
+                    contTotales.appendChild(label);
+                });
+            }
+
+            // 2. Evolución por Categoría
+            const contEvolCat = document.getElementById('containerFiltrosGraficoEvolCat');
+            if (contEvolCat) {
+                contEvolCat.innerHTML = '';
+                catList.forEach(cat => {
+                    const isChecked = window.filtrosGraficoEvolCat.length === 0 || window.filtrosGraficoEvolCat.includes(cat.nombre);
+                    const label = document.createElement('label');
+                    label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                    label.innerHTML = `<input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}`;
+                    contEvolCat.appendChild(label);
+                });
+            }
+
+            // 3. Balance General
+            const contBalance = document.getElementById('containerFiltrosGraficoBalance');
+            if (contBalance) {
+                contBalance.innerHTML = '';
+                const itemsBal = [
+                    { nombre: "Ingreso / Sueldo", color: "#10b981" },
+                    { nombre: "Gastos Totales", color: "#f43f5e" },
+                    { nombre: "Resto Disponible", color: "#3b82f6" }
+                ];
+                itemsBal.forEach(item => {
+                    const isChecked = window.filtrosGraficoBalance.length === 0 || window.filtrosGraficoBalance.includes(item.nombre);
+                    const label = document.createElement('label');
+                    label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                    label.innerHTML = `<input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Balance', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}`;
+                    contBalance.appendChild(label);
+                });
+            }
+
+            // 4. Gráfico de Torta Hormiga (Gastos Hormiga por Categoría)
+            const contHormigaCat = document.getElementById('containerFiltrosGraficoHormigaCat');
+            if (contHormigaCat) {
+                contHormigaCat.innerHTML = '';
+                const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+                catHormigaList.forEach(cat => {
+                    const isChecked = window.filtrosGraficoHormigaCat.length === 0 || window.filtrosGraficoHormigaCat.includes(cat.nombre);
+                    const label = document.createElement('label');
+                    label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                    label.innerHTML = `<input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('HormigaCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}`;
+                    contHormigaCat.appendChild(label);
+                });
+            }
+
+            // 5. Hormiga Evolución Categorías
+            const contHormigaEvolCat = document.getElementById('containerFiltrosGraficoHormigaEvolCat');
+            if (contHormigaEvolCat) {
+                contHormigaEvolCat.innerHTML = '';
+                const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+                catHormigaList.forEach(cat => {
+                    const isChecked = window.filtrosGraficoHormigaEvolCat.length === 0 || window.filtrosGraficoHormigaEvolCat.includes(cat.nombre);
+                    const label = document.createElement('label');
+                    label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                    label.innerHTML = `<input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('HormigaEvolCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}`;
+                    contHormigaEvolCat.appendChild(label);
+                });
+            }
+        }
+
+        window.toggleFiltroGrafico = function(tipo, checkbox) {
+            const val = checkbox.value;
+            let arrRef, fullList;
+
+            if (tipo === 'Totales') {
+                if (window.filtrosGraficoTotales.length === 0) window.filtrosGraficoTotales = ["Gastos Totales", "Ingresos / Sueldo"];
+                arrRef = window.filtrosGraficoTotales;
+                fullList = ["Gastos Totales", "Ingresos / Sueldo"];
+            } else if (tipo === 'EvolCat') {
+                const catList = window.appState.categorias || categoriasDefault;
+                if (window.filtrosGraficoEvolCat.length === 0) window.filtrosGraficoEvolCat = catList.map(c => c.nombre);
+                arrRef = window.filtrosGraficoEvolCat;
+                fullList = catList.map(c => c.nombre);
+            } else if (tipo === 'Balance') {
+                if (window.filtrosGraficoBalance.length === 0) window.filtrosGraficoBalance = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"];
+                arrRef = window.filtrosGraficoBalance;
+                fullList = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"];
+            } else if (tipo === 'HormigaCat') {
+                const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+                if (window.filtrosGraficoHormigaCat.length === 0) window.filtrosGraficoHormigaCat = catHormigaList.map(c => c.nombre);
+                arrRef = window.filtrosGraficoHormigaCat;
+                fullList = catHormigaList.map(c => c.nombre);
+            } else if (tipo === 'HormigaEvolCat') {
+                const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+                if (window.filtrosGraficoHormigaEvolCat.length === 0) window.filtrosGraficoHormigaEvolCat = catHormigaList.map(c => c.nombre);
+                arrRef = window.filtrosGraficoHormigaEvolCat;
+                fullList = catHormigaList.map(c => c.nombre);
+            }
+
+            if (checkbox.checked) {
+                if (!arrRef.includes(val)) arrRef.push(val);
+            } else {
+                const idx = arrRef.indexOf(val);
+                if (idx !== -1) arrRef.splice(idx, 1);
+            }
+
+            if (arrRef.length === fullList.length) {
+                if (tipo === 'Totales') window.filtrosGraficoTotales = [];
+                if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = [];
+                if (tipo === 'Balance') window.filtrosGraficoBalance = [];
+                if (tipo === 'HormigaCat') window.filtrosGraficoHormigaCat = [];
+                if (tipo === 'HormigaEvolCat') window.filtrosGraficoHormigaEvolCat = [];
+            }
+
+            renderFiltrosGraficosCheckboxes();
+            renderCharts();
+            renderHormigaCharts();
+        };
+
+        window.marcarTodosGrafico = function(tipo, marcar) {
+            if (tipo === 'Totales') window.filtrosGraficoTotales = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'Balance') window.filtrosGraficoBalance = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'HormigaCat') window.filtrosGraficoHormigaCat = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'HormigaEvolCat') window.filtrosGraficoHormigaEvolCat = marcar ? [] : ['__NINGUNO__'];
+            
+            renderFiltrosGraficosCheckboxes();
+            renderCharts();
+            renderHormigaCharts();
+        };
+
         function toggleCuotasFields() {
             const isChecked = document.getElementById('checkCuotas').checked;
             document.getElementById('sectionCuotas').classList.toggle('hidden', !isChecked);
-            if (isChecked) {
-                document.getElementById('checkRecurrente').checked = false;
-            }
+            if (isChecked) document.getElementById('checkRecurrente').checked = false;
             calcularValorCuota();
         }
 
@@ -1635,10 +1764,7 @@
             const isCuotas = document.getElementById('checkCuotas').checked;
             const infoBox = document.getElementById('infoCuotaCalculada');
             const textoInfo = document.getElementById('textoInfoCuota');
-            if (!isCuotas) {
-                infoBox.classList.add('hidden');
-                return;
-            }
+            if (!isCuotas) { infoBox.classList.add('hidden'); return; }
             const montoTotal = parseFloat(document.getElementById('gastoMonto').value) || 0;
             const cantCuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
             if (montoTotal > 0 && cantCuotas > 0) {
@@ -1665,12 +1791,6 @@
             if (!ymStr) return '';
             const [year, month] = ymStr.split('-').map(Number);
             return `${monthNames[month - 1]} ${year}`;
-        }
-
-        function sortData(col) {
-            if (window.appState.sortColumn === col) window.appState.sortAscending = !window.appState.sortAscending;
-            else { window.appState.sortColumn = col; window.appState.sortAscending = true; }
-            renderApp();
         }
 
         function getSueldoForMonth(targetMonth) {
@@ -1702,7 +1822,6 @@
             let totalFijos = 0, totalTarjetas = 0;
             let totalesPorCat = {};
             (window.appState.categorias || categoriasDefault).forEach(cat => totalesPorCat[cat.nombre] = 0);
-
             const hoyStr = new Date().toISOString().slice(0, 10);
 
             (window.appState.gastos || []).forEach(gasto => {
@@ -1743,9 +1862,7 @@
                         let mStr = `${fYear}-${String(fMonth).padStart(2, '0')}`;
                         if (mStr === targetMonth) {
                             let vencFinal = gasto.vencimiento || '';
-                            for (let step = 0; step < i; step++) {
-                                vencFinal = sumarUnMesAFecha(vencFinal);
-                            }
+                            for (let step = 0; step < i; step++) vencFinal = sumarUnMesAFecha(vencFinal);
                             const gridKey = `${gasto.id}_${targetMonth}`;
                             const vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined
                                 ? window.appState.excepcionesVencimientoGrid[gridKey]
@@ -1753,15 +1870,10 @@
 
                             const estadoKey = `${gasto.id}_${targetMonth}`;
                             const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
-                            
                             let estadoAplicar = 'PENDIENTE';
-                            if (estadoGuardado === 'PAGADO') {
-                                estadoAplicar = 'PAGADO';
-                            } else if (estadoGuardado === 'VENCIDO') {
-                                estadoAplicar = 'VENCIDO';
-                            } else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) {
-                                estadoAplicar = 'VENCIDO';
-                            }
+                            if (estadoGuardado === 'PAGADO') estadoAplicar = 'PAGADO';
+                            else if (estadoGuardado === 'VENCIDO') estadoAplicar = 'VENCIDO';
+                            else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) estadoAplicar = 'VENCIDO';
 
                             generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: `Cuota ${i + 1}/${totalCuotas}`, monto: montoCuota, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false });
                         }
@@ -1771,31 +1883,21 @@
                         const [sY, sM] = startYM.split('-').map(Number);
                         const [tY, tM] = targetMonth.split('-').map(Number);
                         const diffMeses = (tY - sY) * 12 + (tM - sM);
-
                         let vencCalculado = gasto.vencimiento || '';
-                        for (let step = 0; step < diffMeses; step++) {
-                            vencCalculado = sumarUnMesAFecha(vencCalculado);
-                        }
+                        for (let step = 0; step < diffMeses; step++) vencCalculado = sumarUnMesAFecha(vencCalculado);
 
                         const gridKey = `${gasto.id}_${targetMonth}`;
                         let vencimientoAplicar = window.appState.excepcionesVencimientoGrid?.[gridKey];
                         if (vencimientoAplicar === undefined) {
-                            vencimientoAplicar = window.appState.excepcionesVencimiento?.[gridKey] !== undefined 
-                                ? window.appState.excepcionesVencimiento[gridKey] 
-                                : vencCalculado;
+                            vencimientoAplicar = window.appState.excepcionesVencimiento?.[gridKey] !== undefined ? window.appState.excepcionesVencimiento[gridKey] : vencCalculado;
                         }
 
                         const estadoKey = `${gasto.id}_${targetMonth}`;
                         const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
-                        
                         let estadoAplicar = 'PENDIENTE';
-                        if (estadoGuardado === 'PAGADO') {
-                            estadoAplicar = 'PAGADO';
-                        } else if (estadoGuardado === 'VENCIDO') {
-                            estadoAplicar = 'VENCIDO';
-                        } else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) {
-                            estadoAplicar = 'VENCIDO';
-                        }
+                        if (estadoGuardado === 'PAGADO') estadoAplicar = 'PAGADO';
+                        else if (estadoGuardado === 'VENCIDO') estadoAplicar = 'VENCIDO';
+                        else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) estadoAplicar = 'VENCIDO';
 
                         const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'Débito Automático';
                         generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: true });
@@ -1809,15 +1911,10 @@
 
                         const estadoKey = `${gasto.id}_${targetMonth}`;
                         const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
-                        
                         let estadoAplicar = 'PENDIENTE';
-                        if (estadoGuardado === 'PAGADO') {
-                            estadoAplicar = 'PAGADO';
-                        } else if (estadoGuardado === 'VENCIDO') {
-                            estadoAplicar = 'VENCIDO';
-                        } else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) {
-                            estadoAplicar = 'VENCIDO';
-                        }
+                        if (estadoGuardado === 'PAGADO') estadoAplicar = 'PAGADO';
+                        else if (estadoGuardado === 'VENCIDO') estadoAplicar = 'VENCIDO';
+                        else if (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar) estadoAplicar = 'VENCIDO';
 
                         generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'Débito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false });
                     }
@@ -1826,13 +1923,8 @@
                 generatedItems.forEach(gi => {
                     const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === gi.categoria);
                     const esTarjetaCat = catObj ? catObj.esTarjeta : true;
-
-                    if (!esTarjetaCat) {
-                        totalFijos += gi.monto;
-                    } else {
-                        totalTarjetas += gi.monto;
-                    }
-
+                    if (!esTarjetaCat) totalFijos += gi.monto;
+                    else totalTarjetas += gi.monto;
                     if (totalesPorCat[gi.categoria] !== undefined) totalesPorCat[gi.categoria] += gi.monto;
                     items.push(gi);
                 });
@@ -1845,7 +1937,7 @@
             document.getElementById('displayMonthText').innerText = formatMonthDisplay(currentMonth);
             document.getElementById('badgeMonth').innerText = formatMonthDisplay(currentMonth);
 
-            const { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat } = getCalculatedDataForMonth(currentMonth);
+            const { sueldoActual, items, totalFijos, totalTarjetas } = getCalculatedDataForMonth(currentMonth);
             const totalGastosMes = totalFijos + totalTarjetas;
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -1867,7 +1959,6 @@
             const containerAgrupada = document.getElementById('containerPlanillaAgrupada');
             if (!containerAgrupada) return;
             containerAgrupada.innerHTML = '';
-
             const catList = window.appState.categorias || categoriasDefault;
 
             if (itemsFiltrados.length === 0) {
@@ -1877,13 +1968,8 @@
 
             let gruposPorCat = {};
             catList.forEach(c => gruposPorCat[c.nombre] = []);
-            
             let gastosGlobalesIds = (window.appState.gastos || []).map(g => g.id);
-            itemsFiltrados.sort((a, b) => {
-                let idxA = gastosGlobalesIds.indexOf(a.id);
-                let idxB = gastosGlobalesIds.indexOf(b.id);
-                return idxA - idxB;
-            });
+            itemsFiltrados.sort((a, b) => gastosGlobalesIds.indexOf(a.id) - gastosGlobalesIds.indexOf(b.id));
 
             itemsFiltrados.forEach(item => {
                 if (!gruposPorCat[item.categoria]) gruposPorCat[item.categoria] = [];
@@ -1893,7 +1979,6 @@
             catList.forEach(cat => {
                 const gastosCat = gruposPorCat[cat.nombre] || [];
                 if (gastosCat.length === 0) return;
-
                 const totalCat = gastosCat.reduce((acc, curr) => acc + curr.monto, 0);
                 const colorCat = cat.color;
 
@@ -1909,7 +1994,6 @@
                 let htmlItems = '';
                 gastosCat.forEach(item => {
                     const vencimientoInputHtml = `<input type="date" value="${item.vencimiento || ''}" onchange="actualizarVencimientoGrilla('${item.id}', '${item.categoria}', this.value)" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">`;
-
                     let estadoColorClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
                     if (item.estado === 'PAGADO') estadoColorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
                     if (item.estado === 'VENCIDO') estadoColorClass = "bg-rose-500/10 text-rose-400 border-rose-500/30";
@@ -1923,16 +2007,8 @@
                     `;
 
                     htmlItems += `
-                        <tr draggable="true" 
-                            ondragstart="handleDragStart(event, '${item.id}')" 
-                            ondragover="handleDragOver(event)" 
-                            ondrop="handleDrop(event, '${item.id}')" 
-                            ondragend="handleDragEnd(event)"
-                            class="hover:bg-slate-900/40 transition-colors cursor-grab active:cursor-grabbing">
-                            <td class="px-6 py-3.5 text-white font-bold flex items-center gap-2">
-                                <span class="text-slate-600 hover:text-slate-400 cursor-grab px-1 select-none" title="Arrastrar para reordenar">⋮⋮</span>
-                                ${item.concepto}
-                            </td>
+                        <tr draggable="true" ondragstart="handleDragStart(event, '${item.id}')" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${item.id}')" ondragend="handleDragEnd(event)" class="hover:bg-slate-900/40 transition-colors cursor-grab active:cursor-grabbing">
+                            <td class="px-6 py-3.5 text-white font-bold flex items-center gap-2"><span class="text-slate-600 hover:text-slate-400 px-1 select-none">⋮⋮</span>${item.concepto}</td>
                             <td class="px-6 py-3.5 text-slate-400 text-xs">${item.tipo}</td>
                             <td class="px-6 py-3.5">${vencimientoInputHtml}</td>
                             <td class="px-6 py-3.5 text-right font-extrabold text-white">${fmt(item.monto)}</td>
@@ -1959,7 +2035,6 @@
                                 <span class="text-xs text-slate-400 uppercase font-semibold">Total: <strong class="text-emerald-400 font-extrabold text-sm">${fmt(totalCat)}</strong></span>
                             </div>
                         </div>
-
                         <div id="${collapseId}" class="overflow-x-auto ${isOpen ? '' : 'hidden'}">
                             <table class="w-full text-left border-collapse">
                                 <thead>
@@ -1972,9 +2047,7 @@
                                         <th class="px-6 py-3 text-right">ACCIONES</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-800/40 text-sm font-medium">
-                                    ${htmlItems}
-                                </tbody>
+                                <tbody class="divide-y divide-slate-800/40 text-sm font-medium">${htmlItems}</tbody>
                             </table>
                         </div>
                     </div>
@@ -1983,26 +2056,14 @@
         }
 
         let draggedGastoId = null;
-
-        window.handleDragStart = function(e, id) {
-            draggedGastoId = id;
-            e.target.classList.add('opacity-40', 'border-dashed', 'border-emerald-500');
-            e.dataTransfer.effectAllowed = 'move';
-        };
-
-        window.handleDragOver = function(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        };
-
+        window.handleDragStart = function(e, id) { draggedGastoId = id; e.target.classList.add('opacity-40'); };
+        window.handleDragOver = function(e) { e.preventDefault(); };
         window.handleDrop = function(e, targetId) {
             e.preventDefault();
             if (!draggedGastoId || draggedGastoId === targetId) return;
-
             let gastos = window.appState.gastos || [];
             const draggedIdx = gastos.findIndex(g => g.id === draggedGastoId);
             const targetIdx = gastos.findIndex(g => g.id === targetId);
-
             if (draggedIdx !== -1 && targetIdx !== -1) {
                 const [movedItem] = gastos.splice(draggedIdx, 1);
                 gastos.splice(targetIdx, 0, movedItem);
@@ -2011,11 +2072,7 @@
                 renderApp();
             }
         };
-
-        window.handleDragEnd = function(e) {
-            e.target.classList.remove('opacity-40', 'border-dashed', 'border-emerald-500');
-            draggedGastoId = null;
-        };
+        window.handleDragEnd = function(e) { e.target.classList.remove('opacity-40'); draggedGastoId = null; };
 
         window.toggleCategoriaCollapse = function(collapseId, headerEl) {
             const content = document.getElementById(collapseId);
@@ -2036,12 +2093,10 @@
             const badgeMonthEl = document.getElementById('badgeHormigaMonth');
             const badgeMonthCatEl = document.getElementById('badgeHormigaMonthCat');
             const monthText = formatMonthDisplay(currentMonth);
-            
             if (badgeMonthEl) badgeMonthEl.innerText = monthText;
             if (badgeMonthCatEl) badgeMonthCatEl.innerText = monthText;
 
             renderHormigaCategoriasSelect();
-
             const itemsHormiga = (window.hormigaState.gastos || []).filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
             const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
             
@@ -2051,26 +2106,20 @@
             const [year, month] = currentMonth.split('-').map(Number);
             const diasEnMes = new Date(year, month, 0).getDate();
             const promedioDiario = totalHormiga / diasEnMes;
-
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             document.getElementById('cardHormigaTotal').innerText = fmt(totalHormiga);
             document.getElementById('cardHormigaPromedio').innerText = fmt(promedioDiario);
             document.getElementById('cardHormigaCantidad').innerText = `${itemsHormiga.length} compra${itemsHormiga.length === 1 ? '' : 's'}`;
 
-            // RENDERIZAR TOTALES POR CATEGORÍA (FILTRANDO CEROS Y ORDENANDO DE MAYOR A MENOR)
             const containerCatTotales = document.getElementById('containerHormigaCatTotales');
             if (containerCatTotales) {
                 containerCatTotales.innerHTML = '';
-                
                 let totalesPorCat = {};
                 catHormigaList.forEach(c => totalesPorCat[c.nombre] = 0);
                 itemsHormiga.forEach(g => {
-                    if (totalesPorCat[g.categoria] !== undefined) {
-                        totalesPorCat[g.categoria] += parseFloat(g.monto) || 0;
-                    } else {
-                        totalesPorCat[g.categoria] = parseFloat(g.monto) || 0;
-                    }
+                    if (totalesPorCat[g.categoria] !== undefined) totalesPorCat[g.categoria] += parseFloat(g.monto) || 0;
+                    else totalesPorCat[g.categoria] = parseFloat(g.monto) || 0;
                 });
 
                 let categoriasConMonto = catHormigaList.map(cat => ({
@@ -2085,7 +2134,6 @@
                 } else {
                     categoriasConMonto.forEach(cat => {
                         const porcentaje = totalHormiga > 0 ? ((cat.monto / totalHormiga) * 100).toFixed(1) : 0;
-
                         containerCatTotales.innerHTML += `
                             <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
                                 <div class="flex justify-between items-center text-xs">
@@ -2104,38 +2152,31 @@
                 }
             }
 
-            // RENDERIZAR TABLA DE DETALLE (CON FILTROS MULTILÍNEA Y ORDENAMIENTO)
             const tbody = document.getElementById('tablaHormigaCuerpo');
             if (tbody) {
                 tbody.innerHTML = '';
-
                 let itemsFiltrados = itemsHormiga;
                 const filtrosActivos = window.hormigaState.filtrosCategorias || [];
-                if (filtrosActivos.length > 0) {
-                    itemsFiltrados = itemsFiltrados.filter(g => filtrosActivos.includes(g.categoria));
-                }
+                if (filtrosActivos.length > 0) itemsFiltrados = itemsFiltrados.filter(g => filtrosActivos.includes(g.categoria));
 
                 const sCol = window.hormigaState.sortColumn || 'fecha';
                 const sAsc = window.hormigaState.sortAscending;
-
                 itemsFiltrados.sort((a, b) => {
                     let vA = a[sCol] || '', vB = b[sCol] || '';
                     if (sCol === 'monto') {
-                        vA = parseFloat(vA) || 0;
-                        vB = parseFloat(vB) || 0;
+                        vA = parseFloat(vA) || 0; vB = parseFloat(vB) || 0;
                         return sAsc ? vA - vB : vB - vA;
                     }
                     return typeof vA === 'string' ? (sAsc ? vA.localeCompare(vB) : vB.localeCompare(vA)) : (sAsc ? vA - vB : vB - vA);
                 });
 
                 if (itemsFiltrados.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan con los filtros seleccionados.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan con los filtros.</td></tr>`;
                 } else {
                     itemsFiltrados.forEach(g => {
                         const catObj = catHormigaList.find(c => c.nombre === g.categoria);
                         const colorCat = catObj ? catObj.color : '#f59e0b';
                         const fechaFmt = g.fecha ? g.fecha.split('-').reverse().join('/') : '';
-
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-900/40 transition-colors">
                                 <td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td>
@@ -2158,23 +2199,25 @@
             const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const allHormigaGastos = window.hormigaState.gastos || [];
             const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
-
             const currentItems = allHormigaGastos.filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
+
+            const filtrosHormigaCat = window.filtrosGraficoHormigaCat || [];
             let catMap = {};
-            catHormigaList.forEach(c => catMap[c.nombre] = 0);
+            catHormigaList.forEach(c => {
+                if (filtrosHormigaCat.length === 0 || filtrosHormigaCat.includes(c.nombre)) {
+                    catMap[c.nombre] = 0;
+                }
+            });
             
             currentItems.forEach(g => {
                 if (catMap[g.categoria] !== undefined) {
                     catMap[g.categoria] += parseFloat(g.monto) || 0;
-                } else {
-                    catMap[g.categoria] = parseFloat(g.monto) || 0;
                 }
             });
 
             let catLabels = [];
             let catData = [];
             let catColors = [];
-
             Object.keys(catMap).forEach(cName => {
                 if (catMap[cName] > 0) {
                     catLabels.push(cName);
@@ -2206,16 +2249,12 @@
             let totalsByMonth = [];
 
             for (let i = 5; i >= 0; i--) {
-                let m = cMonth - i;
-                let y = cYear;
+                let m = cMonth - i, y = cYear;
                 while (m < 1) { m += 12; y--; }
-                let ymStr = `${y}-${String(m).padStart(2, '0')}`;
-                
                 monthsLabels.push(`${monthNames[m - 1]} ${y}`);
-
                 let totalM = 0;
                 allHormigaGastos.forEach(g => {
-                    if (g.fecha && g.fecha.slice(0, 7) === ymStr) {
+                    if (g.fecha && g.fecha.slice(0, 7) === `${y}-${String(m).padStart(2, '0')}`) {
                         totalM += parseFloat(g.monto) || 0;
                     }
                 });
@@ -2229,12 +2268,7 @@
                     type: 'bar',
                     data: {
                         labels: monthsLabels,
-                        datasets: [{
-                            label: 'Gasto Hormiga Total',
-                            data: totalsByMonth,
-                            backgroundColor: '#f59e0b',
-                            borderRadius: 6
-                        }]
+                        datasets: [{ label: 'Gasto Hormiga Total', data: totalsByMonth, backgroundColor: '#f59e0b', borderRadius: 6 }]
                     },
                     options: {
                         responsive: true,
@@ -2248,45 +2282,43 @@
                 });
             }
 
-            let datasetsCatSeparadas = catHormigaList.map(cat => {
-                let dataPorMes = [];
-                let [currY2, currM2] = currentMonth.split('-').map(Number);
-                for (let i = 5; i >= 0; i--) {
-                    let m = currM2 - i;
-                    let y = currY2;
-                    while (m < 1) { m += 12; y--; }
-                    let ymStr = `${y}-${String(m).padStart(2, '0')}`;
-                    
-                    let sumaCatMes = 0;
-                    allHormigaGastos.forEach(g => {
-                        if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) {
-                            sumaCatMes += parseFloat(g.monto) || 0;
-                        }
-                    });
-                    dataPorMes.push(sumaCatMes);
-                }
-                return {
-                    label: cat.nombre,
-                    data: dataPorMes,
-                    borderColor: cat.color,
-                    backgroundColor: cat.color,
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    pointStyle: 'rect',
-                    fill: false,
-                    tension: 0.3
-                };
-            });
+            let filtrosActivosHormigaEvol = window.filtrosGraficoHormigaEvolCat || [];
+            let datasetsCatSeparadas = catHormigaList
+                .filter(cat => filtrosActivosHormigaEvol.length === 0 || filtrosActivosHormigaEvol.includes(cat.nombre))
+                .map(cat => {
+                    let dataPorMes = [];
+                    let [currY2, currM2] = currentMonth.split('-').map(Number);
+                    for (let i = 5; i >= 0; i--) {
+                        let m = currM2 - i, y = currY2;
+                        while (m < 1) { m += 12; y--; }
+                        let ymStr = `${y}-${String(m).padStart(2, '0')}`;
+                        let sumaCatMes = 0;
+                        allHormigaGastos.forEach(g => {
+                            if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) {
+                                sumaCatMes += parseFloat(g.monto) || 0;
+                            }
+                        });
+                        dataPorMes.push(sumaCatMes);
+                    }
+                    return {
+                        label: cat.nombre,
+                        data: dataPorMes,
+                        borderColor: cat.color,
+                        backgroundColor: cat.color,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointStyle: 'rect',
+                        fill: false,
+                        tension: 0.3
+                    };
+                });
 
             const ctxHormigaEvolCat = document.getElementById('chartHormigaEvolucionCategorias');
             if (ctxHormigaEvolCat) {
                 if (chartInstHormigaEvolCat) chartInstHormigaEvolCat.destroy();
                 chartInstHormigaEvolCat = new Chart(ctxHormigaEvolCat, {
                     type: 'line',
-                    data: {
-                        labels: monthsLabels,
-                        datasets: datasetsCatSeparadas
-                    },
+                    data: { labels: monthsLabels, datasets: datasetsCatSeparadas },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
@@ -2307,22 +2339,12 @@
             const fecha = document.getElementById('hormigaFecha').value;
             const categoria = document.getElementById('hormigaCategoriaSelect').value;
             const medioPago = document.getElementById('hormigaMedioPago').value;
-
             if (!concepto || !monto || !fecha) return;
 
-            window.hormigaState.gastos.push({
-                id: Date.now().toString(),
-                concepto,
-                monto,
-                fecha,
-                categoria,
-                medioPago
-            });
-
+            window.hormigaState.gastos.push({ id: Date.now().toString(), concepto, monto, fecha, categoria, medioPago });
             window.saveHormigaDataToCloud();
             document.getElementById('hormigaConcepto').value = '';
             document.getElementById('hormigaMonto').value = '';
-            document.getElementById('hormigaMedioPago').value = 'Mercado Pago';
             renderHormigaApp();
         };
 
@@ -2345,46 +2367,48 @@
 
             let [startYear, startMonth] = customRangeFrom.split('-').map(Number);
             let [endYear, endMonth] = customRangeTo.split('-').map(Number);
-
             let currY = startYear, currM = startMonth;
             
-            let datasetsEvolCat = catList.map(cat => ({
-                label: cat.nombre,
-                data: [],
-                borderColor: cat.color,
-                backgroundColor: cat.color,
-                borderWidth: 2,
-                pointRadius: 3,
-                pointStyle: 'rect',
-                fill: false,
-                tension: 0.3
-            }));
+            let filtrosTotales = window.filtrosGraficoTotales || [];
+            let filtrosEvolCat = window.filtrosGraficoEvolCat || [];
+            let filtrosBalance = window.filtrosGraficoBalance || [];
 
-            const containerCheckboxes = document.getElementById('containerCheckboxesRecurrentes');
-            let idsSeleccionados = new Set();
-            if (containerCheckboxes) {
-                const cbs = containerCheckboxes.querySelectorAll('input[type="checkbox"]:checked');
-                cbs.forEach(cb => idsSeleccionados.add(cb.value));
-            } else {
-                (window.appState.recurrentesPreferidos || []).forEach(id => idsSeleccionados.add(id));
-            }
+            let datasetsEvolCat = catList
+                .filter(cat => filtrosEvolCat.length === 0 || filtrosEvolCat.includes(cat.nombre))
+                .map(cat => ({
+                    label: cat.nombre,
+                    data: [],
+                    borderColor: cat.color,
+                    backgroundColor: cat.color,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointStyle: 'rect',
+                    fill: false,
+                    tension: 0.3
+                }));
 
-            let recurrentesIdsUnicos = new Set();
+            let mapIdsUnicos = [];
             (window.appState.gastos || []).forEach(g => {
                 const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
                 if (g.isRecurrente || baseEsFijo) {
-                    recurrentesIdsUnicos.add(g.id);
+                    if (!mapIdsUnicos.includes(g.id)) mapIdsUnicos.push(g.id);
                 }
             });
+
+            if (window.filtrosRecurrentesGrid.length === 0 && window.appState.recurrentesPreferidos?.length > 0) {
+                window.filtrosRecurrentesGrid = [...window.appState.recurrentesPreferidos];
+            }
+            let filtrosRecGrid = window.filtrosRecurrentesGrid;
 
             let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16'];
             let datasetsRecurrentesIndiv = [];
             let mapIdToDatasetIndex = {};
-
             let colorIdx = 0;
+
             (window.appState.gastos || []).forEach(g => {
-                if (recurrentesIdsUnicos.has(g.id) && mapIdToDatasetIndex[g.id] === undefined) {
-                    if (idsSeleccionados.size === 0 || idsSeleccionados.has(g.id)) {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if ((g.isRecurrente || baseEsFijo) && mapIdToDatasetIndex[g.id] === undefined) {
+                    if (filtrosRecGrid.length === 0 || filtrosRecGrid.includes(g.id)) {
                         let color = colorPalette[colorIdx % colorPalette.length];
                         colorIdx++;
                         mapIdToDatasetIndex[g.id] = datasetsRecurrentesIndiv.length;
@@ -2421,16 +2445,25 @@
                     }
                 });
 
-                datasetsRecurrentesIndiv.forEach((ds, idx) => {
-                    ds.data.push(valoresMesRecurrente[idx]);
-                });
+                datasetsRecurrentesIndiv.forEach((ds, idx) => ds.data.push(valoresMesRecurrente[idx]));
 
-                catList.forEach((cat, idx) => {
-                    datasetsEvolCat[idx].data.push(calc.totalesPorCat[cat.nombre] || 0);
+                catList.forEach(cat => {
+                    if (filtrosEvolCat.length === 0 || filtrosEvolCat.includes(cat.nombre)) {
+                        let dsObj = datasetsEvolCat.find(d => d.label === cat.nombre);
+                        if (dsObj) dsObj.data.push(calc.totalesPorCat[cat.nombre] || 0);
+                    }
                 });
 
                 currM++;
                 if (currM > 12) { currM = 1; currY++; }
+            }
+
+            let datasetsTotales = [];
+            if (filtrosTotales.length === 0 || filtrosTotales.includes("Gastos Totales")) {
+                datasetsTotales.push({ label: 'Gastos Totales', data: dataTotales, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
+            }
+            if (filtrosTotales.length === 0 || filtrosTotales.includes("Ingresos / Sueldo")) {
+                datasetsTotales.push({ label: 'Ingresos / Sueldo', data: dataIngresos, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
             }
 
             const ctxTotales = document.getElementById('chartEvolucionTotales');
@@ -2438,37 +2471,12 @@
                 if (chartInstTotales) chartInstTotales.destroy();
                 chartInstTotales = new Chart(ctxTotales, {
                     type: 'line',
-                    data: {
-                        labels: labelsMonths,
-                        datasets: [
-                            {
-                                label: 'Gastos Totales',
-                                data: dataTotales,
-                                borderColor: '#f43f5e',
-                                backgroundColor: 'rgba(244, 63, 94, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'Ingresos / Sueldo',
-                                data: dataIngresos,
-                                borderColor: '#10b981',
-                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.3
-                            }
-                        ]
-                    },
+                    data: { labels: labelsMonths, datasets: datasetsTotales },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
-                        scales: {
-                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-                        }
+                        scales: { x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } } }
                     }
                 });
             }
@@ -2483,10 +2491,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
-                        scales: {
-                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-                        }
+                        scales: { x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } } }
                     }
                 });
             }
@@ -2501,35 +2506,27 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 }, usePointStyle: true, pointStyle: 'rect', boxWidth: 14, boxHeight: 10 } } },
-                        scales: {
-                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-                        }
+                        scales: { x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } } }
                     }
                 });
             }
+
+            let datasetsBalance = [];
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Ingreso / Sueldo")) datasetsBalance.push({ label: 'Ingreso / Sueldo', data: dataIngresos, backgroundColor: '#10b981', borderRadius: 6 });
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Gastos Totales")) datasetsBalance.push({ label: 'Gastos Totales', data: dataTotales, backgroundColor: '#f43f5e', borderRadius: 6 });
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Resto Disponible")) datasetsBalance.push({ label: 'Resto Disponible', data: dataResto, backgroundColor: '#3b82f6', borderRadius: 6 });
 
             const ctxBalance = document.getElementById('chartBalanceGeneral');
             if (ctxBalance) {
                 if (chartInstBalance) chartInstBalance.destroy();
                 chartInstBalance = new Chart(ctxBalance, {
                     type: 'bar',
-                    data: {
-                        labels: labelsMonths,
-                        datasets: [
-                            { label: 'Ingreso / Sueldo', data: dataIngresos, backgroundColor: '#10b981', borderRadius: 6 },
-                            { label: 'Gastos Totales', data: dataTotales, backgroundColor: '#f43f5e', borderRadius: 6 },
-                            { label: 'Resto Disponible', data: dataResto, backgroundColor: '#3b82f6', borderRadius: 6 }
-                        ]
-                    },
+                    data: { labels: labelsMonths, datasets: datasetsBalance },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 } } } },
-                        scales: {
-                            x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                            y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-                        }
+                        scales: { x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } } }
                     }
                 });
             }
@@ -2538,7 +2535,6 @@
         window.actualizarVencimientoGrilla = function(idGastoOrigen, categoriaNombre, nuevaFecha) {
             const currentMonth = window.appState.currentMonth;
             if (!window.appState.excepcionesVencimientoGrid) window.appState.excepcionesVencimientoGrid = {};
-
             const catConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaNombre);
             const esEnBloque = catConfig ? catConfig.esTarjeta : false;
 
@@ -2547,7 +2543,6 @@
                     const excepcionCatKey = `${gasto.id}_${currentMonth}`;
                     const catAplicada = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
                     const startYM = gasto.startMonth || currentMonth;
-
                     if (catAplicada === categoriaNombre && currentMonth >= startYM) {
                         window.appState.excepcionesVencimientoGrid[`${gasto.id}_${currentMonth}`] = nuevaFecha;
                     }
@@ -2555,7 +2550,6 @@
             } else {
                 window.appState.excepcionesVencimientoGrid[`${idGastoOrigen}_${currentMonth}`] = nuevaFecha;
             }
-
             window.saveDataToCloud();
             renderApp();
             renderSaldosApp();
@@ -2564,7 +2558,6 @@
         window.actualizarEstadoGrilla = function(idGastoOrigen, categoriaNombre, nuevoEstado) {
             const currentMonth = window.appState.currentMonth;
             if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
-
             const catConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaNombre);
             const esEnBloque = catConfig ? catConfig.esTarjeta : false;
 
@@ -2573,7 +2566,6 @@
                     const excepcionCatKey = `${gasto.id}_${currentMonth}`;
                     const catAplicada = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
                     const startYM = gasto.startMonth || currentMonth;
-
                     if (catAplicada === categoriaNombre && currentMonth >= startYM) {
                         window.appState.excepcionesEstado[`${gasto.id}_${currentMonth}`] = nuevoEstado;
                     }
@@ -2581,7 +2573,6 @@
             } else {
                 window.appState.excepcionesEstado[`${idGastoOrigen}_${currentMonth}`] = nuevoEstado;
             }
-
             window.saveDataToCloud();
             renderApp();
             renderSaldosApp();
@@ -2614,50 +2605,34 @@
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
                 if (idx !== -1) {
                     const gastoOriginal = window.appState.gastos[idx];
-                    
                     if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
                     let [cY, cM] = currentMonth.split('-').map(Number);
                     let loopY = cY, loopM = cM;
-                    for (let i = 0; i < 36; i++) { 
-                        let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
-                        window.appState.excepcionesMonto[`${id}_${mStr}`] = montoNuevo;
-                        loopM++;
-                        if (loopM > 12) { loopM = 1; loopY++; }
+                    for (let i = 0; i < 36; i++) {
+                        window.appState.excepcionesMonto[`${id}_${loopY}-${String(loopM).padStart(2, '0')}`] = montoNuevo;
+                        loopM++; if (loopM > 12) { loopM = 1; loopY++; }
                     }
 
                     if (vencimientoNuevo !== gastoOriginal.vencimiento) {
                         if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
                         let [cY, cM] = currentMonth.split('-').map(Number);
-                        
                         let fechaIterada = vencimientoNuevo;
                         let loopY = cY, loopM = cM;
-                        
-                        for (let i = 0; i < 36; i++) { 
-                            let mStr = `${loopY}-${String(loopM).padStart(2, '0')}`;
-                            window.appState.excepcionesVencimiento[`${id}_${mStr}`] = fechaIterada;
+                        for (let i = 0; i < 36; i++) {
+                            window.appState.excepcionesVencimiento[`${id}_${loopY}-${String(loopM).padStart(2, '0')}`] = fechaIterada;
                             fechaIterada = sumarUnMesAFecha(fechaIterada);
-                            loopM++;
-                            if (loopM > 12) { loopM = 1; loopY++; }
+                            loopM++; if (loopM > 12) { loopM = 1; loopY++; }
                         }
                     }
 
-                    window.appState.gastos[idx] = { 
-                        id, 
-                        concepto, 
-                        monto: montoNuevo, 
-                        startMonth: startMonthInput || gastoOriginal.startMonth, 
-                        categoria, 
-                        isRecurrente, 
-                        cuotas, 
-                        vencimiento: vencimientoNuevo 
-                    };
+                    window.appState.gastos[idx] = { id, concepto, monto: montoNuevo, startMonth: startMonthInput || gastoOriginal.startMonth, categoria, isRecurrente, cuotas, vencimiento: vencimientoNuevo };
                 }
             } else {
                 window.appState.gastos.push({ id: Date.now().toString(), concepto, monto: montoNuevo, startMonth: startMonthInput, categoria, isRecurrente, cuotas, vencimiento: vencimientoNuevo });
             }
 
             window.saveDataToCloud();
-            initRecurrentesDropdown();
+            initRecurrentesCheckboxesList();
             closeModal('modalGasto');
             renderApp();
             renderSaldosApp();
@@ -2668,16 +2643,12 @@
             if (!gasto) return;
             document.getElementById('gastoId').value = gasto.id;
             document.getElementById('gastoConcepto').value = gasto.concepto;
-            
             const currentMonth = window.appState.currentMonth;
             const calcData = getCalculatedDataForMonth(currentMonth);
             const itemActual = calcData.items.find(i => i.id === id);
             const montoAMostrar = itemActual ? itemActual.monto : gasto.monto;
-
             const excepcionVencKey = `${gasto.id}_${currentMonth}`;
-            const vencAMostrar = window.appState.excepcionesVencimiento?.[excepcionVencKey] !== undefined 
-                ? window.appState.excepcionesVencimiento[excepcionVencKey] 
-                : gasto.vencimiento;
+            const vencAMostrar = window.appState.excepcionesVencimiento?.[excepcionVencKey] !== undefined ? window.appState.excepcionesVencimiento[excepcionVencKey] : gasto.vencimiento;
 
             document.getElementById('gastoMonto').value = montoAMostrar;
             document.getElementById('gastoVencimiento').value = vencAMostrar || '';
@@ -2685,21 +2656,19 @@
             renderCategoriasSelect();
             document.getElementById('gastoCategoria').value = gasto.categoria;
             document.getElementById('checkRecurrente').checked = !!gasto.isRecurrente;
-            
             const esCuotas = (gasto.cuotas || 1) > 1;
             document.getElementById('checkCuotas').checked = esCuotas;
             document.getElementById('gastoCuotas').value = gasto.cuotas || 1;
             toggleCuotasFields();
-
             document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
             openModalGasto();
         };
 
         window.deleteGasto = function(id) {
-            if (confirm('¿Estás seguro de que querés eliminar este gasto?')) {
+            if (confirm('¿Eliminar este gasto?')) {
                 window.appState.gastos = window.appState.gastos.filter(g => g.id !== id);
                 window.saveDataToCloud();
-                initRecurrentesDropdown();
+                initRecurrentesCheckboxesList();
                 renderApp();
                 renderSaldosApp();
             }
@@ -2725,10 +2694,7 @@
 
         window.closeModal = function(id) {
             document.getElementById(id).classList.add('hidden');
-            if (id === 'modalGasto') {
-                document.getElementById('gastoId').value = '';
-                document.getElementById('formGasto').reset();
-            }
+            if (id === 'modalGasto') { document.getElementById('gastoId').value = ''; document.getElementById('formGasto').reset(); }
         };
     </script>
 </body>
