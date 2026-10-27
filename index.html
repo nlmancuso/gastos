@@ -60,7 +60,6 @@
             if (user) {
                 showLoading();
 
-                // Obtener fecha local correcta (Evita desfase de UTC)
                 const dLocal = new Date();
                 const localYear = dLocal.getFullYear();
                 const localMonth = String(dLocal.getMonth() + 1).padStart(2, '0');
@@ -87,7 +86,10 @@
 
                 window.hormigaState = {
                     gastos: [],
-                    categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault))
+                    categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
+                    sortColumn: 'fecha',
+                    sortAscending: false,
+                    filtrosCategorias: []
                 };
 
                 let grupoId = "grupo_mancusososa";
@@ -116,7 +118,6 @@
                         const data = docSnap.data();
                         if (data.appState) {
                             window.appState = { ...window.appState, ...data.appState };
-                            // Mantener siempre el mes local actual al iniciar sesión si no se desea preservar otro
                             const dLocal = new Date();
                             const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
                             if (!window.appState.currentMonth) {
@@ -152,6 +153,9 @@
                         const data = docSnap.data();
                         if (data.hormigaState) {
                             window.hormigaState = { ...window.hormigaState, ...data.hormigaState };
+                            if (window.hormigaState.sortColumn === undefined) window.hormigaState.sortColumn = 'fecha';
+                            if (window.hormigaState.sortAscending === undefined) window.hormigaState.sortAscending = false;
+                            if (window.hormigaState.filtrosCategorias === undefined) window.hormigaState.filtrosCategorias = [];
                         }
                     } else {
                         saveHormigaDataToCloud();
@@ -368,7 +372,7 @@
                             <h3 class="text-lg font-bold text-white">Planilla de Gastos (Agrupada)</h3>
                             <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
                         </div>
-                        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="containerFiltrosCategoria"></div>
+                        <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosCategoria"></div>
                     </div>
 
                     <div id="containerPlanillaAgrupada" class="p-4 space-y-4"></div>
@@ -555,35 +559,62 @@
                         </form>
                     </div>
 
-                    <div class="lg:col-span-2 card-bg rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between">
+                    <!-- CUADRO: TOTALES POR CATEGORÍA DEL MES -->
+                    <div class="lg:col-span-2 card-bg p-6 rounded-2xl flex flex-col justify-between">
                         <div>
-                            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+                            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-pie text-amber-400"></i> Totales por Categoría (Mes Actual)
+                                </h3>
+                                <span id="badgeHormigaMonthCat" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
+                            </div>
+                            <div id="containerHormigaCatTotales" class="space-y-3 max-h-[340px] overflow-y-auto pr-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CUADRO DE DETALLE DE GASTOS DEL MES (CON FILTROS MULTILÍNEA Y ORDENAMIENTO) -->
+                <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
+                    <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
                                 <h3 class="text-base font-bold text-white">Detalle de Gastos del Mes</h3>
                                 <span id="badgeHormigaMonth" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
                             </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                            <th class="px-5 py-3.5">FECHA</th>
-                                            <th class="px-5 py-3.5">DESCRIPCIÓN</th>
-                                            <th class="px-5 py-3.5">CATEGORÍA</th>
-                                            <th class="px-5 py-3.5">MEDIO</th>
-                                            <th class="px-5 py-3.5 text-right">MONTO</th>
-                                            <th class="px-5 py-3.5 text-right">ACCIONES</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tablaHormigaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium"></tbody>
-                                </table>
-                            </div>
                         </div>
+                        <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaCat"></div>
+                    </div>
+                    <div class="max-h-[420px] overflow-y-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                                    <th onclick="sortHormigaData('fecha')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white transition select-none">
+                                        FECHA <i class="fa-solid fa-sort text-[10px] ml-1 text-slate-500"></i>
+                                    </th>
+                                    <th onclick="sortHormigaData('concepto')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white transition select-none">
+                                        DESCRIPCIÓN <i class="fa-solid fa-sort text-[10px] ml-1 text-slate-500"></i>
+                                    </th>
+                                    <th onclick="sortHormigaData('categoria')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white transition select-none">
+                                        CATEGORÍA <i class="fa-solid fa-sort text-[10px] ml-1 text-slate-500"></i>
+                                    </th>
+                                    <th onclick="sortHormigaData('medioPago')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white transition select-none">
+                                        MEDIO <i class="fa-solid fa-sort text-[10px] ml-1 text-slate-500"></i>
+                                    </th>
+                                    <th onclick="sortHormigaData('monto')" class="px-5 py-3.5 text-right bg-slate-900 cursor-pointer hover:text-white transition select-none">
+                                        MONTO <i class="fa-solid fa-sort text-[10px] ml-1 text-slate-500"></i>
+                                    </th>
+                                    <th class="px-5 py-3.5 text-right bg-slate-900">ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaHormigaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium"></tbody>
+                        </table>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                     <div class="card-bg p-6 rounded-2xl">
                         <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Mes Actual)
+                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
                         </h3>
                         <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartHormigaCategorias"></canvas></div>
                     </div>
@@ -840,7 +871,6 @@
             { nombre: "Varios", color: "#64748b" }
         ];
 
-        // Obtener mes local inicial seguro (Año y mes actual local)
         const dInit = new Date();
         const initYear = dInit.getFullYear();
         const initMonth = String(dInit.getMonth() + 1).padStart(2, '0');
@@ -867,7 +897,10 @@
 
         window.hormigaState = window.hormigaState || {
             gastos: [],
-            categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault))
+            categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
+            sortColumn: 'fecha',
+            sortAscending: false,
+            filtrosCategorias: []
         };
 
         window.filtrosTemporales = [];
@@ -1474,6 +1507,7 @@
             window.saveHormigaDataToCloud();
             renderCatHormigaList();
             renderHormigaCategoriasSelect();
+            renderHormigaApp();
         }
 
         function eliminarCatHormiga(index) {
@@ -1482,20 +1516,72 @@
             window.saveHormigaDataToCloud();
             renderCatHormigaList();
             renderHormigaCategoriasSelect();
+            renderHormigaApp();
         }
 
         function renderHormigaCategoriasSelect() {
             const select = document.getElementById('hormigaCategoriaSelect');
-            if (!select) return;
-            const currentVal = select.value;
-            select.innerHTML = '';
-            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat.nombre; opt.innerHTML = cat.nombre;
-                select.appendChild(opt);
-            });
-            if (currentVal) select.value = currentVal;
+            if (select) {
+                const currentVal = select.value;
+                select.innerHTML = '';
+                (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.nombre; opt.innerHTML = cat.nombre;
+                    select.appendChild(opt);
+                });
+                if (currentVal) select.value = currentVal;
+            }
+            renderFiltrosHormigaCatCheckboxes();
         }
+
+        function renderFiltrosHormigaCatCheckboxes() {
+            const container = document.getElementById('containerFiltrosHormigaCat');
+            if (!container) return;
+            container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1.5 self-center">Filtrar:</span>`;
+            const catList = window.hormigaState.categorias || categoriasHormigaDefault;
+            
+            catList.forEach(cat => {
+                const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
+                const label = document.createElement('label');
+                label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                label.innerHTML = `<input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}`;
+                container.appendChild(label);
+            });
+        }
+
+        window.toggleFiltroHormigaCategoria = function(checkbox) {
+            const catNombre = checkbox.value;
+            const catList = window.hormigaState.categorias || categoriasHormigaDefault;
+            
+            if (!window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0) {
+                window.hormigaState.filtrosCategorias = catList.map(c => c.nombre);
+            }
+
+            if (checkbox.checked) {
+                if (!window.hormigaState.filtrosCategorias.includes(catNombre)) {
+                    window.hormigaState.filtrosCategorias.push(catNombre);
+                }
+            } else {
+                window.hormigaState.filtrosCategorias = window.hormigaState.filtrosCategorias.filter(c => c !== catNombre);
+            }
+
+            if (window.hormigaState.filtrosCategorias.length === catList.length) {
+                window.hormigaState.filtrosCategorias = [];
+            }
+
+            renderFiltrosHormigaCatCheckboxes();
+            renderHormigaApp();
+        };
+
+        window.sortHormigaData = function(col) {
+            if (window.hormigaState.sortColumn === col) {
+                window.hormigaState.sortAscending = !window.hormigaState.sortAscending;
+            } else {
+                window.hormigaState.sortColumn = col;
+                window.hormigaState.sortAscending = true;
+            }
+            renderHormigaApp();
+        };
 
         function renderCategoriasSelect() {
             const select = document.getElementById('gastoCategoria');
@@ -1514,7 +1600,7 @@
         function renderFiltrosCategoriasCheckboxes() {
             const container = document.getElementById('containerFiltrosCategoria');
             if (!container) return;
-            container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1 whitespace-nowrap">Filtrar:</span>`;
+            container.innerHTML = `<span class="text-xs text-slate-400 font-medium mr-1.5 self-center">Filtrar:</span>`;
             const catList = window.appState.categorias || categoriasDefault;
             catList.forEach(cat => {
                 const isChecked = window.filtrosTemporales.length === 0 || window.filtrosTemporales.includes(cat.nombre);
@@ -1948,11 +2034,16 @@
         function renderHormigaApp() {
             const currentMonth = window.appState.currentMonth || defaultLocalMonth;
             const badgeMonthEl = document.getElementById('badgeHormigaMonth');
-            if (badgeMonthEl) badgeMonthEl.innerText = formatMonthDisplay(currentMonth);
+            const badgeMonthCatEl = document.getElementById('badgeHormigaMonthCat');
+            const monthText = formatMonthDisplay(currentMonth);
+            
+            if (badgeMonthEl) badgeMonthEl.innerText = monthText;
+            if (badgeMonthCatEl) badgeMonthCatEl.innerText = monthText;
 
             renderHormigaCategoriasSelect();
 
             const itemsHormiga = (window.hormigaState.gastos || []).filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
+            const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
             
             let totalHormiga = 0;
             itemsHormiga.forEach(g => totalHormiga += parseFloat(g.monto) || 0);
@@ -1967,32 +2058,97 @@
             document.getElementById('cardHormigaPromedio').innerText = fmt(promedioDiario);
             document.getElementById('cardHormigaCantidad').innerText = `${itemsHormiga.length} compra${itemsHormiga.length === 1 ? '' : 's'}`;
 
-            const tbody = document.getElementById('tablaHormigaCuerpo');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            itemsHormiga.sort((a, b) => b.fecha.localeCompare(a.fecha));
-
-            if (itemsHormiga.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No registraste gastos hormiga en este mes.</td></tr>`;
-            } else {
+            // RENDERIZAR TOTALES POR CATEGORÍA (FILTRANDO CEROS Y ORDENANDO DE MAYOR A MENOR)
+            const containerCatTotales = document.getElementById('containerHormigaCatTotales');
+            if (containerCatTotales) {
+                containerCatTotales.innerHTML = '';
+                
+                let totalesPorCat = {};
+                catHormigaList.forEach(c => totalesPorCat[c.nombre] = 0);
                 itemsHormiga.forEach(g => {
-                    const catObj = (window.hormigaState.categorias || categoriasHormigaDefault).find(c => c.nombre === g.categoria);
-                    const colorCat = catObj ? catObj.color : '#f59e0b';
-                    const fechaFmt = g.fecha.split('-').reverse().join('/');
-
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-slate-900/40 transition-colors">
-                            <td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td>
-                            <td class="px-5 py-3.5 text-white font-bold">${g.concepto}</td>
-                            <td class="px-5 py-3.5"><span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${g.categoria}</span></td>
-                            <td class="px-5 py-3.5 text-slate-400 text-xs">${g.medioPago || 'Efectivo'}</td>
-                            <td class="px-5 py-3.5 text-right font-extrabold text-amber-400">${fmt(g.monto)}</td>
-                            <td class="px-5 py-3.5 text-right">
-                                <button onclick="deleteGastoHormiga('${g.id}')" class="text-slate-400 hover:text-rose-400" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
-                            </td>
-                        </tr>`;
+                    if (totalesPorCat[g.categoria] !== undefined) {
+                        totalesPorCat[g.categoria] += parseFloat(g.monto) || 0;
+                    } else {
+                        totalesPorCat[g.categoria] = parseFloat(g.monto) || 0;
+                    }
                 });
+
+                let categoriasConMonto = catHormigaList.map(cat => ({
+                    ...cat,
+                    monto: totalesPorCat[cat.nombre] || 0
+                })).filter(cat => cat.monto > 0);
+
+                categoriasConMonto.sort((a, b) => b.monto - a.monto);
+
+                if (categoriasConMonto.length === 0) {
+                    containerCatTotales.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-6">No hay gastos con importe mayor a $ 0 en este mes.</p>';
+                } else {
+                    categoriasConMonto.forEach(cat => {
+                        const porcentaje = totalHormiga > 0 ? ((cat.monto / totalHormiga) * 100).toFixed(1) : 0;
+
+                        containerCatTotales.innerHTML += `
+                            <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="font-bold text-white flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color};"></span>
+                                        ${cat.nombre}
+                                    </span>
+                                    <span class="font-extrabold text-amber-400">${fmt(cat.monto)} <span class="text-[10px] text-slate-500 font-normal">(${porcentaje}%)</span></span>
+                                </div>
+                                <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/80">
+                                    <div class="h-full rounded-full transition-all duration-500" style="width: ${porcentaje}%; background-color: ${cat.color};"></div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+
+            // RENDERIZAR TABLA DE DETALLE (CON FILTROS MULTILÍNEA Y ORDENAMIENTO)
+            const tbody = document.getElementById('tablaHormigaCuerpo');
+            if (tbody) {
+                tbody.innerHTML = '';
+
+                let itemsFiltrados = itemsHormiga;
+                const filtrosActivos = window.hormigaState.filtrosCategorias || [];
+                if (filtrosActivos.length > 0) {
+                    itemsFiltrados = itemsFiltrados.filter(g => filtrosActivos.includes(g.categoria));
+                }
+
+                const sCol = window.hormigaState.sortColumn || 'fecha';
+                const sAsc = window.hormigaState.sortAscending;
+
+                itemsFiltrados.sort((a, b) => {
+                    let vA = a[sCol] || '', vB = b[sCol] || '';
+                    if (sCol === 'monto') {
+                        vA = parseFloat(vA) || 0;
+                        vB = parseFloat(vB) || 0;
+                        return sAsc ? vA - vB : vB - vA;
+                    }
+                    return typeof vA === 'string' ? (sAsc ? vA.localeCompare(vB) : vB.localeCompare(vA)) : (sAsc ? vA - vB : vB - vA);
+                });
+
+                if (itemsFiltrados.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan con los filtros seleccionados.</td></tr>`;
+                } else {
+                    itemsFiltrados.forEach(g => {
+                        const catObj = catHormigaList.find(c => c.nombre === g.categoria);
+                        const colorCat = catObj ? catObj.color : '#f59e0b';
+                        const fechaFmt = g.fecha ? g.fecha.split('-').reverse().join('/') : '';
+
+                        tbody.innerHTML += `
+                            <tr class="hover:bg-slate-900/40 transition-colors">
+                                <td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td>
+                                <td class="px-5 py-3.5 text-white font-bold">${g.concepto}</td>
+                                <td class="px-5 py-3.5"><span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${g.categoria}</span></td>
+                                <td class="px-5 py-3.5 text-slate-400 text-xs">${g.medioPago || 'Efectivo'}</td>
+                                <td class="px-5 py-3.5 text-right font-extrabold text-amber-400">${fmt(g.monto)}</td>
+                                <td class="px-5 py-3.5 text-right">
+                                    <button onclick="deleteGastoHormiga('${g.id}')" class="text-slate-400 hover:text-rose-400" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                                </td>
+                            </tr>`;
+                    });
+                }
             }
 
             renderHormigaCharts();
