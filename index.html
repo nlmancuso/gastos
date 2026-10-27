@@ -1165,12 +1165,15 @@
             renderHormigaApp();
         };
 
-        function renderHormigaApp() {
+function renderHormigaApp() {
             const currentMonth = window.appState.currentMonth || '2026-10';
             const monthText = window.formatMonthDisplay(currentMonth);
             if(document.getElementById('badgeHormigaMonth')) document.getElementById('badgeHormigaMonth').innerText = monthText;
             if(document.getElementById('badgeHormigaMonthCat')) document.getElementById('badgeHormigaMonthCat').innerText = monthText;
+            
             renderHormigaCategoriasSelect();
+            renderFiltrosHormigaEvolCatCheckboxes(); // <--- Agregado para pintar los filtros del gráfico
+
             const itemsHormiga = (window.hormigaState.gastos || []).filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
             const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
             let totalHormiga = 0; itemsHormiga.forEach(g => totalHormiga += parseFloat(g.monto) || 0);
@@ -1204,7 +1207,6 @@
                 const filtrosActivos = window.hormigaState.filtrosCategorias || [];
                 if (filtrosActivos.length > 0) itemsFiltrados = itemsFiltrados.filter(g => filtrosActivos.includes(g.categoria));
 
-                // ORDENAMIENTO DE TABLA
                 const sortCol = window.hormigaState.sortColumn || 'fecha';
                 const sortAsc = window.hormigaState.sortAscending !== false;
                 itemsFiltrados.sort((a, b) => {
@@ -1229,6 +1231,14 @@
                 }
             }
             renderHormigaCharts();
+        }
+
+        function renderFiltrosHormigaEvolCatCheckboxes() {
+            const container = document.getElementById('containerFiltrosHormigaEvolCat'); if (!container) return; container.innerHTML = '';
+            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
+                const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
+                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
+            });
         }
 
         function renderHormigaCategoriasSelect() {
