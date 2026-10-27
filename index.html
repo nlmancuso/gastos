@@ -116,6 +116,13 @@
                         const data = docSnap.data();
                         if (data.appState) {
                             window.appState = { ...window.appState, ...data.appState };
+                            // Mantener siempre el mes local actual al iniciar sesión si no se desea preservar otro
+                            const dLocal = new Date();
+                            const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
+                            if (!window.appState.currentMonth) {
+                                window.appState.currentMonth = currentLocalMonthStr;
+                            }
+
                             if (!window.appState.cuentasBancarias) {
                                 window.appState.cuentasBancarias = [
                                     { id: '1', nombre: 'Banco Ciudad', saldosPorMes: {}, categoriasAsociadas: ["Servicios", "Ciudad Visa"], gastosFijosAsociados: [] },
@@ -281,7 +288,7 @@
                     <button onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1 transition text-sm">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center capitalize">Octubre 2026</span>
+                    <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center capitalize">Cargando...</span>
                     <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1 transition text-sm">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
@@ -359,7 +366,7 @@
                     <div class="px-6 py-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div class="flex items-center gap-3">
                             <h3 class="text-lg font-bold text-white">Planilla de Gastos (Agrupada)</h3>
-                            <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">Octubre 2026</span>
+                            <span id="badgeMonth" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
                         </div>
                         <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="containerFiltrosCategoria"></div>
                     </div>
@@ -552,7 +559,7 @@
                         <div>
                             <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
                                 <h3 class="text-base font-bold text-white">Detalle de Gastos del Mes</h3>
-                                <span id="badgeHormigaMonth" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Octubre 2026</span>
+                                <span id="badgeHormigaMonth" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-left border-collapse">
@@ -833,7 +840,7 @@
             { nombre: "Varios", color: "#64748b" }
         ];
 
-        // Obtener mes local inicial seguro
+        // Obtener mes local inicial seguro (Año y mes actual local)
         const dInit = new Date();
         const initYear = dInit.getFullYear();
         const initMonth = String(dInit.getMonth() + 1).padStart(2, '0');
@@ -1569,6 +1576,7 @@
         }
 
         function formatMonthDisplay(ymStr) {
+            if (!ymStr) return '';
             const [year, month] = ymStr.split('-').map(Number);
             return `${monthNames[month - 1]} ${year}`;
         }
