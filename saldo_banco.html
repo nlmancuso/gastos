@@ -20,11 +20,22 @@
     <!-- LOGIN OVERLAY -->
     <div id="loginOverlay" class="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 hidden">
         <div class="card-bg p-8 rounded-2xl max-w-md w-full text-center border border-slate-800 shadow-2xl">
+            <div class="w-16 h-16 bg-emerald-950/80 border border-emerald-800/60 rounded-2xl flex items-center justify-center text-emerald-400 mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
             <h2 class="text-xl font-bold text-white mb-2">Acceso Protegido</h2>
-            <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
-                <div><label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo</label><input type="email" id="loginEmail" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white"></div>
-                <div><label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label><input type="password" id="loginPassword" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white"></div>
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl">Iniciar Sesión</button>
+            <form id="formLogin" onsubmit="window.handleLogin(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electrónico</label>
+                    <input type="email" id="loginEmail" required placeholder="tucorreo@email.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+                </button>
             </form>
             <p id="loginError" class="text-xs text-rose-400 font-medium mt-4 hidden"></p>
         </div>
@@ -48,7 +59,7 @@
                 </div>
             </div>
             <div class="flex border-b border-slate-800 overflow-x-auto">
-                <a href="planilla_gasto.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</a>
+                <a href="index.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</a>
                 <a href="analisis_grafico.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</a>
                 <a href="saldo_banco.html" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</a>
                 <a href="gasto_hormiga.html" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2"><i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga</a>
@@ -63,7 +74,7 @@
                     </h3>
                     <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta.</p>
                 </div>
-                <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 shrink-0">
+                <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 shrink-0">
                     <i class="fa-solid fa-plus"></i> Nueva Cuenta / Banco
                 </button>
             </div>
@@ -128,7 +139,7 @@
         }
 
         function renderSaldosApp() {
-            const currentMonth = window.appState.currentMonth || '2026-06';
+            const currentMonth = window.appState.currentMonth || '2026-10';
             if(document.getElementById('displayMonthText')) document.getElementById('displayMonthText').innerText = window.formatMonthDisplay(currentMonth);
 
             const calcData = window.getCalculatedDataForMonth(currentMonth);
@@ -291,7 +302,7 @@
                 containerCat.appendChild(div);
             });
 
-            const currentMonth = window.appState.currentMonth || '2026-06';
+            const currentMonth = window.appState.currentMonth || '2026-10';
             const calcData = window.getCalculatedDataForMonth(currentMonth);
             const itemsFijosActuales = calcData.items.filter(item => {
                 const catObj = catList.find(c => c.nombre === item.categoria);
@@ -330,7 +341,7 @@
         };
 
         window.editCuenta = function(id) {
-            const currentMonth = window.appState.currentMonth || '2026-06';
+            const currentMonth = window.appState.currentMonth || '2026-10';
             const cuenta = (window.appState.cuentasBancarias || []).find(c => c.id === id);
             if (!cuenta) return;
             const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
@@ -345,7 +356,7 @@
 
         window.handleSaveCuenta = function(e) {
             e.preventDefault();
-            const currentMonth = window.appState.currentMonth || '2026-06';
+            const currentMonth = window.appState.currentMonth || '2026-10';
             const id = document.getElementById('cuentaId').value;
             const nombre = document.getElementById('cuentaNombre').value.trim();
             const bcoSaldo = parseFloat(document.getElementById('cuentaBcoSaldo').value) || 0;
