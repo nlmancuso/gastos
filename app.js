@@ -195,7 +195,7 @@ onAuthStateChanged(auth, async (user) => {
 
         const userName = user.email ? user.email.split('@')[0] : 'Usuario';
         const grupoDisplay = document.getElementById('grupoStatus');
-        if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName} (${grupoId})`;
+        if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName}`; // Solo muestra el usuario
 
         if (unsubscribeSnapshot) unsubscribeSnapshot();
         if (unsubscribeHormiga) unsubscribeHormiga();
