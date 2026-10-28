@@ -1,24 +1,14 @@
 /**
- * APP.JS - Lógica principal y formateadores globales para la gestión de gastos.
+ * APP.JS - Lógica principal, Firebase y formateadores globales.
  */
 
 // ==================== FORMATEADORES Y UTILIDADES GLOBALES ====================
 
-/**
- * Formatea un número al estándar de moneda de Argentina ($ X.XXX,XX).
- * @param {number} num 
- * @returns {string}
- */
 window.formatMoneda = function(num) {
     const val = parseFloat(num) || 0;
     return "$ " + val.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-/**
- * Formatea un string de fecha (YYYY-MM-DD) a formato corto (DD/MM).
- * @param {string} fechaStr 
- * @returns {string}
- */
 window.formatFechaVencimientoSimple = function(fechaStr) {
     if (!fechaStr) return '';
     const partes = fechaStr.split('-');
@@ -28,11 +18,6 @@ window.formatFechaVencimientoSimple = function(fechaStr) {
     return fechaStr;
 };
 
-/**
- * Formatea una clave de mes (YYYY-MM) a texto legible (Ej: "Octubre 2026").
- * @param {string} monthKey 
- * @returns {string}
- */
 window.formatMonthDisplay = function(monthKey) {
     if (!monthKey) return '';
     const [year, month] = monthKey.split('-').map(Number);
@@ -43,11 +28,6 @@ window.formatMonthDisplay = function(monthKey) {
     return `${monthNames[month - 1]} ${year}`;
 };
 
-/**
- * Suma un mes exacto a una fecha en formato YYYY-MM-DD.
- * @param {string} fechaStr 
- * @returns {string}
- */
 window.sumarUnMesAFecha = function(fechaStr) {
     if (!fechaStr) return '';
     let [y, m, d] = fechaStr.split('-').map(Number);
@@ -99,22 +79,28 @@ window.filtrosGraficoTotales = [];
 window.filtrosGraficoEvolCat = [];
 window.filtrosGraficoBalance = [];
 
+// ==================== CAMBIO DE MES ====================
+
+window.changeMonth = function(direction) {
+    let [year, month] = (window.appState.currentMonth || '2026-10').split('-').map(Number);
+    month += direction;
+    if (month > 12) {
+        month = 1;
+        year++;
+    } else if (month < 1) {
+        month = 12;
+        year--;
+    }
+    window.appState.currentMonth = `${year}-${String(month).padStart(2, '0')}`;
+    if (typeof renderApp === 'function') renderApp();
+};
+
 // ==================== CÁLCULOS Y PROCESAMIENTO DE DATOS ====================
 
-/**
- * Obtiene el sueldo registrado para un mes dado.
- * @param {string} monthKey 
- * @returns {number}
- */
 window.getSueldoForMonth = function(monthKey) {
     return parseFloat(window.appState.sueldos?.[monthKey]) || 0;
 };
 
-/**
- * Calcula y unifica todos los datos de gastos, tarjetas e ítems fijos para un mes específico.
- * @param {string} monthKey 
- * @returns {object}
- */
 window.getCalculatedDataForMonth = function(monthKey) {
     const sueldoActual = window.getSueldoForMonth(monthKey);
     const catList = window.appState.categorias || [];
@@ -126,14 +112,11 @@ window.getCalculatedDataForMonth = function(monthKey) {
     catList.forEach(c => totalesPorCat[c.nombre] = 0);
 
     (window.appState.gastos || []).forEach(g => {
-        // Verificar si fue eliminado para este mes o meses posteriores
         const limiteEliminacion = window.appState.excepcionesEliminacion?.[g.id];
         if (limiteEliminacion && monthKey >= limiteEliminacion) return;
 
-        // Verificar mes de inicio
         if (g.startMonth && monthKey < g.startMonth) return;
 
-        // Calcular cuotas
         const cuotasTotales = parseInt(g.cuotas) || 1;
         if (cuotasTotales > 1 && g.startMonth) {
             const [startY, startM] = g.startMonth.split('-').map(Number);
@@ -143,8 +126,6 @@ window.getCalculatedDataForMonth = function(monthKey) {
         }
 
         const gridKey = `${g.id}_${monthKey}`;
-        
-        // Obtener monto con posibles excepciones
         const montoBase = window.appState.excepcionesMonto?.[gridKey] !== undefined 
             ? window.appState.excepcionesMonto[gridKey] 
             : g.monto;
@@ -154,7 +135,6 @@ window.getCalculatedDataForMonth = function(monthKey) {
             monto = monto / cuotasTotales;
         }
 
-        // Categoria y Vencimiento con excepciones
         const categoria = window.appState.excepcionesCategoria?.[gridKey] !== undefined 
             ? window.appState.excepcionesCategoria[gridKey] 
             : g.categoria;
@@ -171,7 +151,7 @@ window.getCalculatedDataForMonth = function(monthKey) {
         const esTarjeta = catObj ? catObj.esTarjeta : true;
         const tipoLabel = cuotasTotales > 1 ? `Cuotas (${cuotasTotales})` : (g.isRecurrente ? 'Débito / Recurrente' : 'Fijo / Directo');
 
-        const itemObj = {
+        items.push({
             id: g.id,
             concepto: g.concepto,
             monto,
@@ -181,33 +161,19 @@ window.getCalculatedDataForMonth = function(monthKey) {
             isRecurrente: !!g.isRecurrente,
             tipo: tipoLabel,
             esTarjeta
-        };
+        });
 
-        items.push(itemObj);
+        if (esTarjeta) totalTarjetas += monto;
+        else totalFijos += monto;
 
-        if (esTarjeta) {
-            totalTarjetas += monto;
-        } else {
-            totalFijos += monto;
-        }
-
-        if (totalesPorCat[categoria] !== undefined) {
-            totalesPorCat[categoria] += monto;
-        } else {
-            totalesPorCat[categoria] = monto;
-        }
+        if (totalesPorCat[categoria] !== undefined) totalesPorCat[categoria] += monto;
+        else totalesPorCat[categoria] = monto;
     });
 
-    return {
-        sueldoActual,
-        items,
-        totalFijos,
-        totalTarjetas,
-        totalesPorCat
-    };
+    return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
 };
 
-// ==================== PERSISTENCIA EN NUBE / FIRESTORE ====================
+// ==================== PERSISTENCIA ====================
 
 window.saveDataToCloud = function() {
     if (typeof window.syncAppStateToFirebase === 'function') {
