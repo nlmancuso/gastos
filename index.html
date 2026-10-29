@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="app.js"></script>
+    
+    <link rel="prefetch" href="index.html">
+    <link rel="prefetch" href="app.js">
 
     <style>
         body { background-color: #0b1120; color: #f1f5f9; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -79,6 +82,7 @@
                     </div>
                 </div>
             </div>
+            
             <div class="flex border-b border-slate-800 overflow-x-auto">
                 <button onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</button>
                 <button onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</button>
@@ -87,7 +91,7 @@
             </div>
         </header>
 
-        <!-- SECCIÓN PLANILLA -->
+        <!-- SECCIÓN 1: PLANILLA -->
         <section id="viewPlanilla" class="max-w-7xl mx-auto px-4 py-4 space-y-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="card-bg p-5 rounded-2xl">
@@ -118,23 +122,316 @@
             </div>
         </section>
 
-        <!-- SECCIÓN ANÁLISIS Y GRÁFICOS -->
+        <!-- SECCIÓN 2: ANÁLISIS Y GRÁFICOS -->
         <section id="viewAnalisis" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
-            <!-- (Lógica de gráficos...) -->
+            <div class="card-bg p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2 text-slate-300 text-sm font-bold">
+                    <i class="fa-solid fa-calendar-days text-emerald-400"></i>
+                    <span>Rango de Meses para Análisis</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-1.5">
+                        <label class="text-xs font-semibold text-slate-400">Desde:</label>
+                        <input type="month" id="chartMonthFrom" onchange="applyCustomMonthRange()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white focus:outline-none">
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <label class="text-xs font-semibold text-slate-400">Hasta:</label>
+                        <input type="month" id="chartMonthTo" onchange="applyCustomMonthRange()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white focus:outline-none">
+                    </div>
+                    <button onclick="resetDefaultMonthRange()" class="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-800/60 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                        Restablecer (±3 Meses)
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card-bg p-6 rounded-2xl space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales vs. Ingresos
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Mostrar:</span>
+                                <button onclick="marcarTodosGrafico('Totales', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('Totales', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionTotales', 'Evolución Gastos Totales vs. Ingresos')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoTotales"></div>
+                    <div class="relative h-64 w-full"><canvas id="chartEvolucionTotales"></canvas></div>
+                </div>
+
+                <div class="card-bg p-6 rounded-2xl space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosGrafico('EvolCat', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('EvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionCategorias', 'Evolución por Categoría')" class="text-slate-400 hover:text-blue-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoEvolCat"></div>
+                    <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
+                </div>
+
+                <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-rotate text-amber-400"></i> Evolución de Gastos Recurrentes y Débitos Automáticos
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosRecurrentesGrid(true)" class="text-amber-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosRecurrentesGrid(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionRecurrentesIndiv', 'Evolución de Gastos Recurrentes')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosRecurrentesGrid"></div>
+                    <div class="relative h-72 w-full"><canvas id="chartEvolucionRecurrentesIndiv"></canvas></div>
+                </div>
+
+                <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto)
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Mostrar:</span>
+                                <button onclick="marcarTodosGrafico('Balance', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('Balance', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartBalanceGeneral', 'Balance (Ingreso vs. Gastos vs. Resto)')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoBalance"></div>
+                    <div class="relative h-64 w-full"><canvas id="chartBalanceGeneral"></canvas></div>
+                </div>
+            </div>
         </section>
 
-        <!-- SECCIÓN SALDOS -->
+        <!-- SECCIÓN 3: SALDOS Y BANCOS -->
         <section id="viewSaldos" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
-            <!-- (Lógica de saldos...) -->
+            <div class="card-bg p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-building-columns text-emerald-400"></i> Gestión de Cuentas y Saldos
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta.</p>
+                </div>
+                <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 shrink-0">
+                    <i class="fa-solid fa-plus"></i> Nueva Cuenta / Banco
+                </button>
+            </div>
+            <div id="containerResumenDisponibles" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            <div id="containerBancosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </section>
 
-        <!-- SECCIÓN HORMIGA -->
+        <!-- SECCIÓN 4: GASTOS HORMIGA -->
         <section id="viewHormiga" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
-            <!-- (Lógica de hormiga...) -->
+            <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3 text-amber-300 text-xs font-medium">
+                    <div class="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+                        <i class="fa-solid fa-user-lock text-sm"></i>
+                    </div>
+                    <span>Estás en tu sección personal de Gastos Hormiga. Ningún otro usuario del grupo puede ver tus gastos de esta solapa.</span>
+                </div>
+                <button onclick="openModalCatHormiga()" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider shrink-0">
+                    <i class="fa-solid fa-tags text-slate-950"></i> Categorías Hormiga
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="card-bg p-5 rounded-2xl">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL HORMIGA (MES)</span>
+                    <h2 id="cardHormigaTotal" class="text-2xl font-extrabold text-amber-400 my-1">$ 0,00</h2>
+                </div>
+                <div class="card-bg p-5 rounded-2xl">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">PROMEDIO DIARIO</span>
+                    <h2 id="cardHormigaPromedio" class="text-2xl font-extrabold text-blue-400 my-1">$ 0,00</h2>
+                </div>
+                <div class="card-bg p-5 rounded-2xl">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CANTIDAD DE GASTOS</span>
+                    <h2 id="cardHormigaCantidad" class="text-2xl font-extrabold text-emerald-400 my-1">0 compras</h2>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="card-bg p-6 rounded-2xl h-fit">
+                    <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-amber-400"></i> Registrar Gasto Hormiga
+                    </h3>
+                    <form onsubmit="handleSaveGastoHormiga(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">¿QUÉ COMPRASTE?</label>
+                            <input type="text" id="hormigaConcepto" required placeholder="Ej: Café, Galletitas..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO ($)</label>
+                                <input type="number" step="0.01" id="hormigaMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">FECHA</label>
+                                <input type="date" id="hormigaFecha" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CATEGORÍA</label>
+                            <select id="hormigaCategoriaSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MEDIO DE PAGO</label>
+                            <select id="hormigaMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                                <option value="Mercado Pago" selected>Mercado Pago</option>
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Débito">Débito</option>
+                                <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
+                            <i class="fa-solid fa-cookie"></i> Guardar Gasto Hormiga
+                        </button>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 card-bg p-6 rounded-2xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie text-amber-400"></i> Totales por Categoría (Mes Actual)
+                            </h3>
+                            <span id="badgeHormigaMonthCat" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
+                        </div>
+                        <div id="containerHormigaCatTotales" class="space-y-3 max-h-[340px] overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
+                <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-base font-bold text-white">Detalle de Gastos del Mes</h3>
+                            <span id="badgeHormigaMonth" class="text-xs font-semibold bg-slate-800 text-amber-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Filtrar:</span>
+                            <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaCat"></div>
+                </div>
+                <div class="max-h-[420px] overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                                <th onclick="sortHormigaData('fecha')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">FECHA <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('concepto')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">DESCRIPCIÓN <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('categoria')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">CATEGORÍA <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('medioPago')" class="px-5 py-3.5 bg-slate-900 cursor-pointer hover:text-white">MEDIO <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th onclick="sortHormigaData('monto')" class="px-5 py-3.5 text-right bg-slate-900 cursor-pointer hover:text-white">MONTO <i class="fa-solid fa-sort ml-1 text-slate-500"></i></th>
+                                <th class="px-5 py-3.5 text-right bg-slate-900">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaHormigaCuerpo" class="divide-y divide-slate-800/60 text-sm font-medium"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                <div class="card-bg p-6 rounded-2xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
+                        </h3>
+                        <button onclick="expandirGraficoModal('chartHormigaCategorias', 'Gastos Hormiga por Categoría')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartHormigaCategorias"></canvas></div>
+                </div>
+                <div class="card-bg p-6 rounded-2xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
+                        </h3>
+                        <button onclick="expandirGraficoModal('chartHormigaEvolucion', 'Evolución Gasto Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="relative h-64 w-full"><canvas id="chartHormigaEvolucion"></canvas></div>
+                </div>
+            </div>
+
+            <div class="card-bg p-6 rounded-2xl space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
+                    </h3>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Filtrar:</span>
+                            <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        </div>
+                        <button onclick="expandirGraficoModal('chartHormigaEvolucionCategorias', 'Evolución por Categoría Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaEvolCat"></div>
+                <div class="relative h-72 w-full"><canvas id="chartHormigaEvolucionCategorias"></canvas></div>
+            </div>
         </section>
     </div>
 
-    <!-- MODAL GASTO (CON INFLACIÓN Y SUBCATEGORÍA) -->
+    <!-- MODALES -->
+    <div id="modalSueldo" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-sm w-full p-6 text-white border border-slate-700">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold">Editar Sueldo del Mes</h3>
+                <button type="button" onclick="closeModal('modalSueldo')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="handleSaveSueldo(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO SUELDO ($)</label>
+                    <input type="number" step="0.01" id="inputSueldoMonto" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL GASTO -->
     <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
@@ -145,11 +442,11 @@
                 <input type="hidden" id="gastoId">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre del Concepto</label>
-                    <input type="text" id="gastoConcepto" required placeholder="Ej: Alquiler, Luz..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                    <input type="text" id="gastoConcepto" required placeholder="Ej: Supermercado, Luz..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría Principal</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría / Tarjeta</label>
                         <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white"></select>
                     </div>
                     <div>
@@ -191,7 +488,7 @@
                     </div>
                 </div>
 
-                <!-- OPCIONES DE PAGOS Y CUOTAS -->
+                <!-- OPCIONES DE PAGO -->
                 <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
                     <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-credit-card"></i> Opciones de Tarjeta / Pago
@@ -225,15 +522,14 @@
         </div>
     </div>
 
-    <!-- MODAL CATEGORÍAS Y SUBCATEGORÍAS -->
+    <!-- MODAL CATEGORÍAS GENERALES -->
     <div id="modalCatGeneral" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-                <h3 class="text-lg font-bold flex items-center gap-2 text-amber-400"><i class="fa-solid fa-tags"></i> Categorías y Subcategorías</h3>
+                <h3 class="text-lg font-bold flex items-center gap-2 text-amber-400"><i class="fa-solid fa-tags"></i> Gestión de Categorías Generales</h3>
                 <button type="button" onclick="closeModal('modalCatGeneral')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
-            <!-- PANEL CONFIGURACIÓN MASIVA SUBCATEGORÍAS -->
             <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 mb-4 space-y-3">
                 <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-sliders"></i> Aumento Masivo por Subcategoría</h4>
                 <div class="flex items-center gap-2">
@@ -244,12 +540,134 @@
                 <div id="listaSubcatGeneralConfig" class="space-y-2 pt-2 max-h-36 overflow-y-auto pr-1"></div>
             </div>
 
+            <div class="space-y-3 mb-4 bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nuevaCatGenNombre" placeholder="Nueva categoría..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                    <input type="color" id="nuevaCatGenColor" value="#3b82f6" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoriaGeneral()" class="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-md transition"><i class="fa-solid fa-plus text-base"></i></button>
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="nuevaCatGenBloque" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-600 cursor-pointer">
+                    <label for="nuevaCatGenBloque" class="text-xs text-slate-300 font-semibold cursor-pointer">¿Es tarjeta o comparte vencimiento único en bloque?</label>
+                </div>
+            </div>
             <div id="listaCatGeneralConfig" class="space-y-3 overflow-y-auto pr-1 max-h-56"></div>
         </div>
     </div>
 
+    <!-- OTROS MODALES (CUENTA, CAT HORMIGA, GRÁFICO EXPANDIDO) -->
+    <div id="modalCuenta" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalCuentaTitulo" class="text-lg font-bold">Configurar Banco / Cuenta</h3>
+                <button type="button" onclick="closeModal('modalCuenta')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="handleSaveCuenta(event)" class="space-y-4 overflow-y-auto pr-1">
+                <input type="hidden" id="cuentaId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">NOMBRE DEL BANCO / CUENTA</label>
+                    <input type="text" id="cuentaNombre" required placeholder="Ej: Banco Ciudad, Santander..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO BANCO ($)</label>
+                        <input type="number" step="0.01" id="cuentaBcoSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO MP ($)</label>
+                        <input type="number" step="0.01" id="cuentaMpSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                    </div>
+                </div>
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-credit-card mr-1"></i> Tarjetas de Crédito</label>
+                        <div id="containerCategoriasAsociadas" class="grid grid-cols-2 gap-2 pt-2"></div>
+                    </div>
+                    <hr class="border-slate-800">
+                    <div>
+                        <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-thumbtack mr-1"></i> Gastos Fijos e Ítems</label>
+                        <div id="containerGastosFijosAsociados" class="space-y-1.5 pt-2 max-h-40 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('modalCuenta')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalCatHormiga" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold flex items-center gap-2 text-amber-400"><i class="fa-solid fa-tags"></i> Categorías de Gastos Hormiga</h3>
+                <button type="button" onclick="closeModal('modalCatHormiga')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nuevaCatHormigaNombre" placeholder="Nueva categoría..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                    <input type="color" id="nuevaCatHormigaColor" value="#f59e0b" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoriaHormiga()" class="w-10 h-10 bg-amber-600 hover:bg-amber-500 text-white rounded-xl flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            <div id="listaCatHormigaConfig" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+
+    <div id="modalGraficoExpandido" class="fixed inset-0 bg-slate-950/90 hidden flex items-center justify-center p-4 sm:p-6 z-50 backdrop-blur-md transition-all">
+        <div class="card-bg rounded-2xl shadow-2xl w-full max-w-5xl p-6 text-white border border-slate-700 relative flex flex-col h-[85vh]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalGraficoTitulo" class="text-base sm:text-lg font-bold text-emerald-400 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line"></i> Gráfico Expandido
+                </h3>
+                <button type="button" onclick="cerrarGraficoModal()" class="text-slate-400 hover:text-white bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 transition text-xs font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-xmark"></i> Cerrar
+                </button>
+            </div>
+            <div class="relative flex-1 w-full h-full flex items-center justify-center">
+                <canvas id="chartModalCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // SCRIPT VISTA PREVIA INFLACIÓN 6 MESES
+        let currentActiveTab = 'planilla';
+
+        window.switchTab = function(tabName) {
+            currentActiveTab = tabName;
+            
+            document.getElementById('viewPlanilla').classList.add('hidden');
+            document.getElementById('viewAnalisis').classList.add('hidden');
+            document.getElementById('viewSaldos').classList.add('hidden');
+            document.getElementById('viewHormiga').classList.add('hidden');
+
+            document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+            document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+            document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+            document.getElementById('btnTabHormiga').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+
+            if (tabName === 'planilla') {
+                document.getElementById('viewPlanilla').classList.remove('hidden');
+                document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                renderPlanillaTab();
+            } else if (tabName === 'analisis') {
+                document.getElementById('viewAnalisis').classList.remove('hidden');
+                document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                if (typeof initChartRangeInputs === 'function' && (!customRangeFrom || !customRangeTo)) initChartRangeInputs();
+                if (typeof initRecurrentesCheckboxesList === 'function') initRecurrentesCheckboxesList();
+                if (typeof renderFiltrosGraficosCheckboxes === 'function') renderFiltrosGraficosCheckboxes();
+                if (typeof renderCharts === 'function') renderCharts();
+            } else if (tabName === 'saldos') {
+                document.getElementById('viewSaldos').classList.remove('hidden');
+                document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                if (typeof renderSaldosApp === 'function') renderSaldosApp();
+            } else if (tabName === 'hormiga') {
+                document.getElementById('viewHormiga').classList.remove('hidden');
+                document.getElementById('btnTabHormiga').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                if (typeof renderHormigaApp === 'function') renderHormigaApp();
+            }
+        };
+
         window.actualizarVistaPreviaInflacionModal = function() {
             const montoBase = parseFloat(document.getElementById('gastoMonto').value) || 0;
             const pctIndivStr = document.getElementById('gastoPctAumento').value;
@@ -427,6 +845,12 @@
             window.appState.subcategorias.splice(idx, 1);
             window.saveDataToCloud();
             renderSubcatList();
+        };
+
+        window.openModalCatGeneral = function() { 
+            if (typeof renderCatGeneralList === 'function') renderCatGeneralList();
+            renderSubcatList();
+            document.getElementById('modalCatGeneral').classList.remove('hidden'); 
         };
     </script>
 </body>
