@@ -30,6 +30,13 @@ const categoriasDefault = [
     { nombre: "Santander Amex", color: "#f97316", esTarjeta: true, vencimientoUnicoEnBloque: true }
 ];
 
+const subcategoriasDefault = [
+    { id: "sub_alquiler", nombre: "Alquiler / Expensas", porcentajeAumento: 0 },
+    { id: "sub_servicios_basicos", nombre: "Servicios Básicos (Luz/Gas/Agua)", porcentajeAumento: 0 },
+    { id: "sub_conectividad", nombre: "Internet / Cable / Telefonía", porcentajeAumento: 0 },
+    { id: "sub_suscripciones", nombre: "Streaming y Suscripciones", porcentajeAumento: 0 }
+];
+
 const categoriasHormigaDefault = [
     { nombre: "Kiosco", color: "#f59e0b" },
     { nombre: "Panadería", color: "#d97706" },
@@ -58,6 +65,8 @@ window.appState = window.appState || {
     excepcionesVencimientoGrid: {},
     excepcionesEstado: {},
     excepcionesEliminacion: {},
+    aumentosIndividuales: {},
+    subcategorias: JSON.parse(JSON.stringify(subcategoriasDefault)),
     sueldos: {},
     cuentasBancarias: [],
     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
@@ -161,7 +170,24 @@ onAuthStateChanged(auth, async (user) => {
         window.currentGrupo = grupoId;
         window.docHormigaRef = doc(db, "app_data_hormiga", user.uid);
 
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
         if (unsubscribeHormiga) unsubscribeHormiga();
+
+        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.appState) {
+                    window.appState = { ...window.appState, ...data.appState };
+                    if (!window.appState.subcategorias) window.appState.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
+                    if (!window.appState.aumentosIndividuales) window.appState.aumentosIndividuales = {};
+                    if (!window.appState.currentMonth) window.appState.currentMonth = currentLocalMonthStr;
+                }
+            } else {
+                window.saveDataToCloud();
+            }
+            triggerPageRenders();
+            window.showApp();
+        });
 
         unsubscribeHormiga = onSnapshot(window.docHormigaRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -179,7 +205,6 @@ onAuthStateChanged(auth, async (user) => {
                     };
                 }
             } else {
-                // Si no existe para este UID, inicializamos limpio para este usuario
                 window.hormigaState = {
                     gastos: [],
                     categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
@@ -195,34 +220,7 @@ onAuthStateChanged(auth, async (user) => {
 
         const userName = user.email ? user.email.split('@')[0] : 'Usuario';
         const grupoDisplay = document.getElementById('grupoStatus');
-        if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName}`; // Solo muestra el usuario
-
-        if (unsubscribeSnapshot) unsubscribeSnapshot();
-        if (unsubscribeHormiga) unsubscribeHormiga();
-
-        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.appState) {
-                    window.appState = { ...window.appState, ...data.appState };
-                    if (!window.appState.currentMonth) window.appState.currentMonth = currentLocalMonthStr;
-                }
-            } else {
-                window.saveDataToCloud();
-            }
-            triggerPageRenders();
-            window.showApp();
-        });
-
-        unsubscribeHormiga = onSnapshot(window.docHormigaRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.hormigaState) window.hormigaState = { ...window.hormigaState, ...data.hormigaState };
-            } else {
-                window.saveHormigaDataToCloud();
-            }
-            triggerPageRenders();
-        });
+        if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName}`;
     } else {
         window.showLogin();
         if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
@@ -292,6 +290,20 @@ window.getSueldoForMonth = function(targetMonth) {
     return sueldoAplicar;
 };
 
+// HELPER DE OBTENCIÓN DE PORCENTAJE DE AUMENTO
+window.getPorcentajeAumentoGasto = function(gasto) {
+    if (window.appState.aumentosIndividuales?.[gasto.id] !== undefined && window.appState.aumentosIndividuales[gasto.id] !== '') {
+        return parseFloat(window.appState.aumentosIndividuales[gasto.id]) || 0;
+    }
+    if (gasto.subcategoriaId) {
+        const subcat = (window.appState.subcategorias || []).find(s => s.id === gasto.subcategoriaId);
+        if (subcat && subcat.porcentajeAumento) {
+            return parseFloat(subcat.porcentajeAumento) || 0;
+        }
+    }
+    return 0;
+};
+
 window.getCalculatedDataForMonth = function(targetMonth) {
     const sueldoActual = window.getSueldoForMonth(targetMonth);
     let items = [];
@@ -311,27 +323,54 @@ window.getCalculatedDataForMonth = function(targetMonth) {
         const startYM = gasto.startMonth || targetMonth;
         
         let montoAplicar = undefined;
+        let baseMonthStr = startYM;
+
         if (window.appState.excepcionesMonto?.[excepcionCatKey] !== undefined) {
             montoAplicar = parseFloat(window.appState.excepcionesMonto[excepcionCatKey]);
+            baseMonthStr = targetMonth;
         } else {
             let [tY, tM] = targetMonth.split('-').map(Number);
             let foundMonto = null;
+            let foundMonthStr = null;
+
             for (let i = 0; i < 36; i++) {
                 let checkYM = `${tY}-${String(tM).padStart(2, '0')}`;
                 if (window.appState.excepcionesMonto?.[`${gasto.id}_${checkYM}`] !== undefined) {
                     foundMonto = parseFloat(window.appState.excepcionesMonto[`${gasto.id}_${checkYM}`]);
+                    foundMonthStr = checkYM;
                     break;
                 }
                 tM--; if (tM < 1) { tM = 12; tY--; }
             }
-            montoAplicar = foundMonto !== null ? foundMonto : parseFloat(gasto.monto);
+            if (foundMonto !== null) {
+                montoAplicar = foundMonto;
+                baseMonthStr = foundMonthStr;
+            } else {
+                montoAplicar = parseFloat(gasto.monto);
+                baseMonthStr = startYM;
+            }
         }
         
         const totalCuotas = parseInt(gasto.cuotas) || 1;
-        const catObjConfig = (window.appState.categorias || categoriasDefault).find(c => c.nombre === categoriaAplicar);
         const baseEsFijo = (gasto.categoria || '').toLowerCase().includes('fijo') || (gasto.categoria || '').toLowerCase().includes('servicio');
         const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
         const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
+
+        // CÁLCULO DE AUMENTO COMPUESTO POR INFLACIÓN SI CORRESPONDE
+        const pctAumento = window.getPorcentajeAumentoGasto(gasto);
+        if (isRecurrente && pctAumento > 0 && targetMonth > baseMonthStr) {
+            const [bY, bM] = baseMonthStr.split('-').map(Number);
+            const [tY, tM] = targetMonth.split('-').map(Number);
+            const diffMeses = (tY - bY) * 12 + (tM - bM);
+
+            if (diffMeses > 0) {
+                let montoCalculado = montoAplicar;
+                for (let m = 0; m < diffMeses; m++) {
+                    montoCalculado = montoCalculado * (1 + (pctAumento / 100));
+                }
+                montoAplicar = Math.round(montoCalculado * 100) / 100;
+            }
+        }
 
         let generatedItems = [];
         if (totalCuotas > 1) {
