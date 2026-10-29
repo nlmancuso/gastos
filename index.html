@@ -818,8 +818,9 @@
                         const vencimientoVal = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKey] : (g.vencimiento || '');
                         const estadoVal = g.estado || 'PENDIENTE';
 
-                        // Datos de subcategoría y % inflación para las nuevas columnas ordenadas
-                        const subcatObj = (window.appState.subcategorias || []).find(s => s.id === g.subcategoriaId);
+                        // Subcategoría correcta (buscando la excepción del mes o la original del objeto)
+                        const subcatIdActual = window.appState.excepcionesSubcategoria?.[gridKey] !== undefined ? window.appState.excepcionesSubcategoria[gridKey] : g.subcategoriaId;
+                        const subcatObj = (window.appState.subcategorias || []).find(s => s.id === subcatIdActual);
                         const subcatNombre = subcatObj ? subcatObj.nombre : '-';
 
                         const pctIndiv = window.appState.aumentosIndividuales?.[g.id];
@@ -991,7 +992,7 @@
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
 
-        // LÓGICA DE SUBCATEGORÍAS MASIVAS Y VISTA PREVIA A 6 MESES
+        // LÓGICA DE SUB. Y VISTA PREVIA A 6 MESES
         window.actualizarVistaPreviaInflacionModal = function() {
             const montoBase = parseFloat(document.getElementById('gastoMonto').value) || 0;
             const pctIndivStr = document.getElementById('gastoPctAumento').value;
@@ -1180,11 +1181,15 @@
 
             const selectSubcat = document.getElementById('gastoSubcategoria'); 
             selectSubcat.innerHTML = '<option value="">Sin Subcategoría</option>';
+            const subcatActual = window.appState.excepcionesSubcategoria?.[`${id}_${currentActiveMonth}`] !== undefined
+                ? window.appState.excepcionesSubcategoria[`${id}_${currentActiveMonth}`]
+                : gasto.subcategoriaId;
+
             (window.appState.subcategorias || []).forEach(s => { 
                 const opt = document.createElement('option'); 
                 opt.value = s.id; 
                 opt.innerHTML = `${s.nombre} (${s.porcentajeAumento || 0}%)`; 
-                if (s.id === gasto.subcategoriaId) opt.selected = true;
+                if (s.id === subcatActual) opt.selected = true;
                 selectSubcat.appendChild(opt); 
             });
 
@@ -1209,17 +1214,19 @@
 
             if (!window.appState.gastos) window.appState.gastos = [];
             if (!window.appState.aumentosIndividuales) window.appState.aumentosIndividuales = {};
+            if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+            if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+            if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
+            if (!window.appState.excepcionesSubcategoria) window.appState.excepcionesSubcategoria = {};
 
             if (id) {
-                if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
-                if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
-                if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
-
                 window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] = monto;
                 window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] = vencimiento;
                 window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`] = categoria;
+                window.appState.excepcionesSubcategoria[`${id}_${currentActiveMonth}`] = subcategoriaId;
                 window.appState.aumentosIndividuales[id] = pctAumentoVal;
 
+                // Propagación compuesta hacia adelante para los meses futuros
                 let [currY, currM] = currentActiveMonth.split('-').map(Number);
                 let montoPropagado = monto;
                 let fechaPropagada = vencimiento;
@@ -1241,11 +1248,12 @@
                         fechaPropagada = window.sumarUnMesAFecha(fechaPropagada);
                         window.appState.excepcionesVencimiento[`${id}_${nextMonthStr}`] = fechaPropagada;
                     }
-                    if (pctPropagacion > 0 && isRecurrente) {
+                    if (pctPropagacion > 0) {
                         montoPropagado = montoPropagado * (1 + (pctPropagacion / 100));
                     }
                     window.appState.excepcionesMonto[`${id}_${nextMonthStr}`] = Math.round(montoPropagado * 100) / 100;
                     window.appState.excepcionesCategoria[`${id}_${nextMonthStr}`] = categoria;
+                    window.appState.excepcionesSubcategoria[`${id}_${nextMonthStr}`] = subcategoriaId;
                 }
 
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
