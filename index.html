@@ -156,11 +156,16 @@
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales vs. Ingresos
                         </h3>
-                        <div class="flex items-center gap-2 text-xs font-semibold">
-                            <span class="text-slate-400">Mostrar:</span>
-                            <button onclick="marcarTodosGrafico('Totales', true)" class="text-emerald-400 hover:underline">Todos</button>
-                            <span class="text-slate-600">|</span>
-                            <button onclick="marcarTodosGrafico('Totales', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Mostrar:</span>
+                                <button onclick="marcarTodosGrafico('Totales', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('Totales', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionTotales', 'Evolución Gastos Totales vs. Ingresos')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoTotales"></div>
@@ -172,11 +177,16 @@
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
                         </h3>
-                        <div class="flex items-center gap-2 text-xs font-semibold">
-                            <span class="text-slate-400">Filtrar:</span>
-                            <button onclick="marcarTodosGrafico('EvolCat', true)" class="text-emerald-400 hover:underline">Todos</button>
-                            <span class="text-slate-600">|</span>
-                            <button onclick="marcarTodosGrafico('EvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosGrafico('EvolCat', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('EvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionCategorias', 'Evolución por Categoría')" class="text-slate-400 hover:text-blue-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoEvolCat"></div>
@@ -188,11 +198,16 @@
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-rotate text-amber-400"></i> Evolución de Gastos Recurrentes y Débitos Automáticos
                         </h3>
-                        <div class="flex items-center gap-2 text-xs font-semibold">
-                            <span class="text-slate-400">Filtrar:</span>
-                            <button onclick="marcarTodosRecurrentesGrid(true)" class="text-amber-400 hover:underline">Todos</button>
-                            <span class="text-slate-600">|</span>
-                            <button onclick="marcarTodosRecurrentesGrid(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosRecurrentesGrid(true)" class="text-amber-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosRecurrentesGrid(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionRecurrentesIndiv', 'Evolución de Gastos Recurrentes')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosRecurrentesGrid"></div>
@@ -204,11 +219,16 @@
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto)
                         </h3>
-                        <div class="flex items-center gap-2 text-xs font-semibold">
-                            <span class="text-slate-400">Mostrar:</span>
-                            <button onclick="marcarTodosGrafico('Balance', true)" class="text-emerald-400 hover:underline">Todos</button>
-                            <span class="text-slate-600">|</span>
-                            <button onclick="marcarTodosGrafico('Balance', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Mostrar:</span>
+                                <button onclick="marcarTodosGrafico('Balance', true)" class="text-emerald-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('Balance', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartBalanceGeneral', 'Balance (Ingreso vs. Gastos vs. Resto)')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoBalance"></div>
@@ -352,29 +372,44 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                 <div class="card-bg p-6 rounded-2xl space-y-4">
-                    <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
-                    </h3>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
+                        </h3>
+                        <button onclick="expandirGraficoModal('chartHormigaCategorias', 'Gastos Hormiga por Categoría')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
+                    </div>
                     <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartHormigaCategorias"></canvas></div>
                 </div>
-                <div class="card-bg p-6 rounded-2xl">
-                    <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
-                    </h3>
+                <div class="card-bg p-6 rounded-2xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
+                        </h3>
+                        <button onclick="expandirGraficoModal('chartHormigaEvolucion', 'Evolución Gasto Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
+                    </div>
                     <div class="relative h-64 w-full"><canvas id="chartHormigaEvolucion"></canvas></div>
                 </div>
             </div>
 
             <div class="card-bg p-6 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                         <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
                     </h3>
-                    <div class="flex items-center gap-2 text-xs font-semibold">
-                        <span class="text-slate-400">Filtrar:</span>
-                        <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
-                        <span class="text-slate-600">|</span>
-                        <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Filtrar:</span>
+                            <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                        </div>
+                        <button onclick="expandirGraficoModal('chartHormigaEvolucionCategorias', 'Evolución por Categoría Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaEvolCat"></div>
@@ -549,6 +584,23 @@
         </div>
     </div>
 
+    <!-- MODAL GRÁFICO EXPANDIDO -->
+    <div id="modalGraficoExpandido" class="fixed inset-0 bg-slate-950/90 hidden flex items-center justify-center p-4 sm:p-6 z-50 backdrop-blur-md transition-all">
+        <div class="card-bg rounded-2xl shadow-2xl w-full max-w-5xl p-6 text-white border border-slate-700 relative flex flex-col h-[85vh]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalGraficoTitulo" class="text-base sm:text-lg font-bold text-emerald-400 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line"></i> Gráfico Expandido
+                </h3>
+                <button type="button" onclick="cerrarGraficoModal()" class="text-slate-400 hover:text-white bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 transition text-xs font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-xmark"></i> Cerrar
+                </button>
+            </div>
+            <div class="relative flex-1 w-full h-full flex items-center justify-center">
+                <canvas id="chartModalCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentActiveTab = 'planilla';
 
@@ -670,7 +722,7 @@
             renderApp();
         };
 
-function renderPlanillaAgrupadaTabla(items) {
+        function renderPlanillaAgrupadaTabla(items) {
             const container = document.getElementById('containerPlanillaAgrupada');
             if (!container) return;
             container.innerHTML = '';
@@ -1503,6 +1555,58 @@ function renderPlanillaAgrupadaTabla(items) {
             window.hormigaState.categorias.splice(index, 1);
             window.saveHormigaDataToCloud(); renderCatHormigaList(); renderHormigaCategoriasSelect(); renderHormigaApp();
         };
+
+        // ---------------- FUNCIONES DE MÁS / EXPANDIR GRÁFICOS ----------------
+        let modalChartInstance = null;
+
+        window.expandirGraficoModal = function(originalCanvasId, titulo) {
+            const originalCanvas = document.getElementById(originalCanvasId);
+            if (!originalCanvas) return;
+
+            const originalChart = Chart.getChart(originalCanvas);
+            if (!originalChart) return;
+
+            document.getElementById('modalGraficoTitulo').innerText = titulo || "Vista Ampliada del Gráfico";
+
+            const modalCanvas = document.getElementById('chartModalCanvas');
+            const ctx = modalCanvas.getContext('2d');
+
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+            }
+
+            modalChartInstance = new Chart(ctx, {
+                type: originalChart.config.type,
+                data: JSON.parse(JSON.stringify(originalChart.config.data)),
+                options: {
+                    ...originalChart.config.options,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        ...originalChart.config.options.plugins,
+                        legend: {
+                            ...originalChart.config.options.plugins?.legend,
+                            display: true,
+                            labels: { color: '#cbd5e1', font: { size: 12 } }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('modalGraficoExpandido').classList.remove('hidden');
+        };
+
+        window.cerrarGraficoModal = function() {
+            document.getElementById('modalGraficoExpandido').classList.add('hidden');
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+                modalChartInstance = null;
+            }
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') window.cerrarGraficoModal();
+        });
     </script>
 </body>
 </html>
