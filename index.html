@@ -1,226 +1,214 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planilla de Gastos Inteligente</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Control de Gastos</title>
+    
+    <!-- FAVICON / ÍCONO SVG BILLETERA ESMERALDA -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='%2310b981' d='M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-224c0-35.3-28.7-64-64-64L96 128c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L64 32zm320 224a32 32 0 1 1 0 64 32 32 0 1 1 0-64z'/></svg>">
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome para Iconos -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js para Gráficos Estadísticos -->
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Script Compartido -->
+    <script type="module" src="app.js"></script>
+    
+    <!-- PREFETCH PARA NAVEGACIÓN INSTÁNTANEA -->
+    <link rel="prefetch" href="index.html">
+    <link rel="prefetch" href="app.js">
+
     <style>
-        body { background-color: #030712; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
-        .card-bg { background-color: #111827; border: 1px solid #1f2937; }
-        .table-header { background-color: #0f172a; }
-        .tab-btn-active { border-bottom: 2px solid #10b981; color: #10b981; }
-        tr.dragging { opacity: 0.4; }
+        body { background-color: #0b1120; color: #f1f5f9; font-family: ui-sans-serif, system-ui, sans-serif; }
+        .card-bg { background-color: #111827; border: 1px solid #1e293b; }
+        .table-header { background-color: #0f172a; border-bottom: 1px solid #1e293b; }
+        .text-green-accent { color: #10b981; }
+        .text-blue-accent { color: #6366f1; }
+        .tab-btn-active { border-bottom: 2px solid #10b981; color: #10b981; font-weight: 700; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+        .dragging { opacity: 0.4; background-color: #1e293b !important; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between">
-
-    <!-- ==================== HEADER / NAVEGACIÓN ==================== -->
-    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400 font-bold text-lg shadow-lg">
-                    <i class="fa-solid fa-wallet"></i>
+<body class="min-h-screen pb-12">
+    <!-- LOGIN OVERLAY -->
+    <div id="loginOverlay" class="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 hidden">
+        <div class="card-bg p-8 rounded-2xl max-w-md w-full text-center border border-slate-800 shadow-2xl">
+            <div class="w-16 h-16 bg-emerald-950/80 border border-emerald-800/60 rounded-2xl flex items-center justify-center text-emerald-400 mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-2">Acceso Protegido</h2>
+            <p class="text-xs text-slate-400 mb-6">Ingresá tus credenciales para acceder a tu planilla.</p>
+            
+            <form id="formLogin" onsubmit="window.handleLogin(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Correo Electrónico</label>
+                    <input type="email" id="loginEmail" required placeholder="tucorreo@email.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div>
-                    <h1 class="text-base font-bold text-white tracking-wide">Control Financiero</h1>
-                    <span id="displayMonthText" class="text-xs text-emerald-400 font-semibold">Octubre 2026</span>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
-            </div>
-
-            <!-- Navegación de Solapas -->
-            <nav class="flex items-center gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-                <button onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-4 py-2 text-xs font-semibold tab-btn-active flex items-center gap-2 transition cursor-pointer">
-                    <i class="fa-solid fa-table-cells"></i> Planilla
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
                 </button>
-                <button onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-2 transition cursor-pointer">
-                    <i class="fa-solid fa-chart-line"></i> Análisis
-                </button>
-                <button onclick="switchTab('saldos')" id="btnTabSaldos" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-2 transition cursor-pointer">
-                    <i class="fa-solid fa-building-columns"></i> Saldos y Bancos
-                </button>
-                <button onclick="switchTab('hormiga')" id="btnTabHormiga" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-2 transition cursor-pointer">
-                    <i class="fa-solid fa-cookie-bite"></i> Hormiga
-                </button>
-            </nav>
+            </form>
+            <p id="loginError" class="text-xs text-rose-400 font-medium mt-4 hidden"></p>
         </div>
-    </header>
+    </div>
+    
+    <!-- LOADING OVERLAY -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 hidden">
+        <div class="animate-spin w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full"></div>
+    </div>
 
-    <!-- ==================== CONTENIDO PRINCIPAL ==================== -->
-    <div class="flex-1 pb-12">
-
-        <!-- ==================== SECCIÓN 1: PLANILLA ==================== -->
-        <section id="viewPlanilla" class="max-w-7xl mx-auto px-4 py-4 space-y-6">
-            
-            <!-- Barra de Mes y Sueldo -->
-            <div class="card-bg p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- CONTENIDO APP -->
+    <div id="appContent" class="hidden">
+        <header class="max-w-7xl mx-auto px-4 pt-6 pb-2">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                 <div class="flex items-center gap-3">
-                    <button onclick="window.changeMonth(-1)" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white hover:border-slate-700 transition">
-                        <i class="fa-solid fa-chevron-left text-xs"></i>
-                    </button>
-                    <span id="badgeMonth" class="text-sm font-extrabold text-white bg-slate-900 px-4 py-2 rounded-xl border border-slate-800">Cargando...</span>
-                    <button onclick="window.changeMonth(1)" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white hover:border-slate-700 transition">
-                        <i class="fa-solid fa-chevron-right text-xs"></i>
-                    </button>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-950 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-wallet text-xl"></i></div>
+                    <div><h1 class="text-xl font-bold text-white">Control de Gastos</h1><p class="text-xs text-slate-400" id="grupoStatus">Cargando...</p></div>
                 </div>
-                <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-                    <button onclick="openModalSueldo()" class="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                        <i class="fa-solid fa-money-bill-wave"></i> Editar Sueldo
-                    </button>
+                <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                    <button onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center">Cargando...</span>
+                    <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+                <div class="flex items-center gap-3">
                     <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-plus"></i> Nuevo Gasto
                     </button>
-                    <button onclick="openModalCatGeneral()" class="bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 text-xs font-bold px-3 py-2.5 rounded-xl transition" title="Gestionar Categorías">
-                        <i class="fa-solid fa-tags"></i>
-                    </button>
+                    <button onclick="openModalCatGeneral()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition" title="Configurar Categorías"><i class="fa-solid fa-gear text-sm"></i></button>
+                    <button onclick="cerrarSesion()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition" title="Cerrar Sesión"><i class="fa-solid fa-right-from-bracket text-sm"></i></button>
+                    <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronizado
+                    </div>
                 </div>
             </div>
-
-            <!-- Tarjetas de Resumen Financiero -->
-            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <div class="card-bg p-4 rounded-2xl">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SUELDO / INGRESOS</span>
-                    <h2 id="cardSueldo" class="text-xl font-extrabold text-emerald-400 mt-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-4 rounded-2xl">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">GASTOS FIJOS</span>
-                    <h2 id="cardGastosFijos" class="text-xl font-extrabold text-blue-400 mt-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-4 rounded-2xl">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">TARJETAS</span>
-                    <h2 id="cardTarjetas" class="text-xl font-extrabold text-amber-400 mt-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-4 rounded-2xl">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">GASTOS TOTALES</span>
-                    <h2 id="cardGastosTotales" class="text-xl font-extrabold text-rose-400 mt-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-4 rounded-2xl col-span-2 lg:col-span-1 border-emerald-500/30 bg-emerald-950/10">
-                    <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">RESTO DISPONIBLE</span>
-                    <h2 id="cardResto" class="text-xl font-black text-emerald-400 mt-1">$ 0,00</h2>
-                </div>
+            <!-- NAVEGACIÓN INSTANTÁNEA (SPA) -->
+            <div class="flex border-b border-slate-800 overflow-x-auto">
+                <button onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</button>
+                <button onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</button>
+                <button onclick="switchTab('saldos')" id="btnTabSaldos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</button>
+                <button onclick="switchTab('hormiga')" id="btnTabHormiga" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga <span class="bg-amber-500/20 text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-mono">Privado</span></button>
             </div>
+        </header>
 
-            <!-- Filtros de Categorías (Pills) -->
-            <div class="card-bg p-4 rounded-2xl space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Filtrar por Categoría</span>
-                    <div class="flex items-center gap-2 text-xs font-semibold">
+        <!-- ==================== SECCIÓN 1: PLANILLA ==================== -->
+        <section id="viewPlanilla" class="max-w-7xl mx-auto px-4 py-4 space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="card-bg p-5 rounded-2xl">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-slate-400 uppercase">INGRESO / SUELDO</span><button onclick="openModalSueldo()" class="text-xs text-emerald-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-pen text-[10px]"></i> Editar</button></div>
+                    <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
+                </div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">GASTOS FIJOS</span><h2 id="cardGastosFijos" class="text-2xl font-extrabold text-amber-500 my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">TOTAL TARJETAS</span><h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">GASTOS TOTALES</span><h2 id="cardGastosTotales" class="text-2xl font-extrabold text-rose-500 my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">RESTO DISPONIBLE</span><h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2></div>
+            </div>
+            
+            <div class="card-bg p-5 rounded-2xl shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-base font-bold text-white">Planilla de Gastos (Agrupada)</h3>
+                        <span id="badgeMonth" class="text-xs font-semibold bg-slate-900 text-slate-300 px-3 py-1 rounded-full border border-slate-800">...</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs font-semibold">
+                        <span class="text-slate-400">Filtrar:</span>
                         <button onclick="marcarTodosFiltros(true)" class="text-emerald-400 hover:underline">Todos</button>
                         <span class="text-slate-600">|</span>
                         <button onclick="marcarTodosFiltros(false)" class="text-rose-400 hover:underline">Ninguno</button>
                     </div>
                 </div>
-                <div id="containerFiltrosCategoriasPills" class="flex flex-wrap gap-2"></div>
+                <div id="containerFiltrosCategoriasPills" class="flex flex-wrap items-center gap-2 pt-1"></div>
+                <div id="containerPlanillaAgrupada" class="space-y-4 pt-2"></div>
             </div>
-
-            <!-- Grilla Principal Acordeón -->
-            <div id="containerPlanillaAgrupada" class="space-y-4"></div>
         </section>
 
-        <!-- ==================== SECCIÓN 2: ANÁLISIS & GRÁFICOS ==================== -->
+        <!-- ==================== SECCIÓN 2: ANÁLISIS Y GRÁFICOS ==================== -->
         <section id="viewAnalisis" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
-            <!-- Selector de Rango de Meses -->
             <div class="card-bg p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-2 text-xs text-slate-300 font-semibold">
-                    <i class="fa-solid fa-calendar-days text-emerald-400"></i> Rango de Análisis:
-                    <input type="month" id="chartMonthFrom" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white">
-                    <span class="text-slate-500">hasta</span>
-                    <input type="month" id="chartMonthTo" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white">
-                    <button onclick="applyCustomMonthRange()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition">Aplicar</button>
+                <div class="flex items-center gap-2 text-slate-300 text-sm font-bold">
+                    <i class="fa-solid fa-calendar-days text-emerald-400"></i>
+                    <span>Rango de Meses para Análisis</span>
                 </div>
-                <button onclick="resetDefaultMonthRange()" class="bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                    Restablecer (±3 Meses)
-                </button>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-1.5">
+                        <label class="text-xs font-semibold text-slate-400">Desde:</label>
+                        <input type="month" id="chartMonthFrom" onchange="applyCustomMonthRange()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white focus:outline-none">
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <label class="text-xs font-semibold text-slate-400">Hasta:</label>
+                        <input type="month" id="chartMonthTo" onchange="applyCustomMonthRange()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white focus:outline-none">
+                    </div>
+                    <button onclick="resetDefaultMonthRange()" class="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-800/60 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                        Restablecer (±3 Meses)
+                    </button>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Gráfico 1: Totales vs Ingresos -->
                 <div class="card-bg p-6 rounded-2xl space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolución Gastos Totales vs. Ingresos
                         </h3>
-                        <div class="flex items-center gap-3">
-                            <div class="flex items-center gap-2 text-xs font-semibold">
-                                <span class="text-slate-400">Mostrar:</span>
-                                <button onclick="marcarTodosGrafico('Totales', true)" class="text-emerald-400 hover:underline">Todos</button>
-                                <span class="text-slate-600">|</span>
-                                <button onclick="marcarTodosGrafico('Totales', false)" class="text-rose-400 hover:underline">Ninguno</button>
-                            </div>
-                            <button onclick="expandirGraficoModal('chartEvolucionTotales', 'Evolución Gastos Totales vs. Ingresos')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                                <i class="fa-solid fa-expand text-xs"></i>
-                            </button>
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Mostrar:</span>
+                            <button onclick="marcarTodosGrafico('Totales', true)" class="text-emerald-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosGrafico('Totales', false)" class="text-rose-400 hover:underline">Ninguno</button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoTotales"></div>
                     <div class="relative h-64 w-full"><canvas id="chartEvolucionTotales"></canvas></div>
                 </div>
 
-                <!-- Gráfico 2: Evolución por Categoría -->
                 <div class="card-bg p-6 rounded-2xl space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-chart-area text-blue-400"></i> Evolución por Categoría
                         </h3>
-                        <div class="flex items-center gap-3">
-                            <div class="flex items-center gap-2 text-xs font-semibold">
-                                <span class="text-slate-400">Filtrar:</span>
-                                <button onclick="marcarTodosGrafico('EvolCat', true)" class="text-emerald-400 hover:underline">Todos</button>
-                                <span class="text-slate-600">|</span>
-                                <button onclick="marcarTodosGrafico('EvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
-                            </div>
-                            <button onclick="expandirGraficoModal('chartEvolucionCategorias', 'Evolución por Categoría')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                                <i class="fa-solid fa-expand text-xs"></i>
-                            </button>
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Filtrar:</span>
+                            <button onclick="marcarTodosGrafico('EvolCat', true)" class="text-emerald-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosGrafico('EvolCat', false)" class="text-rose-400 hover:underline">Ninguno</button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoEvolCat"></div>
                     <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
                 </div>
 
-                <!-- Gráfico 3: Recurrentes Individuales -->
                 <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-rotate text-amber-400"></i> Evolución de Gastos Recurrentes y Débitos Automáticos
                         </h3>
-                        <div class="flex items-center gap-3">
-                            <div class="flex items-center gap-2 text-xs font-semibold">
-                                <span class="text-slate-400">Filtrar:</span>
-                                <button onclick="marcarTodosRecurrentesGrid(true)" class="text-amber-400 hover:underline">Todos</button>
-                                <span class="text-slate-600">|</span>
-                                <button onclick="marcarTodosRecurrentesGrid(false)" class="text-rose-400 hover:underline">Ninguno</button>
-                            </div>
-                            <button onclick="expandirGraficoModal('chartEvolucionRecurrentesIndiv', 'Evolución de Gastos Recurrentes')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                                <i class="fa-solid fa-expand text-xs"></i>
-                            </button>
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Filtrar:</span>
+                            <button onclick="marcarTodosRecurrentesGrid(true)" class="text-amber-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosRecurrentesGrid(false)" class="text-rose-400 hover:underline">Ninguno</button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosRecurrentesGrid"></div>
                     <div class="relative h-72 w-full"><canvas id="chartEvolucionRecurrentesIndiv"></canvas></div>
                 </div>
 
-                <!-- Gráfico 4: Balance General -->
                 <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
                             <i class="fa-solid fa-chart-bar text-emerald-400"></i> Balance (Ingreso vs. Gastos vs. Resto)
                         </h3>
-                        <div class="flex items-center gap-3">
-                            <div class="flex items-center gap-2 text-xs font-semibold">
-                                <span class="text-slate-400">Mostrar:</span>
-                                <button onclick="marcarTodosGrafico('Balance', true)" class="text-emerald-400 hover:underline">Todos</button>
-                                <span class="text-slate-600">|</span>
-                                <button onclick="marcarTodosGrafico('Balance', false)" class="text-rose-400 hover:underline">Ninguno</button>
-                            </div>
-                            <button onclick="expandirGraficoModal('chartBalanceGeneral', 'Balance (Ingreso vs. Gastos vs. Resto)')" class="text-slate-400 hover:text-emerald-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                                <i class="fa-solid fa-expand text-xs"></i>
-                            </button>
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <span class="text-slate-400">Mostrar:</span>
+                            <button onclick="marcarTodosGrafico('Balance', true)" class="text-emerald-400 hover:underline">Todos</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="marcarTodosGrafico('Balance', false)" class="text-rose-400 hover:underline">Ninguno</button>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoBalance"></div>
@@ -236,7 +224,7 @@
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-building-columns text-emerald-400"></i> Gestión de Cuentas y Saldos
                     </h3>
-                    <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas y gastos fijos se debitan de cada cuenta.</p>
+                    <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta.</p>
                 </div>
                 <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 shrink-0">
                     <i class="fa-solid fa-plus"></i> Nueva Cuenta / Banco
@@ -328,7 +316,7 @@
                 </div>
             </div>
 
-            <!-- Tabla de Detalle Hormiga -->
+            <!-- TABLA DE DETALLE DE GASTOS HORMIGA CON ORDENAMIENTO -->
             <div class="card-bg rounded-2xl overflow-hidden shadow-xl">
                 <div class="px-6 py-4 border-b border-slate-800 flex flex-col gap-3">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -362,47 +350,31 @@
                 </div>
             </div>
 
-            <!-- Gráficos de Hormiga -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                 <div class="card-bg p-6 rounded-2xl space-y-4">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría
-                        </h3>
-                        <button onclick="expandirGraficoModal('chartHormigaCategorias', 'Gastos Hormiga por Categoría')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                            <i class="fa-solid fa-expand text-xs"></i>
-                        </button>
-                    </div>
+                    <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-amber-400"></i> Gastos Hormiga por Categoría (Gráfico)
+                    </h3>
                     <div class="relative h-64 w-full flex items-center justify-center"><canvas id="chartHormigaCategorias"></canvas></div>
                 </div>
-                <div class="card-bg p-6 rounded-2xl space-y-4">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
-                        </h3>
-                        <button onclick="expandirGraficoModal('chartHormigaEvolucion', 'Evolución Gasto Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                            <i class="fa-solid fa-expand text-xs"></i>
-                        </button>
-                    </div>
+                <div class="card-bg p-6 rounded-2xl">
+                    <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
+                    </h3>
                     <div class="relative h-64 w-full"><canvas id="chartHormigaEvolucion"></canvas></div>
                 </div>
             </div>
 
             <div class="card-bg p-6 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría Hormiga (Últimos 6 Meses)
+                    <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
                     </h3>
-                    <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-2 text-xs font-semibold">
-                            <span class="text-slate-400">Filtrar:</span>
-                            <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
-                            <span class="text-slate-600">|</span>
-                            <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
-                        </div>
-                        <button onclick="expandirGraficoModal('chartHormigaEvolucionCategorias', 'Evolución por Categoría Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
-                            <i class="fa-solid fa-expand text-xs"></i>
-                        </button>
+                    <div class="flex items-center gap-2 text-xs font-semibold">
+                        <span class="text-slate-400">Filtrar:</span>
+                        <button onclick="marcarTodosHormiga(true)" class="text-amber-400 hover:underline">Todos</button>
+                        <span class="text-slate-600">|</span>
+                        <button onclick="marcarTodosHormiga(false)" class="text-rose-400 hover:underline">Ninguno</button>
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaEvolCat"></div>
@@ -411,78 +383,1126 @@
         </section>
     </div>
 
-    <!-- ==================== MODAL DE GRÁFICO EXPANDIDO ==================== -->
-    <div id="modalGraficoExpandido" class="fixed inset-0 bg-slate-950/90 hidden flex items-center justify-center p-4 sm:p-6 z-50 backdrop-blur-md transition-all">
-        <div class="card-bg rounded-2xl shadow-2xl w-full max-w-5xl p-6 text-white border border-slate-700 relative flex flex-col h-[85vh]">
+    <!-- MODALES GENERALES -->
+    <div id="modalSueldo" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-sm w-full p-6 text-white border border-slate-700">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-                <h3 id="modalGraficoTitulo" class="text-base sm:text-lg font-bold text-emerald-400 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-line"></i> Gráfico Expandido
-                </h3>
-                <button type="button" onclick="cerrarGraficoModal()" class="text-slate-400 hover:text-white bg-slate-900 p-2 rounded-xl border border-slate-800 transition text-sm">
-                    <i class="fa-solid fa-xmark"></i> Cerrar
-                </button>
+                <h3 class="text-base font-bold">Editar Sueldo del Mes</h3>
+                <button type="button" onclick="closeModal('modalSueldo')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="relative flex-1 w-full h-full flex items-center justify-center">
-                <canvas id="chartModalCanvas"></canvas>
-            </div>
+            <form onsubmit="handleSaveSueldo(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO SUELDO ($)</label>
+                    <input type="number" step="0.01" id="inputSueldoMonto" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('modalSueldo')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg">Guardar</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- ==================== LÓGICA DE EXPANSIÓN Y SCRIPTS ==================== -->
+    <div id="modalGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalGastoTitulo" class="text-lg font-bold">Nuevo Gasto</h3>
+                <button type="button" onclick="closeModal('modalGasto')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="handleSaveGasto(event)" class="space-y-4">
+                <input type="hidden" id="gastoId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre del Concepto</label>
+                    <input type="text" id="gastoConcepto" required placeholder="Ej: Supermercado, Luz..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría / Tarjeta</label>
+                        <select id="gastoCategoria" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Monto ($)</label>
+                        <input type="number" step="0.01" id="gastoMonto" oninput="actualizarCalculoCuotasModal()" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha de Vencimiento (Opcional)</label>
+                    <input type="date" id="gastoVencimiento" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">A partir de qué mes empieza</label>
+                    <input type="month" id="gastoStartMonth" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white">
+                </div>
+
+                <!-- SECCIÓN OPCIONES DE TARJETA / PAGO -->
+                <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-credit-card"></i> Opciones de Tarjeta / Pago
+                    </span>
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" id="gastoIsRecurrente" class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-emerald-600 cursor-pointer">
+                        <label for="gastoIsRecurrente" class="text-xs text-slate-300 font-semibold cursor-pointer flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate text-emerald-400"></i> Débito Automático / Recurrente
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" id="gastoEsCuotasCheck" onchange="toggleCuotasInputModal(this.checked)" class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-emerald-600 cursor-pointer">
+                        <label for="gastoEsCuotasCheck" class="text-xs text-slate-300 font-semibold cursor-pointer">
+                            ¿Es una compra en Cuotas?
+                        </label>
+                    </div>
+                    <div id="containerCuotasInput" class="space-y-2 pt-2 hidden">
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Cantidad de Cuotas</label>
+                        <input type="number" min="1" id="gastoCuotas" value="1" oninput="actualizarCalculoCuotasModal()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white">
+                        <div id="infoCuotaCalculada" class="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-xs text-emerald-400 font-semibold hidden flex items-center gap-2">
+                            <i class="fa-solid fa-lightbulb"></i> <span id="textoCuotaCalculada">Valor de cada cuota: $ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeModal('modalGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalCatGeneral" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold flex items-center gap-2 text-amber-400"><i class="fa-solid fa-tags"></i> Gestión de Categorías Generales</h3>
+                <button type="button" onclick="closeModal('modalCatGeneral')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 mb-4 bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nuevaCatGenNombre" placeholder="Nueva categoría..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                    <input type="color" id="nuevaCatGenColor" value="#3b82f6" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoriaGeneral()" class="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-md transition"><i class="fa-solid fa-plus text-base"></i></button>
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="nuevaCatGenBloque" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-600 cursor-pointer">
+                    <label for="nuevaCatGenBloque" class="text-xs text-slate-300 font-semibold cursor-pointer">¿Es tarjeta o comparte vencimiento único en bloque?</label>
+                </div>
+            </div>
+            <div id="listaCatGeneralConfig" class="space-y-3 overflow-y-auto pr-1 max-h-72"></div>
+        </div>
+    </div>
+
+    <!-- MODAL CUENTA (SALDOS) -->
+    <div id="modalCuenta" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="modalCuentaTitulo" class="text-lg font-bold">Configurar Banco / Cuenta</h3>
+                <button type="button" onclick="closeModal('modalCuenta')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="handleSaveCuenta(event)" class="space-y-4 overflow-y-auto pr-1">
+                <input type="hidden" id="cuentaId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">NOMBRE DEL BANCO / CUENTA</label>
+                    <input type="text" id="cuentaNombre" required placeholder="Ej: Banco Ciudad, Santander..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO BANCO ($)</label>
+                        <input type="number" step="0.01" id="cuentaBcoSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO MP ($)</label>
+                        <input type="number" step="0.01" id="cuentaMpSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                    </div>
+                </div>
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-credit-card mr-1"></i> Tarjetas de Crédito</label>
+                        <div id="containerCategoriasAsociadas" class="grid grid-cols-2 gap-2 pt-2"></div>
+                    </div>
+                    <hr class="border-slate-800">
+                    <div>
+                        <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1"><i class="fa-solid fa-thumbtack mr-1"></i> Gastos Fijos e Ítems</label>
+                        <div id="containerGastosFijosAsociados" class="space-y-1.5 pt-2 max-h-40 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('modalCuenta')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CAT HORMIGA -->
+    <div id="modalCatHormiga" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold flex items-center gap-2 text-amber-400"><i class="fa-solid fa-tags"></i> Categorías de Gastos Hormiga</h3>
+                <button type="button" onclick="closeModal('modalCatHormiga')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nuevaCatHormigaNombre" placeholder="Nueva categoría..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                    <input type="color" id="nuevaCatHormigaColor" value="#f59e0b" class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer p-1">
+                    <button onclick="agregarCategoriaHormiga()" class="w-10 h-10 bg-amber-600 hover:bg-amber-500 text-white rounded-xl flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            <div id="listaCatHormigaConfig" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+
     <script>
-        let modalChartInstance = null;
+        let currentActiveTab = 'planilla';
 
-        window.expandirGraficoModal = function(originalCanvasId, titulo) {
-            const originalCanvas = document.getElementById(originalCanvasId);
-            if (!originalCanvas) return;
+        window.switchTab = function(tabName) {
+            currentActiveTab = tabName;
+            
+            document.getElementById('viewPlanilla').classList.add('hidden');
+            document.getElementById('viewAnalisis').classList.add('hidden');
+            document.getElementById('viewSaldos').classList.add('hidden');
+            document.getElementById('viewHormiga').classList.add('hidden');
 
-            const originalChart = Chart.getChart(originalCanvas);
-            if (!originalChart) return;
+            document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+            document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+            document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
+            document.getElementById('btnTabHormiga').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
 
-            document.getElementById('modalGraficoTitulo').innerText = titulo || "Vista Ampliada del Gráfico";
+            if (tabName === 'planilla') {
+                document.getElementById('viewPlanilla').classList.remove('hidden');
+                document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                renderPlanillaTab();
+            } else if (tabName === 'analisis') {
+                document.getElementById('viewAnalisis').classList.remove('hidden');
+                document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
+                initRecurrentesCheckboxesList();
+                renderFiltrosGraficosCheckboxes();
+                renderCharts();
+            } else if (tabName === 'saldos') {
+                document.getElementById('viewSaldos').classList.remove('hidden');
+                document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                renderSaldosApp();
+            } else if (tabName === 'hormiga') {
+                document.getElementById('viewHormiga').classList.remove('hidden');
+                document.getElementById('btnTabHormiga').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
+                renderHormigaApp();
+            }
+        };
 
-            const modalCanvas = document.getElementById('chartModalCanvas');
-            const ctx = modalCanvas.getContext('2d');
+        function renderApp() {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            if(document.getElementById('displayMonthText')) document.getElementById('displayMonthText').innerText = window.formatMonthDisplay(currentMonth);
+            if(document.getElementById('badgeMonth')) document.getElementById('badgeMonth').innerText = window.formatMonthDisplay(currentMonth);
 
-            if (modalChartInstance) {
-                modalChartInstance.destroy();
+            if (currentActiveTab === 'planilla') renderPlanillaTab();
+            else if (currentActiveTab === 'analisis') renderCharts();
+            else if (currentActiveTab === 'saldos') renderSaldosApp();
+            else if (currentActiveTab === 'hormiga') renderHormigaApp();
+        }
+
+        function renderPlanillaTab() {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const { sueldoActual, items, totalFijos, totalTarjetas } = window.getCalculatedDataForMonth(currentMonth);
+            const totalGastosMes = totalFijos + totalTarjetas;
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+
+            if(document.getElementById('cardSueldo')) document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
+            if(document.getElementById('cardGastosFijos')) document.getElementById('cardGastosFijos').innerText = fmt(totalFijos);
+            if(document.getElementById('cardTarjetas')) document.getElementById('cardTarjetas').innerText = fmt(totalTarjetas);
+            if(document.getElementById('cardGastosTotales')) document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
+            if(document.getElementById('cardResto')) document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
+
+            renderFiltrosCategoriasPills();
+            renderPlanillaAgrupadaTabla(items);
+        }
+
+        window.openModalSueldo = function() {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const sueldoVal = window.getSueldoForMonth(currentMonth);
+            document.getElementById('inputSueldoMonto').value = sueldoVal;
+            document.getElementById('modalSueldo').classList.remove('hidden');
+        };
+
+        window.handleSaveSueldo = function(e) {
+            e.preventDefault();
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const monto = parseFloat(document.getElementById('inputSueldoMonto').value) || 0;
+            if (!window.appState.sueldos) window.appState.sueldos = {};
+            window.appState.sueldos[currentMonth] = monto;
+            window.saveDataToCloud();
+            window.closeModal('modalSueldo');
+            renderApp();
+        };
+
+        function renderFiltrosCategoriasPills() {
+            const container = document.getElementById('containerFiltrosCategoriasPills');
+            if (!container) return;
+            container.innerHTML = '';
+            const catList = window.appState.categorias || [];
+            if (window.filtrosTemporales === undefined) window.filtrosTemporales = [];
+
+            catList.forEach(cat => {
+                const isChecked = window.filtrosTemporales.length === 0 || window.filtrosTemporales.includes(cat.nombre);
+                const label = document.createElement('label');
+                label.className = `cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold border transition inline-flex items-center gap-2 ${isChecked ? 'bg-slate-900 text-white border-slate-700 shadow-md' : 'bg-slate-950/60 text-slate-500 border-slate-900'}`;
+                label.innerHTML = `
+                    <input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroCategoriaPill(this)" class="hidden">
+                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color};"></span>
+                    ${cat.nombre}
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        window.toggleFiltroCategoriaPill = function(checkbox) {
+            const catNombre = checkbox.value;
+            const catList = window.appState.categorias || [];
+            if (window.filtrosTemporales.length === 0) window.filtrosTemporales = catList.map(c => c.nombre);
+            if (checkbox.checked) {
+                if (!window.filtrosTemporales.includes(catNombre)) window.filtrosTemporales.push(catNombre);
+            } else {
+                window.filtrosTemporales = window.filtrosTemporales.filter(c => c !== catNombre);
+            }
+            if (window.filtrosTemporales.length === catList.length) window.filtrosTemporales = [];
+            renderApp();
+        };
+
+        window.marcarTodosFiltros = function(marcar) {
+            window.filtrosTemporales = marcar ? [] : ['__NINGUNA__'];
+            renderApp();
+        };
+
+function renderPlanillaAgrupadaTabla(items) {
+            const container = document.getElementById('containerPlanillaAgrupada');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const filtrosActivos = window.filtrosTemporales || [];
+            let itemsFiltrados = items.filter(item => filtrosActivos.length === 0 || filtrosActivos.includes(item.categoria));
+
+            if (itemsFiltrados.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-8">No hay gastos que coincidan con los filtros seleccionados.</p>';
+                return;
             }
 
-            // Clonamos la configuración completa del gráfico original
-            modalChartInstance = new Chart(ctx, {
-                type: originalChart.config.type,
-                data: JSON.parse(JSON.stringify(originalChart.config.data)),
-                options: {
-                    ...originalChart.config.options,
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        ...originalChart.config.options.plugins,
-                        legend: {
-                            ...originalChart.config.options.plugins?.legend,
-                            display: true, // Mostramos la leyenda siempre en pantalla grande
-                            labels: { color: '#cbd5e1', font: { size: 12 } }
-                        }
+            let grupos = {};
+            itemsFiltrados.forEach(item => {
+                if (!grupos[item.categoria]) grupos[item.categoria] = [];
+                grupos[item.categoria].push(item);
+            });
+
+            const ordenGuardado = window.appState.ordenItemsCategoria || {};
+            Object.keys(grupos).forEach(cat => {
+                if (ordenGuardado[cat]) {
+                    const idsOrden = ordenGuardado[cat];
+                    grupos[cat].sort((a, b) => {
+                        let idxA = idsOrden.indexOf(a.id);
+                        let idxB = idsOrden.indexOf(b.id);
+                        if (idxA === -1) idxA = 999;
+                        if (idxB === -1) idxB = 999;
+                        return idxA - idxB;
+                    });
+                }
+            });
+
+            const catList = window.appState.categorias || [];
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+
+            Object.entries(grupos).forEach(([categoria, gastosCat]) => {
+                const catObj = catList.find(c => c.nombre === categoria);
+                const colorCat = catObj ? catObj.color : '#64748b';
+                const totalCat = gastosCat.reduce((acc, g) => acc + g.monto, 0);
+                const isAbierto = window.categoriasAbiertasMap[categoria] === true;
+                const esBloque = catObj ? catObj.vencimientoUnicoEnBloque : false;
+
+                let vencimientoGrupo = '';
+                gastosCat.forEach(g => { if (g.vencimiento && !vencimientoGrupo) vencimientoGrupo = g.vencimiento; });
+                const gridKeyFirst = `${gastosCat[0]?.id}_${currentMonth}`;
+                const vencimientoValFirst = window.appState.excepcionesVencimientoGrid?.[gridKeyFirst] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKeyFirst] : vencimientoGrupo;
+                const vencimientoFmt = (esBloque && vencimientoValFirst) ? window.formatFechaVencimientoSimple(vencimientoValFirst) : '';
+
+                let rowsHtml = '';
+                if (isAbierto) {
+                    rowsHtml = gastosCat.map(g => {
+                        const gridKey = `${g.id}_${currentMonth}`;
+                        const vencimientoVal = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKey] : (g.vencimiento || '');
+                        const estadoVal = g.estado || 'PENDIENTE';
+
+                        return `
+                            <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event, '${categoria}')" data-id="${g.id}" class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs cursor-default">
+                                <td class="px-5 py-3 text-white font-bold flex items-center gap-2">
+                                    <span class="text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing p-1"><i class="fa-solid fa-grip-vertical"></i></span>
+                                    ${g.concepto}
+                                </td>
+                                <td class="px-5 py-3 text-slate-400">${g.tipo}</td>
+                                <td class="px-5 py-3">
+                                    <input type="date" value="${vencimientoVal}" onchange="actualizarVencimientoGrid('${g.id}', '${currentMonth}', this.value, '${categoria}')" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs ${vencimientoVal ? 'text-amber-400 font-bold border-amber-800/60 bg-amber-950/60' : 'text-slate-300'} focus:outline-none">
+                                </td>
+                                <td class="px-5 py-3 text-right font-extrabold text-white">${fmt(g.monto)}</td>
+                                <td class="px-5 py-3 text-center">
+                                    <select onchange="actualizarEstadoGasto('${g.id}', '${currentMonth}', this.value)" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-bold ${estadoVal === 'PAGADO' ? 'text-emerald-400' : (estadoVal === 'VENCIDO' ? 'text-rose-400' : 'text-amber-500')} focus:outline-none cursor-pointer">
+                                        <option value="PENDIENTE" ${estadoVal === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
+                                        <option value="PAGADO" ${estadoVal === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
+                                        <option value="VENCIDO" ${estadoVal === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
+                                    </select>
+                                </td>
+                                <td class="px-5 py-3 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button onclick="editGasto('${g.id}')" class="text-slate-400 hover:text-white p-1" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                                        <button onclick="deleteGasto('${g.id}')" class="text-slate-400 hover:text-rose-400 p-1" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                container.innerHTML += `
+                    <div class="bg-slate-900/60 rounded-xl overflow-hidden border border-slate-800/80 mb-3">
+                        <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800/80 flex justify-between items-center cursor-pointer select-none" onclick="toggleCategoriaAcordeon('${categoria}')">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-chevron-${isAbierto ? 'down' : 'right'} text-xs text-slate-400"></i>
+                                <span class="w-3 h-3 rounded-full" style="background-color: ${colorCat};"></span>
+                                <span class="text-sm font-bold text-white">${categoria}</span>
+                                <span class="text-[11px] bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-semibold">${gastosCat.length} ítem${gastosCat.length === 1 ? '' : 's'}</span>
+                                ${vencimientoFmt ? `<span class="text-[11px] bg-amber-950/60 text-amber-400 border border-amber-800/60 px-2.5 py-0.5 rounded-full font-mono"><i class="fa-solid fa-calendar-days mr-1"></i>Venc: ${vencimientoFmt}</span>` : ''}
+                            </div>
+                            <span class="text-sm font-extrabold text-emerald-400">TOTAL: ${fmt(totalCat)}</span>
+                        </div>
+                        ${isAbierto ? `
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="px-5 py-3">CONCEPTO</th>
+                                            <th class="px-5 py-3">TIPO / CUOTAS</th>
+                                            <th class="px-5 py-3">VENCIMIENTO</th>
+                                            <th class="px-5 py-3 text-right">MONTO</th>
+                                            <th class="px-5 py-3 text-center">ESTADO</th>
+                                            <th class="px-5 py-3 text-right">ACCIONES</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800/60 text-sm font-medium">
+                                        ${rowsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+        }
+
+        let draggedRowId = null;
+        window.dragStart = function(e) { draggedRowId = e.currentTarget.getAttribute('data-id'); e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
+        window.dragOver = function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+        window.dropItem = function(e, categoria) {
+            e.preventDefault();
+            const targetRow = e.target.closest('tr');
+            if (!targetRow) return;
+            const targetRowId = targetRow.getAttribute('data-id');
+            if (!draggedRowId || draggedRowId === targetRowId) return;
+            const rows = Array.from(targetRow.parentNode.querySelectorAll('tr[data-id]'));
+            let nuevosIds = rows.map(r => r.getAttribute('data-id'));
+            const fromIdx = nuevosIds.indexOf(draggedRowId);
+            const toIdx = nuevosIds.indexOf(targetRowId);
+            if (fromIdx !== -1 && toIdx !== -1) {
+                nuevosIds.splice(fromIdx, 1);
+                nuevosIds.splice(toIdx, 0, draggedRowId);
+                if (!window.appState.ordenItemsCategoria) window.appState.ordenItemsCategoria = {};
+                window.appState.ordenItemsCategoria[categoria] = nuevosIds;
+                window.saveDataToCloud();
+                renderApp();
+            }
+        };
+
+        window.toggleCategoriaAcordeon = function(catNombre) { window.categoriasAbiertasMap[catNombre] = !window.categoriasAbiertasMap[catNombre]; renderApp(); };
+        window.actualizarVencimientoGrid = function(gastoId, monthStr, nuevaFecha, categoriaNombre) {
+            if (!window.appState.excepcionesVencimientoGrid) window.appState.excepcionesVencimientoGrid = {};
+            const catObj = (window.appState.categorias || []).find(c => c.nombre === categoriaNombre);
+            if (catObj && catObj.vencimientoUnicoEnBloque) {
+                const calc = window.getCalculatedDataForMonth(monthStr);
+                calc.items.forEach(item => { if (item.categoria === categoriaNombre) window.appState.excepcionesVencimientoGrid[`${item.id}_${monthStr}`] = nuevaFecha; });
+            } else { window.appState.excepcionesVencimientoGrid[`${gastoId}_${monthStr}`] = nuevaFecha; }
+            window.saveDataToCloud(); renderApp();
+        };
+        window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
+            if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
+            window.appState.excepcionesEstado[`${gastoId}_${monthStr}`] = nuevoEstado;
+            window.saveDataToCloud(); renderApp();
+        };
+
+        window.openModalCatGeneral = function() { renderCatGeneralList(); document.getElementById('modalCatGeneral').classList.remove('hidden'); };
+        function renderCatGeneralList() {
+            const container = document.getElementById('listaCatGeneralConfig');
+            if (!container) return; container.innerHTML = '';
+            (window.appState.categorias || []).forEach((cat, index) => {
+                container.innerHTML += `
+                    <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 flex-1">
+                                <input type="color" value="${cat.color}" onchange="actualizarCatGenCampo(${index}, 'color', this.value)" class="w-8 h-8 rounded bg-slate-900 border border-slate-800 cursor-pointer p-0.5">
+                                <input type="text" value="${cat.nombre}" onchange="actualizarCatGenCampo(${index}, 'nombre', this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-white focus:outline-none">
+                            </div>
+                            <button onclick="eliminarCatGeneral(${index})" class="text-rose-400 hover:text-rose-300 p-2" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </div>
+                        <div class="flex items-center gap-2 pt-1 border-t border-slate-900">
+                            <input type="checkbox" id="catGenBloque_${index}" ${cat.vencimientoUnicoEnBloque ? 'checked' : ''} onchange="actualizarCatGenCampo(${index}, 'vencimientoUnicoEnBloque', this.checked)" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 cursor-pointer">
+                            <label for="catGenBloque_${index}" class="text-xs text-slate-300 font-semibold cursor-pointer">${cat.vencimientoUnicoEnBloque ? 'Vencimiento único en bloque (Tarjeta)' : 'Vencimiento individual'}</label>
+                        </div>
+                    </div>`;
+            });
+        }
+        window.actualizarCatGenCampo = function(index, campo, valor) {
+            if (!window.appState.categorias[index]) return;
+            const nombreAnterior = window.appState.categorias[index].nombre;
+            if (campo === 'nombre') {
+                const nuevoNombre = valor.trim();
+                if (!nuevoNombre) return;
+                (window.appState.gastos || []).forEach(g => { if (g.categoria === nombreAnterior) g.categoria = nuevoNombre; });
+                window.appState.categorias[index].nombre = nuevoNombre;
+            } else { window.appState.categorias[index][campo] = valor; }
+            window.saveDataToCloud(); renderApp(); renderCatGeneralList();
+        };
+        window.agregarCategoriaGeneral = function() {
+            const nombre = document.getElementById('nuevaCatGenNombre').value.trim();
+            const color = document.getElementById('nuevaCatGenColor').value;
+            const vencimientoUnicoEnBloque = document.getElementById('nuevaCatGenBloque').checked;
+            if (!nombre) return;
+            if (!window.appState.categorias) window.appState.categorias = [];
+            window.appState.categorias.push({ nombre, color, esTarjeta: vencimientoUnicoEnBloque, vencimientoUnicoEnBloque });
+            document.getElementById('nuevaCatGenNombre').value = ''; document.getElementById('nuevaCatGenBloque').checked = false;
+            window.saveDataToCloud(); renderApp(); renderCatGeneralList();
+        };
+        window.eliminarCatGeneral = function(index) {
+            if (window.appState.categorias.length <= 1) return alert("Debe haber al menos una categoría.");
+            window.appState.categorias.splice(index, 1);
+            window.saveDataToCloud(); renderApp(); renderCatGeneralList();
+        };
+
+        window.toggleCuotasInputModal = function(isCuotas) {
+            const container = document.getElementById('containerCuotasInput');
+            if (!container) return;
+            if (isCuotas) {
+                container.classList.remove('hidden');
+                if (document.getElementById('gastoCuotas').value < 2) document.getElementById('gastoCuotas').value = 2;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('gastoCuotas').value = 1;
+            }
+            actualizarCalculoCuotasModal();
+        };
+
+        window.actualizarCalculoCuotasModal = function() {
+            const montoTotal = parseFloat(document.getElementById('gastoMonto').value) || 0;
+            const cantCuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
+            const infoBox = document.getElementById('infoCuotaCalculada');
+            const textoBox = document.getElementById('textoCuotaCalculada');
+            const isCuotasChecked = document.getElementById('gastoEsCuotasCheck').checked;
+
+            if (isCuotasChecked && cantCuotas > 1 && montoTotal > 0) {
+                const valorCuota = montoTotal / cantCuotas;
+                const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (textoBox) textoBox.innerText = `Valor de cada cuota: ${fmt(valorCuota)} (${cantCuotas} cuotas)`;
+                if (infoBox) infoBox.classList.remove('hidden');
+            } else {
+                if (infoBox) infoBox.classList.add('hidden');
+            }
+        };
+
+        window.openModalGasto = function() {
+            document.getElementById('gastoId').value = ''; 
+            document.getElementById('modalGastoTitulo').innerText = "Nuevo Gasto";
+            document.getElementById('gastoConcepto').value = ''; 
+            document.getElementById('gastoMonto').value = '';
+            document.getElementById('gastoCuotas').value = '1'; 
+            document.getElementById('gastoStartMonth').value = window.appState.currentMonth || '2026-10';
+            document.getElementById('gastoVencimiento').value = ''; 
+            document.getElementById('gastoIsRecurrente').checked = false;
+            document.getElementById('gastoEsCuotasCheck').checked = false;
+            document.getElementById('containerCuotasInput').classList.add('hidden');
+            document.getElementById('infoCuotaCalculada').classList.add('hidden');
+            
+            const selectCat = document.getElementById('gastoCategoria'); 
+            selectCat.innerHTML = '';
+            (window.appState.categorias || []).forEach(c => { 
+                const opt = document.createElement('option'); 
+                opt.value = c.nombre; 
+                opt.innerHTML = c.nombre; 
+                selectCat.appendChild(opt); 
+            });
+            document.getElementById('modalGasto').classList.remove('hidden');
+        };
+
+        window.editGasto = function(id) {
+            const gasto = (window.appState.gastos || []).find(g => g.id === id);
+            if (!gasto) return;
+            const currentActiveMonth = window.appState.currentMonth || '2026-10';
+
+            document.getElementById('gastoId').value = gasto.id; 
+            document.getElementById('modalGastoTitulo').innerText = "Editar Gasto";
+            document.getElementById('gastoConcepto').value = gasto.concepto; 
+            
+            const montoActual = window.appState.excepcionesMonto?.[`${id}_${currentActiveMonth}`] !== undefined 
+                ? window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] 
+                : gasto.monto;
+            const vencActual = window.appState.excepcionesVencimiento?.[`${id}_${currentActiveMonth}`] !== undefined 
+                ? window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] 
+                : (gasto.vencimiento || '');
+
+            document.getElementById('gastoMonto').value = montoActual;
+            const cuotasVal = parseInt(gasto.cuotas) || 1;
+            document.getElementById('gastoCuotas').value = cuotasVal; 
+            document.getElementById('gastoStartMonth').value = gasto.startMonth || window.appState.currentMonth;
+            document.getElementById('gastoVencimiento').value = vencActual; 
+            document.getElementById('gastoIsRecurrente').checked = !!gasto.isRecurrente;
+            
+            const esCuotas = cuotasVal > 1;
+            document.getElementById('gastoEsCuotasCheck').checked = esCuotas;
+            if (esCuotas) {
+                document.getElementById('containerCuotasInput').classList.remove('hidden');
+                actualizarCalculoCuotasModal();
+            } else {
+                document.getElementById('containerCuotasInput').classList.add('hidden');
+            }
+
+            const selectCat = document.getElementById('gastoCategoria'); selectCat.innerHTML = '';
+            const catActual = window.appState.excepcionesCategoria?.[`${id}_${currentActiveMonth}`] !== undefined
+                ? window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`]
+                : gasto.categoria;
+
+            (window.appState.categorias || []).forEach(c => { 
+                const opt = document.createElement('option'); 
+                opt.value = c.nombre; 
+                opt.innerHTML = c.nombre; 
+                if (c.nombre === catActual) opt.selected = true; 
+                selectCat.appendChild(opt); 
+            });
+
+            document.getElementById('modalGasto').classList.remove('hidden');
+        };
+
+        window.handleSaveGasto = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('gastoId').value;
+            const concepto = document.getElementById('gastoConcepto').value.trim();
+            const monto = parseFloat(document.getElementById('gastoMonto').value) || 0;
+            const cuotas = parseInt(document.getElementById('gastoCuotas').value) || 1;
+            const categoria = document.getElementById('gastoCategoria').value;
+            const startMonth = document.getElementById('gastoStartMonth').value;
+            const vencimiento = document.getElementById('gastoVencimiento').value;
+            const isRecurrente = document.getElementById('gastoIsRecurrente').checked;
+
+            const currentActiveMonth = window.appState.currentMonth || '2026-10';
+
+            if (!window.appState.gastos) window.appState.gastos = [];
+
+            if (id) {
+                if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+                if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
+                if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
+
+                window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] = monto;
+                window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] = vencimiento;
+                window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`] = categoria;
+
+                let [currY, currM] = currentActiveMonth.split('-').map(Number);
+                let fechaPropagada = vencimiento;
+
+                for (let i = 1; i <= 36; i++) {
+                    currM++;
+                    if (currM > 12) { currM = 1; currY++; }
+                    let nextMonthStr = `${currY}-${String(currM).padStart(2, '0')}`;
+                    
+                    if (fechaPropagada) {
+                        fechaPropagada = window.sumarUnMesAFecha(fechaPropagada);
+                        window.appState.excepcionesVencimiento[`${id}_${nextMonthStr}`] = fechaPropagada;
+                    }
+                    window.appState.excepcionesMonto[`${id}_${nextMonthStr}`] = monto;
+                    window.appState.excepcionesCategoria[`${id}_${nextMonthStr}`] = categoria;
+                }
+
+                const idx = window.appState.gastos.findIndex(g => g.id === id);
+                if (idx !== -1) {
+                    window.appState.gastos[idx].concepto = concepto;
+                    window.appState.gastos[idx].cuotas = cuotas;
+                    window.appState.gastos[idx].isRecurrente = isRecurrente;
+                }
+            } else {
+                const nuevoGasto = { id: Date.now().toString(), concepto, monto, cuotas, categoria, startMonth, vencimiento, isRecurrente };
+                window.appState.gastos.push(nuevoGasto);
+            }
+
+            window.saveDataToCloud();
+            window.closeModal('modalGasto');
+            renderApp();
+        };
+
+        window.deleteGasto = function(id) {
+            if (confirm("¿Estás seguro de eliminar este gasto a partir de este mes? Los meses anteriores se mantendrán intactos.")) {
+                const currentActiveMonth = window.appState.currentMonth || '2026-10';
+                
+                if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
+                window.appState.excepcionesEliminacion[id] = currentActiveMonth;
+
+                window.saveDataToCloud();
+                renderApp();
+            }
+        };
+
+        window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
+
+        // ---------------- SCRIPT ANÁLISIS & GRÁFICOS ----------------
+        let customRangeFrom = null; let customRangeTo = null;
+        let chartInstTotales = null; let chartInstEvolCat = null; let chartInstRecurrentesIndiv = null; let chartInstBalance = null;
+
+        function initChartRangeInputs() {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            let [cYear, cMonth] = currentMonth.split('-').map(Number);
+            let mFrom = cMonth - 3, yFrom = cYear; while (mFrom < 1) { mFrom += 12; yFrom--; }
+            const fromStr = `${yFrom}-${String(mFrom).padStart(2, '0')}`;
+            let mTo = cMonth + 3, yTo = cYear; while (mTo > 12) { mTo -= 12; yTo++; }
+            const toStr = `${yTo}-${String(mTo).padStart(2, '0')}`;
+            customRangeFrom = fromStr; customRangeTo = toStr;
+            const elFrom = document.getElementById('chartMonthFrom'); const elTo = document.getElementById('chartMonthTo');
+            if (elFrom) elFrom.value = fromStr; if (elTo) elTo.value = toStr;
+        }
+        function resetDefaultMonthRange() { initChartRangeInputs(); renderCharts(); }
+        function applyCustomMonthRange() {
+            const elFrom = document.getElementById('chartMonthFrom').value; const elTo = document.getElementById('chartMonthTo').value;
+            if (elFrom && elTo && elFrom <= elTo) { customRangeFrom = elFrom; customRangeTo = elTo; renderCharts(); }
+        }
+        function initRecurrentesCheckboxesList() {
+            const container = document.getElementById('containerFiltrosRecurrentesGrid'); if (!container) return;
+            let mapIdsUnicos = new Map();
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if (g.isRecurrente || baseEsFijo) { if (!mapIdsUnicos.has(g.id)) mapIdsUnicos.set(g.id, g.concepto); }
+            });
+            if (window.filtrosRecurrentesGrid.length === 0 && window.appState.recurrentesPreferidos?.length > 0) window.filtrosRecurrentesGrid = [...window.appState.recurrentesPreferidos];
+            container.innerHTML = '';
+            let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16']; let colorIdx = 0;
+            mapIdsUnicos.forEach((concepto, id) => {
+                const isChecked = window.filtrosRecurrentesGrid.length === 0 || window.filtrosRecurrentesGrid.includes(id);
+                let color = colorPalette[colorIdx % colorPalette.length]; colorIdx++;
+                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroRecurrenteGrid(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>${concepto}</label>`;
+            });
+        }
+        window.toggleFiltroRecurrenteGrid = function(checkbox) {
+            const id = checkbox.value; let mapIdsUnicos = [];
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if (g.isRecurrente || baseEsFijo) { if (!mapIdsUnicos.includes(g.id)) mapIdsUnicos.push(g.id); }
+            });
+            if (window.filtrosRecurrentesGrid.length === 0) window.filtrosRecurrentesGrid = [...mapIdsUnicos];
+            if (checkbox.checked) { if (!window.filtrosRecurrentesGrid.includes(id)) window.filtrosRecurrentesGrid.push(id); }
+            else { window.filtrosRecurrentesGrid = window.filtrosRecurrentesGrid.filter(i => i !== id); }
+            if (window.filtrosRecurrentesGrid.length === mapIdsUnicos.length) window.filtrosRecurrentesGrid = [];
+            initRecurrentesCheckboxesList(); renderCharts();
+        };
+        window.marcarTodosRecurrentesGrid = function(marcar) { window.filtrosRecurrentesGrid = marcar ? [] : ['__NINGUNO__']; initRecurrentesCheckboxesList(); renderCharts(); };
+
+        function renderFiltrosGraficosCheckboxes() {
+            const catList = window.appState.categorias || [];
+            const contTotales = document.getElementById('containerFiltrosGraficoTotales');
+            if (contTotales) {
+                contTotales.innerHTML = '';
+                [ { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Ingresos / Sueldo", color: "#10b981" } ].forEach(item => {
+                    const isChecked = window.filtrosGraficoTotales.length === 0 || window.filtrosGraficoTotales.includes(item.nombre);
+                    contTotales.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Totales', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}</label>`;
+                });
+            }
+            const contEvolCat = document.getElementById('containerFiltrosGraficoEvolCat');
+            if (contEvolCat) {
+                contEvolCat.innerHTML = '';
+                catList.forEach(cat => {
+                    const isChecked = window.filtrosGraficoEvolCat.length === 0 || window.filtrosGraficoEvolCat.includes(cat.nombre);
+                    contEvolCat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
+                });
+            }
+            const contBalance = document.getElementById('containerFiltrosGraficoBalance');
+            if (contBalance) {
+                contBalance.innerHTML = '';
+                [ { nombre: "Ingreso / Sueldo", color: "#10b981" }, { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Resto Disponible", color: "#3b82f6" } ].forEach(item => {
+                    const isChecked = window.filtrosGraficoBalance.length === 0 || window.filtrosGraficoBalance.includes(item.nombre);
+                    contBalance.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Balance', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}</label>`;
+                });
+            }
+        }
+        window.toggleFiltroGrafico = function(tipo, checkbox) {
+            const val = checkbox.value; let arrRef, fullList;
+            if (tipo === 'Totales') { if (window.filtrosGraficoTotales.length === 0) window.filtrosGraficoTotales = ["Gastos Totales", "Ingresos / Sueldo"]; arrRef = window.filtrosGraficoTotales; fullList = ["Gastos Totales", "Ingresos / Sueldo"]; }
+            else if (tipo === 'EvolCat') { const catList = window.appState.categorias || []; if (window.filtrosGraficoEvolCat.length === 0) window.filtrosGraficoEvolCat = catList.map(c => c.nombre); arrRef = window.filtrosGraficoEvolCat; fullList = catList.map(c => c.nombre); }
+            else if (tipo === 'Balance') { if (window.filtrosGraficoBalance.length === 0) window.filtrosGraficoBalance = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; arrRef = window.filtrosGraficoBalance; fullList = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; }
+            if (checkbox.checked) { if (!arrRef.includes(val)) arrRef.push(val); } else { const idx = arrRef.indexOf(val); if (idx !== -1) arrRef.splice(idx, 1); }
+            if (arrRef.length === fullList.length) { if (tipo === 'Totales') window.filtrosGraficoTotales = []; if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = []; if (tipo === 'Balance') window.filtrosGraficoBalance = []; }
+            renderFiltrosGraficosCheckboxes(); renderCharts();
+        };
+        window.marcarTodosGrafico = function(tipo, marcar) {
+            if (tipo === 'Totales') window.filtrosGraficoTotales = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'Balance') window.filtrosGraficoBalance = marcar ? [] : ['__NINGUNO__'];
+            renderFiltrosGraficosCheckboxes(); renderCharts();
+        };
+
+        function renderCharts() {
+            if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
+            let labelsMonths = [], dataTotales = [], dataIngresos = [], dataResto = [];
+            let catList = window.appState.categorias || [];
+            let [startYear, startMonth] = customRangeFrom.split('-').map(Number);
+            let [endYear, endMonth] = customRangeTo.split('-').map(Number);
+            let currY = startYear, currM = startMonth;
+            let filtrosTotales = window.filtrosGraficoTotales || [];
+            let filtrosEvolCat = window.filtrosGraficoEvolCat || [];
+            let filtrosBalance = window.filtrosGraficoBalance || [];
+
+            let datasetsEvolCat = catList.filter(cat => filtrosEvolCat.length === 0 || filtrosEvolCat.includes(cat.nombre)).map(cat => ({ label: cat.nombre, data: [], borderColor: cat.color, backgroundColor: cat.color, borderWidth: 2, pointRadius: 3, pointStyle: 'rect', fill: false, tension: 0.3 }));
+            let mapIdToDatasetIndex = {}; let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16']; let datasetsRecurrentesIndiv = []; let colorIdx = 0; let filtrosRecGrid = window.filtrosRecurrentesGrid;
+
+            (window.appState.gastos || []).forEach(g => {
+                const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
+                if ((g.isRecurrente || baseEsFijo) && mapIdToDatasetIndex[g.id] === undefined) {
+                    if (filtrosRecGrid.length === 0 || filtrosRecGrid.includes(g.id)) {
+                        let color = colorPalette[colorIdx % colorPalette.length]; colorIdx++;
+                        mapIdToDatasetIndex[g.id] = datasetsRecurrentesIndiv.length;
+                        datasetsRecurrentesIndiv.push({ label: g.concepto, data: [], borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 3, pointStyle: 'rect', fill: false, tension: 0.3 });
                     }
                 }
             });
 
-            document.getElementById('modalGraficoExpandido').classList.remove('hidden');
-        };
-
-        window.cerrarGraficoModal = function() {
-            document.getElementById('modalGraficoExpandido').classList.add('hidden');
-            if (modalChartInstance) {
-                modalChartInstance.destroy();
-                modalChartInstance = null;
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            while (currY < endYear || (currY === endYear && currM <= endMonth)) {
+                let ymStr = `${currY}-${String(currM).padStart(2, '0')}`;
+                labelsMonths.push(`${monthNames[currM - 1]} ${currY}`);
+                const calc = window.getCalculatedDataForMonth(ymStr);
+                const sumaTotalMes = calc.totalFijos + calc.totalTarjetas;
+                dataTotales.push(sumaTotalMes); dataIngresos.push(calc.sueldoActual); dataResto.push(calc.sueldoActual - sumaTotalMes);
+                let valoresMesRecurrente = new Array(datasetsRecurrentesIndiv.length).fill(0);
+                calc.items.forEach(item => { if (item.isRecurrente && mapIdToDatasetIndex[item.id] !== undefined) valoresMesRecurrente[mapIdToDatasetIndex[item.id]] += item.monto; });
+                datasetsRecurrentesIndiv.forEach((ds, idx) => ds.data.push(valoresMesRecurrente[idx]));
+                catList.forEach(cat => { if (filtrosEvolCat.length === 0 || filtrosEvolCat.includes(cat.nombre)) { let dsObj = datasetsEvolCat.find(d => d.label === cat.nombre); if (dsObj) dsObj.data.push(calc.totalesPorCat[cat.nombre] || 0); } });
+                currM++; if (currM > 12) { currM = 1; currY++; }
             }
+
+            let datasetsTotales = [];
+            if (filtrosTotales.length === 0 || filtrosTotales.includes("Gastos Totales")) datasetsTotales.push({ label: 'Gastos Totales', data: dataTotales, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
+            if (filtrosTotales.length === 0 || filtrosTotales.includes("Ingresos / Sueldo")) datasetsTotales.push({ label: 'Ingresos / Sueldo', data: dataIngresos, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
+
+            const ctxTotales = document.getElementById('chartEvolucionTotales');
+            if (ctxTotales) { if (chartInstTotales) chartInstTotales.destroy(); chartInstTotales = new Chart(ctxTotales, { type: 'line', data: { labels: labelsMonths, datasets: datasetsTotales }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
+
+            const ctxEvolCat = document.getElementById('chartEvolucionCategorias');
+            if (ctxEvolCat) { if (chartInstEvolCat) chartInstEvolCat.destroy(); chartInstEvolCat = new Chart(ctxEvolCat, { type: 'line', data: { labels: labelsMonths, datasets: datasetsEvolCat }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
+
+            const ctxRecurrentesIndiv = document.getElementById('chartEvolucionRecurrentesIndiv');
+            if (ctxRecurrentesIndiv) { if (chartInstRecurrentesIndiv) chartInstRecurrentesIndiv.destroy(); chartInstRecurrentesIndiv = new Chart(ctxRecurrentesIndiv, { type: 'line', data: { labels: labelsMonths, datasets: datasetsRecurrentesIndiv }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
+
+            let datasetsBalance = [];
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Ingreso / Sueldo")) datasetsBalance.push({ label: 'Ingreso / Sueldo', data: dataIngresos, backgroundColor: '#10b981', borderRadius: 6 });
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Gastos Totales")) datasetsBalance.push({ label: 'Gastos Totales', data: dataTotales, backgroundColor: '#f43f5e', borderRadius: 6 });
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Resto Disponible")) datasetsBalance.push({ label: 'Resto Disponible', data: dataResto, backgroundColor: '#3b82f6', borderRadius: 6 });
+
+            const ctxBalance = document.getElementById('chartBalanceGeneral');
+            if (ctxBalance) { if (chartInstBalance) chartInstBalance.destroy(); chartInstBalance = new Chart(ctxBalance, { type: 'bar', data: { labels: labelsMonths, datasets: datasetsBalance }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
+        }
+
+        // ---------------- SCRIPT SALDOS Y BANCOS ----------------
+        function renderSaldosApp() {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const calcData = window.getCalculatedDataForMonth(currentMonth);
+            const container = document.getElementById('containerBancosGrid');
+            const containerResumen = document.getElementById('containerResumenDisponibles');
+            if (!container) return; container.innerHTML = ''; if (containerResumen) containerResumen.innerHTML = '';
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            let totalDisponibleRealSuma = 0; let tarjetasBancosHtml = '';
+
+            (window.appState.cuentasBancarias || []).forEach(cuenta => {
+                const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
+                const bcoSaldo = parseFloat(saldosMes.bcoSaldo) || 0; const mpSaldo = parseFloat(saldosMes.mpSaldo) || 0;
+                const totalIngresos = bcoSaldo + mpSaldo; const catAsociadas = cuenta.categoriasAsociadas || []; const fijosAsociadosIds = cuenta.gastosFijosAsociados || [];
+                let totalesTarjetasEspecificas = {}; let vencimientosTarjetas = {}; let gastosFijosCuenta = [];
+
+                calcData.items.forEach(item => {
+                    if (item.estado === 'PAGADO') return;
+                    const catObj = (window.appState.categorias || []).find(c => c.nombre === item.categoria);
+                    const esTarjeta = catObj ? catObj.esTarjeta : true;
+                    if (esTarjeta && catAsociadas.includes(item.categoria)) {
+                        totalesTarjetasEspecificas[item.categoria] = (totalesTarjetasEspecificas[item.categoria] || 0) + item.monto;
+                        if (item.vencimiento && !vencimientosTarjetas[item.categoria]) vencimientosTarjetas[item.categoria] = item.vencimiento;
+                    } else if (!esTarjeta && fijosAsociadosIds.includes(item.id)) gastosFijosCuenta.push(item);
+                });
+
+                let tarjetasDesglosadasHtml = ''; let sumaTarjetas = 0;
+                Object.entries(totalesTarjetasEspecificas).forEach(([nombreCat, montoCat]) => {
+                    sumaTarjetas += montoCat; const vencStr = vencimientosTarjetas[nombreCat] ? window.formatFechaVencimientoSimple(vencimientosTarjetas[nombreCat]) : '';
+                    tarjetasDesglosadasHtml += `<div class="flex justify-between items-center text-xs text-slate-300 py-1.5 border-b border-slate-800/40 gap-2"><span class="font-semibold shrink-0">${nombreCat}:</span><span class="text-[11px] text-amber-400 font-mono text-center flex-1">${vencStr ? `Venc: ${vencStr}` : ''}</span><span class="text-rose-400 font-bold shrink-0">-$${montoCat.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>`;
+                });
+                const fijosHtml = gastosFijosCuenta.map(g => {
+                    const vencFmt = g.vencimiento ? window.formatFechaVencimientoSimple(g.vencimiento) : '';
+                    return `<div class="flex justify-between items-center text-xs text-slate-400 py-1.5 border-b border-slate-800/40 gap-2"><span class="truncate shrink-0 max-w-[140px]">- ${g.concepto} (${g.categoria})</span><span class="text-[11px] text-amber-400 font-mono text-center flex-1">${vencFmt ? `Venc: ${vencFmt}` : ''}</span><span class="text-rose-400 font-semibold shrink-0">-$${g.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>`;
+                }).join('');
+
+                const totalGastosFijos = gastosFijosCuenta.reduce((acc, g) => acc + g.monto, 0);
+                const totalDescuentosBanco = sumaTarjetas + totalGastosFijos; const disponibleFinal = totalIngresos - totalDescuentosBanco;
+                totalDisponibleRealSuma += disponibleFinal;
+
+                tarjetasBancosHtml += `<div class="card-bg p-4 rounded-2xl border border-slate-800 relative"><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-slate-400 uppercase tracking-wider truncate flex items-center gap-1.5"><i class="fa-solid fa-building-columns text-emerald-400"></i> ${cuenta.nombre}</span></div><h2 class="text-xl font-extrabold my-0.5 ${disponibleFinal >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(disponibleFinal)}</h2><span class="text-[10px] text-slate-500 font-medium">Disponible Real</span></div>`;
+
+                container.innerHTML += `<div class="card-bg p-5 rounded-2xl flex flex-col justify-between shadow-xl border border-slate-800"><div><div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800"><h4 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-university text-emerald-400"></i> ${cuenta.nombre}</h4><div class="flex items-center gap-2"><button onclick="editCuenta('${cuenta.id}')" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-pen"></i></button><button onclick="deleteCuenta('${cuenta.id}')" class="text-slate-400 hover:text-rose-400 text-xs"><i class="fa-solid fa-trash-can"></i></button></div></div><div class="space-y-1.5 text-xs mb-4"><div class="flex justify-between text-slate-300"><span>Saldo Banco:</span> <strong>${fmt(bcoSaldo)}</strong></div><div class="flex justify-between text-slate-300"><span>Saldo Mercado Pago:</span> <strong>${fmt(mpSaldo)}</strong></div><div class="flex justify-between text-emerald-400 font-bold pt-1 border-t border-slate-800"><span>Total Saldos:</span> <span>${fmt(totalIngresos)}</span></div></div><div class="space-y-1 mb-4 bg-slate-900/60 p-3 rounded-xl border border-slate-800"><div class="flex justify-between items-center mb-2"><span class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Descuentos Aplicados</span><span class="text-[10px] text-slate-500 font-semibold">${window.formatMonthDisplay(currentMonth)}</span></div>${tarjetasDesglosadasHtml}${fijosHtml}${(!tarjetasDesglosadasHtml && !fijosHtml) ? '<p class="text-[11px] text-slate-500 italic py-1">No hay descuentos pendientes.</p>' : `<div class="flex justify-between items-center text-xs text-rose-400 font-bold pt-2 mt-1 border-t border-slate-800/80"><span>Total Descuentos:</span><span>-$${totalDescuentosBanco.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>`}</div></div><div class="pt-3 border-t border-slate-800 flex justify-between items-center"><span class="text-xs font-bold text-slate-300 uppercase">Disponible Real:</span><span class="text-base font-extrabold ${disponibleFinal >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(disponibleFinal)}</span></div></div>`;
+            });
+
+            if (containerResumen) containerResumen.innerHTML = `${tarjetasBancosHtml}<div class="card-bg p-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 relative"><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-coins"></i> DISPONIBLE REAL TOTAL</span></div><h2 class="text-xl font-black my-0.5 ${totalDisponibleRealSuma >= 0 ? 'text-emerald-400' : 'text-rose-500'}">${fmt(totalDisponibleRealSuma)}</h2><span class="text-[10px] text-slate-400 font-medium">Suma Cuentas y Bancos</span></div>`;
+        }
+
+        window.openModalCuenta = function() {
+            document.getElementById('cuentaId').value = ''; document.getElementById('modalCuentaTitulo').innerText = "Nueva Cuenta / Banco";
+            document.getElementById('cuentaNombre').value = ''; document.getElementById('cuentaBcoSaldo').value = ''; document.getElementById('cuentaMpSaldo').value = '';
+            renderCategoriasAsociadasCheckboxes([], []); document.getElementById('modalCuenta').classList.remove('hidden');
+        };
+        window.editCuenta = function(id) {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const cuenta = (window.appState.cuentasBancarias || []).find(c => c.id === id); if (!cuenta) return;
+            const saldosMes = cuenta.saldosPorMes?.[currentMonth] || { bcoSaldo: 0, mpSaldo: 0 };
+            document.getElementById('cuentaId').value = cuenta.id; document.getElementById('modalCuentaTitulo').innerText = "Configurar Banco y Descuentos";
+            document.getElementById('cuentaNombre').value = cuenta.nombre; document.getElementById('cuentaBcoSaldo').value = saldosMes.bcoSaldo; document.getElementById('cuentaMpSaldo').value = saldosMes.mpSaldo;
+            renderCategoriasAsociadasCheckboxes(cuenta.categoriasAsociadas || [], cuenta.gastosFijosAsociados || []); document.getElementById('modalCuenta').classList.remove('hidden');
+        };
+        function renderCategoriasAsociadasCheckboxes(categoriasSeleccionadas = [], gastosFijosSeleccionados = []) {
+            const containerCat = document.getElementById('containerCategoriasAsociadas'); const containerFijos = document.getElementById('containerGastosFijosAsociados');
+            if (!containerCat || !containerFijos) return; containerCat.innerHTML = ''; containerFijos.innerHTML = '';
+            const catList = window.appState.categorias || [];
+            catList.filter(c => c.esTarjeta).forEach(cat => {
+                const isChecked = categoriasSeleccionadas.includes(cat.nombre);
+                containerCat.innerHTML += `<div class="flex items-center gap-2 p-1.5 bg-slate-950 rounded-lg border border-slate-800"><input type="checkbox" id="catCheck_${cat.nombre}" value="${cat.nombre}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-600 cursor-pointer"><label for="catCheck_${cat.nombre}" class="text-xs text-slate-300 font-semibold cursor-pointer truncate flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${cat.color};"></span>${cat.nombre}</label></div>`;
+            });
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const calcData = window.getCalculatedDataForMonth(currentMonth);
+            calcData.items.filter(item => { const catObj = catList.find(c => c.nombre === item.categoria); return catObj ? !catObj.esTarjeta : true; }).forEach(item => {
+                const isChecked = gastosFijosSeleccionados.includes(item.id);
+                containerFijos.innerHTML += `<div class="flex items-center justify-between p-1.5 bg-slate-950 rounded-lg border border-slate-800"><div class="flex items-center gap-2 truncate"><input type="checkbox" id="fijoCheck_${item.id}" value="${item.id}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 cursor-pointer"><label for="fijoCheck_${item.id}" class="text-xs text-slate-300 font-semibold cursor-pointer truncate">${item.concepto} <span class="text-[10px] text-slate-500">(${item.categoria})</span></label></div><span class="text-xs font-bold text-rose-400 shrink-0">$${item.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>`;
+            });
+        }
+        window.handleSaveCuenta = function(e) {
+            e.preventDefault(); const currentMonth = window.appState.currentMonth || '2026-10';
+            const id = document.getElementById('cuentaId').value; const nombre = document.getElementById('cuentaNombre').value.trim();
+            const bcoSaldo = parseFloat(document.getElementById('cuentaBcoSaldo').value) || 0; const mpSaldo = parseFloat(document.getElementById('cuentaMpSaldo').value) || 0;
+            const categoriasAsociadas = Array.from(document.querySelectorAll('#containerCategoriasAsociadas input[type="checkbox"]:checked')).map(cb => cb.value);
+            const gastosFijosAsociados = Array.from(document.querySelectorAll('#containerGastosFijosAsociados input[type="checkbox"]:checked')).map(cb => cb.value);
+            if (!window.appState.cuentasBancarias) window.appState.cuentasBancarias = [];
+            if (id) {
+                const idx = window.appState.cuentasBancarias.findIndex(c => c.id === id);
+                if (idx !== -1) {
+                    if (!window.appState.cuentasBancarias[idx].saldosPorMes) window.appState.cuentasBancarias[idx].saldosPorMes = {};
+                    window.appState.cuentasBancarias[idx].saldosPorMes[currentMonth] = { bcoSaldo, mpSaldo };
+                    window.appState.cuentasBancarias[idx].nombre = nombre; window.appState.cuentasBancarias[idx].categoriasAsociadas = categoriasAsociadas; window.appState.cuentasBancarias[idx].gastosFijosAsociados = gastosFijosAsociados;
+                }
+            } else {
+                let saldosPorMes = {}; saldosPorMes[currentMonth] = { bcoSaldo, mpSaldo };
+                window.appState.cuentasBancarias.push({ id: Date.now().toString(), nombre, saldosPorMes, categoriasAsociadas, gastosFijosAsociados });
+            }
+            window.saveDataToCloud(); closeModal('modalCuenta'); renderSaldosApp();
+        };
+        window.deleteCuenta = function(id) { if (confirm("¿Estás seguro de eliminar esta cuenta?")) { window.appState.cuentasBancarias = (window.appState.cuentasBancarias || []).filter(c => c.id !== id); window.saveDataToCloud(); renderSaldosApp(); } };
+
+        // ---------------- SCRIPT GASTOS HORMIGA ----------------
+        const categoriasHormigaDefault = [ { nombre: "Kiosco", color: "#f59e0b" }, { nombre: "Panadería", color: "#d97706" }, { nombre: "Ferretería", color: "#78716c" }, { nombre: "Cafetería", color: "#b45309" }, { nombre: "Supermercado Rápido", color: "#10b981" }, { nombre: "Transporte / Peaje", color: "#3b82f6" }, { nombre: "Propinas", color: "#ec4899" }, { nombre: "Varios", color: "#64748b" } ];
+        let chartInstHormigaCat = null; let chartInstHormigaEvol = null; let chartInstHormigaEvolCat = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const fechaInput = document.getElementById('hormigaFecha');
+            if (fechaInput) fechaInput.value = new Date().toISOString().slice(0, 10);
+        });
+
+        window.sortHormigaData = function(column) {
+            if (window.hormigaState.sortColumn === column) {
+                window.hormigaState.sortAscending = !window.hormigaState.sortAscending;
+            } else {
+                window.hormigaState.sortColumn = column;
+                window.hormigaState.sortAscending = true;
+            }
+            renderHormigaApp();
         };
 
-        // Permite cerrar con la tecla Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') window.cerrarGraficoModal();
-        });
+        function renderHormigaApp() {
+            const currentMonth = window.appState.currentMonth || '2026-10';
+            const monthText = window.formatMonthDisplay(currentMonth);
+            if(document.getElementById('badgeHormigaMonth')) document.getElementById('badgeHormigaMonth').innerText = monthText;
+            if(document.getElementById('badgeHormigaMonthCat')) document.getElementById('badgeHormigaMonthCat').innerText = monthText;
+            
+            renderHormigaCategoriasSelect();
+            renderFiltrosHormigaEvolCatCheckboxes();
+
+            const itemsHormiga = (window.hormigaState.gastos || []).filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
+            const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+            let totalHormiga = 0; itemsHormiga.forEach(g => totalHormiga += parseFloat(g.monto) || 0);
+            const [year, month] = currentMonth.split('-').map(Number);
+            const diasEnMes = new Date(year, month, 0).getDate(); const promedioDiario = totalHormiga / diasEnMes;
+            const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            document.getElementById('cardHormigaTotal').innerText = fmt(totalHormiga);
+            document.getElementById('cardHormigaPromedio').innerText = fmt(promedioDiario);
+            document.getElementById('cardHormigaCantidad').innerText = `${itemsHormiga.length} compra${itemsHormiga.length === 1 ? '' : 's'}`;
+
+            const containerCatTotales = document.getElementById('containerHormigaCatTotales');
+            if (containerCatTotales) {
+                containerCatTotales.innerHTML = ''; let totalesPorCat = {};
+                catHormigaList.forEach(c => totalesPorCat[c.nombre] = 0);
+                itemsHormiga.forEach(g => { if (totalesPorCat[g.categoria] !== undefined) totalesPorCat[g.categoria] += parseFloat(g.monto) || 0; else totalesPorCat[g.categoria] = parseFloat(g.monto) || 0; });
+                let categoriasConMonto = catHormigaList.map(cat => ({ ...cat, monto: totalesPorCat[cat.nombre] || 0 })).filter(cat => cat.monto > 0);
+                categoriasConMonto.sort((a, b) => b.monto - a.monto);
+                if (categoriasConMonto.length === 0) containerCatTotales.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-6">No hay gastos hormiga en este mes.</p>';
+                else {
+                    categoriasConMonto.forEach(cat => {
+                        const porcentaje = totalHormiga > 0 ? ((cat.monto / totalHormiga) * 100).toFixed(1) : 0;
+                        containerCatTotales.innerHTML += `<div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5"><div class="flex justify-between items-center text-xs"><span class="font-bold text-white flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</span><span class="font-extrabold text-amber-400">${fmt(cat.monto)} <span class="text-[10px] text-slate-500 font-normal">(${porcentaje}%)</span></span></div><div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/80"><div class="h-full rounded-full transition-all duration-500" style="width: ${porcentaje}%; background-color: ${cat.color};"></div></div></div>`;
+                    });
+                }
+            }
+
+            const tbody = document.getElementById('tablaHormigaCuerpo');
+            if (tbody) {
+                tbody.innerHTML = ''; let itemsFiltrados = itemsHormiga;
+                const filtrosActivos = window.hormigaState.filtrosCategorias || [];
+                if (filtrosActivos.length > 0) itemsFiltrados = itemsFiltrados.filter(g => filtrosActivos.includes(g.categoria));
+
+                const sortCol = window.hormigaState.sortColumn || 'fecha';
+                const sortAsc = window.hormigaState.sortAscending !== false;
+                itemsFiltrados.sort((a, b) => {
+                    let valA = a[sortCol] || '';
+                    let valB = b[sortCol] || '';
+                    if (sortCol === 'monto') {
+                        valA = parseFloat(valA) || 0;
+                        valB = parseFloat(valB) || 0;
+                    }
+                    if (valA < valB) return sortAsc ? -1 : 1;
+                    if (valA > valB) return sortAsc ? 1 : -1;
+                    return 0;
+                });
+
+                if (itemsFiltrados.length === 0) tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan.</td></tr>`;
+                else {
+                    itemsFiltrados.forEach(g => {
+                        const catObj = catHormigaList.find(c => c.nombre === g.categoria); const colorCat = catObj ? catObj.color : '#f59e0b';
+                        const fechaFmt = g.fecha ? g.fecha.split('-').reverse().join('/') : '';
+                        tbody.innerHTML += `<tr class="hover:bg-slate-900/40 transition-colors"><td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td><td class="px-5 py-3.5 text-white font-bold">${g.concepto}</td><td class="px-5 py-3.5"><span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${g.categoria}</span></td><td class="px-5 py-3.5 text-slate-400 text-xs">${g.medioPago || 'Efectivo'}</td><td class="px-5 py-3.5 text-right font-extrabold text-amber-400">${fmt(g.monto)}</td><td class="px-5 py-3.5 text-right"><button onclick="deleteGastoHormiga('${g.id}')" class="text-slate-400 hover:text-rose-400" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button></td></tr>`;
+                    });
+                }
+            }
+            renderHormigaCharts();
+        }
+
+        function renderHormigaCategoriasSelect() {
+            const select = document.getElementById('hormigaCategoriaSelect');
+            if (select) {
+                const currentVal = select.value; select.innerHTML = '';
+                (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => { const opt = document.createElement('option'); opt.value = cat.nombre; opt.innerHTML = cat.nombre; select.appendChild(opt); });
+                if (currentVal) select.value = currentVal;
+            }
+            renderFiltrosHormigaCatCheckboxes();
+        }
+        function renderFiltrosHormigaCatCheckboxes() {
+            const container = document.getElementById('containerFiltrosHormigaCat'); if (!container) return; container.innerHTML = '';
+            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
+                const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
+                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
+            });
+        }
+
+        function renderFiltrosHormigaEvolCatCheckboxes() {
+            const container = document.getElementById('containerFiltrosHormigaEvolCat'); if (!container) return; container.innerHTML = '';
+            (window.hormigaState.categorias || categoriasHormigaDefault).forEach(cat => {
+                const isChecked = !window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0 || window.hormigaState.filtrosCategorias.includes(cat.nombre);
+                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroHormigaCategoria(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
+            });
+        }
+
+        window.toggleFiltroHormigaCategoria = function(checkbox) {
+            const catNombre = checkbox.value; const catList = window.hormigaState.categorias || categoriasHormigaDefault;
+            if (!window.hormigaState.filtrosCategorias || window.hormigaState.filtrosCategorias.length === 0) window.hormigaState.filtrosCategorias = catList.map(c => c.nombre);
+            if (checkbox.checked) { if (!window.hormigaState.filtrosCategorias.includes(catNombre)) window.hormigaState.filtrosCategorias.push(catNombre); }
+            else { window.hormigaState.filtrosCategorias = window.hormigaState.filtrosCategorias.filter(c => c !== catNombre); }
+            if (window.hormigaState.filtrosCategorias.length === catList.length) window.hormigaState.filtrosCategorias = [];
+            renderFiltrosHormigaCatCheckboxes(); renderHormigaApp();
+        };
+        window.marcarTodosHormiga = function(marcar) { window.hormigaState.filtrosCategorias = marcar ? [] : ['__NINGUNA__']; renderFiltrosHormigaCatCheckboxes(); renderHormigaApp(); };
+
+        function renderHormigaCharts() {
+            const currentMonth = window.appState.currentMonth || '2026-10'; const allHormigaGastos = window.hormigaState.gastos || []; const catHormigaList = window.hormigaState.categorias || categoriasHormigaDefault;
+            const currentItems = allHormigaGastos.filter(g => g.fecha && g.fecha.slice(0, 7) === currentMonth);
+            let catMap = {}; catHormigaList.forEach(c => { catMap[c.nombre] = 0; });
+            currentItems.forEach(g => { if (catMap[g.categoria] !== undefined) catMap[g.categoria] += parseFloat(g.monto) || 0; });
+            let catLabels = [], catData = [], catColors = [];
+            Object.keys(catMap).forEach(cName => { if (catMap[cName] > 0) { catLabels.push(cName); catData.push(catMap[cName]); const found = catHormigaList.find(c => c.nombre === cName); catColors.push(found ? found.color : '#f59e0b'); } });
+
+            const ctxHormigaCat = document.getElementById('chartHormigaCategorias');
+            if (ctxHormigaCat) { if (chartInstHormigaCat) chartInstHormigaCat.destroy(); chartInstHormigaCat = new Chart(ctxHormigaCat, { type: 'doughnut', data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#cbd5e1' } } } } }); }
+
+            let [cYear, cMonth] = currentMonth.split('-').map(Number); let monthsLabels = [], totalsByMonth = [];
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            for (let i = 5; i >= 0; i--) {
+                let m = cMonth - i, y = cYear; while (m < 1) { m += 12; y--; }
+                monthsLabels.push(`${monthNames[m - 1]} ${y}`); let totalM = 0;
+                allHormigaGastos.forEach(g => { if (g.fecha && g.fecha.slice(0, 7) === `${y}-${String(m).padStart(2, '0')}`) totalM += parseFloat(g.monto) || 0; });
+                totalsByMonth.push(totalM);
+            }
+            const ctxHormigaEvol = document.getElementById('chartHormigaEvolucion');
+            if (ctxHormigaEvol) { if (chartInstHormigaEvol) chartInstHormigaEvol.destroy(); chartInstHormigaEvol = new Chart(ctxHormigaEvol, { type: 'bar', data: { labels: monthsLabels, datasets: [{ label: 'Gasto Hormiga Total', data: totalsByMonth, backgroundColor: '#f59e0b', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
+
+            const filtrosHormigaActivos = window.hormigaState.filtrosCategorias || [];
+            let datasetsCatSeparadas = catHormigaList
+                .filter(cat => filtrosHormigaActivos.length === 0 || filtrosHormigaActivos.includes(cat.nombre))
+                .map(cat => {
+                    let dataPorMes = []; let [currY2, currM2] = currentMonth.split('-').map(Number);
+                    for (let i = 5; i >= 0; i--) {
+                        let m = currM2 - i, y = currY2; while (m < 1) { m += 12; y--; }
+                        let ymStr = `${y}-${String(m).padStart(2, '0')}`; let sumaCatMes = 0;
+                        allHormigaGastos.forEach(g => { if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) sumaCatMes += parseFloat(g.monto) || 0; });
+                        dataPorMes.push(sumaCatMes);
+                    }
+                    return { label: cat.nombre, data: dataPorMes, borderColor: cat.color, backgroundColor: cat.color, borderWidth: 2, fill: false, tension: 0.3 };
+                });
+
+            const ctxHormigaEvolCat = document.getElementById('chartHormigaEvolucionCategorias');
+            if (ctxHormigaEvolCat) { 
+                if (chartInstHormigaEvolCat) chartInstHormigaEvolCat.destroy(); 
+                chartInstHormigaEvolCat = new Chart(ctxHormigaEvolCat, { 
+                    type: 'line', 
+                    data: { labels: monthsLabels, datasets: datasetsCatSeparadas }, 
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+                }); 
+            }
+        }
+
+        window.handleSaveGastoHormiga = function(e) {
+            e.preventDefault();
+            const concepto = document.getElementById('hormigaConcepto').value; const monto = parseFloat(document.getElementById('hormigaMonto').value);
+            const fecha = document.getElementById('hormigaFecha').value; const categoria = document.getElementById('hormigaCategoriaSelect').value; const medioPago = document.getElementById('hormigaMedioPago').value;
+            if (!concepto || !monto || !fecha) return;
+            window.hormigaState.gastos.push({ id: Date.now().toString(), concepto, monto, fecha, categoria, medioPago });
+            window.saveHormigaDataToCloud(); document.getElementById('hormigaConcepto').value = ''; document.getElementById('hormigaMonto').value = ''; renderHormigaApp();
+        };
+        window.deleteGastoHormiga = function(id) { if (confirm('¿Eliminar este gasto hormiga?')) { window.hormigaState.gastos = window.hormigaState.gastos.filter(g => g.id !== id); window.saveHormigaDataToCloud(); renderHormigaApp(); } };
+        window.openModalCatHormiga = function() { renderCatHormigaList(); document.getElementById('modalCatHormiga').classList.remove('hidden'); };
+        function renderCatHormigaList() {
+            const container = document.getElementById('listaCatHormigaConfig'); container.innerHTML = '';
+            (window.hormigaState.categorias || []).forEach((cat, index) => {
+                container.innerHTML += `<div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800"><div class="flex items-center gap-2 flex-1"><input type="color" value="${cat.color}" onchange="actualizarCatHormigaCampo(${index}, 'color', this.value)" class="w-8 h-8 rounded bg-slate-900 border border-slate-800 cursor-pointer p-0.5"><input type="text" value="${cat.nombre}" onchange="actualizarCatHormigaCampo(${index}, 'nombre', this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-white"></div><button onclick="eliminarCatHormiga(${index})" class="text-rose-400 hover:text-rose-300 p-2" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button></div>`;
+            });
+        }
+        window.actualizarCatHormigaCampo = function(index, campo, valor) {
+            if (!window.hormigaState.categorias[index]) return;
+            window.hormigaState.categorias[index][campo] = valor;
+            window.saveHormigaDataToCloud(); renderHormigaCategoriasSelect(); renderHormigaApp();
+        };
+        window.agregarCategoriaHormiga = function() {
+            const nombre = document.getElementById('nuevaCatHormigaNombre').value.trim(); const color = document.getElementById('nuevaCatHormigaColor').value;
+            if (!nombre) return; window.hormigaState.categorias.push({ nombre, color });
+            document.getElementById('nuevaCatHormigaNombre').value = ''; window.saveHormigaDataToCloud(); renderCatHormigaList(); renderHormigaCategoriasSelect(); renderHormigaApp();
+        };
+        window.eliminarCatHormiga = function(index) {
+            if (window.hormigaState.categorias.length <= 1) return alert("Mínimo una categoría.");
+            window.hormigaState.categorias.splice(index, 1);
+            window.saveHormigaDataToCloud(); renderCatHormigaList(); renderHormigaCategoriasSelect(); renderHormigaApp();
+        };
     </script>
-    <script src="app.js"></script>
 </body>
 </html>
