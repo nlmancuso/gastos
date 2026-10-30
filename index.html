@@ -1307,7 +1307,7 @@
 
         window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 
-        // ---------------- SCRIPT ANÁLISIS & GRÁFICOS (ACTUALIZADO CON RANGO PERSISTENTE Y SUBCATEGORÍAS) ----------------
+        // ---------------- SCRIPT ANÁLISIS & GRÁFICOS (CORREGIDO) ----------------
         let chartInstTotales = null; let chartInstEvolCat = null; let chartInstEvolSubcat = null; let chartInstRecurrentesIndiv = null; let chartInstBalance = null;
 
         function initChartRangeInputs() {
@@ -1399,26 +1399,27 @@
                     contEvolCat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
                 });
             }
-            const contEvolSubcat = document.getElementById('containerFiltrosGraficoEvolSubcat');
+            
+            // --- INICIALIZACIÓN Y RENDERIZADO CORREGIDO PARA SUBCATEGORÍAS ---
             const contEvolSubcat = document.getElementById('containerFiltrosGraficoEvolSubcat');
             if (contEvolSubcat) {
-                // Si la variable no está definida o es undefined, aseguramos un array
                 if (!window.filtrosGraficoEvolSubcat) {
                     window.filtrosGraficoEvolSubcat = [];
                 }
-
                 contEvolSubcat.innerHTML = '';
                 subcatList.forEach((sub, idx) => {
                     const color = colorPalette[idx % colorPalette.length];
-                    // Si el array está vacío ([]), significa que deben estar TODOS seleccionados por defecto
                     const isChecked = window.filtrosGraficoEvolSubcat.length === 0 || window.filtrosGraficoEvolSubcat.includes(sub.id);
-                    
-                    contEvolSubcat.innerHTML += `
-                        <label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}">
-                            <input type="checkbox" value="${sub.id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolSubcat', this)" class="hidden">
-                            <span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>
-                            ${sub.nombre}
-                        </label>`;
+                    contEvolSubcat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${sub.id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolSubcat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>${sub.nombre}</label>`;
+                });
+            }
+
+            const contBalance = document.getElementById('containerFiltrosGraficoBalance');
+            if (contBalance) {
+                contBalance.innerHTML = '';
+                [ { nombre: "Ingreso / Sueldo", color: "#10b981" }, { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Resto Disponible", color: "#3b82f6" } ].forEach(item => {
+                    const isChecked = window.filtrosGraficoBalance.length === 0 || window.filtrosGraficoBalance.includes(item.nombre);
+                    contBalance.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Balance', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}</label>`;
                 });
             }
         }
@@ -1426,7 +1427,7 @@
             const val = checkbox.value; let arrRef, fullList;
             if (tipo === 'Totales') { if (window.filtrosGraficoTotales.length === 0) window.filtrosGraficoTotales = ["Gastos Totales", "Ingresos / Sueldo"]; arrRef = window.filtrosGraficoTotales; fullList = ["Gastos Totales", "Ingresos / Sueldo"]; }
             else if (tipo === 'EvolCat') { const catList = window.appState.categorias || []; if (window.filtrosGraficoEvolCat.length === 0) window.filtrosGraficoEvolCat = catList.map(c => c.nombre); arrRef = window.filtrosGraficoEvolCat; fullList = catList.map(c => c.nombre); }
-            else if (tipo === 'EvolSubcat') { const subcatList = window.appState.subcategorias || []; if (window.filtrosGraficoEvolSubcat.length === 0) window.filtrosGraficoEvolSubcat = subcatList.map(s => s.id); arrRef = window.filtrosGraficoEvolSubcat; fullList = subcatList.map(s => s.id); }
+            else if (tipo === 'EvolSubcat') { const subcatList = window.appState.subcategorias || []; if (!window.filtrosGraficoEvolSubcat) window.filtrosGraficoEvolSubcat = []; if (window.filtrosGraficoEvolSubcat.length === 0) window.filtrosGraficoEvolSubcat = subcatList.map(s => s.id); arrRef = window.filtrosGraficoEvolSubcat; fullList = subcatList.map(s => s.id); }
             else if (tipo === 'Balance') { if (window.filtrosGraficoBalance.length === 0) window.filtrosGraficoBalance = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; arrRef = window.filtrosGraficoBalance; fullList = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; }
             
             if (checkbox.checked) { if (!arrRef.includes(val)) arrRef.push(val); } else { const idx = arrRef.indexOf(val); if (idx !== -1) arrRef.splice(idx, 1); }
