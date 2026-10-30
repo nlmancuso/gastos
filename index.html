@@ -193,6 +193,28 @@
                     <div class="relative h-64 w-full"><canvas id="chartEvolucionCategorias"></canvas></div>
                 </div>
 
+                <!-- NUEVO GRÁFICO: EVOLUCIÓN POR SUBCATEGORÍA (EN EL ESPACIO VERDE) -->
+                <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4 border border-emerald-500/30">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Subcategoría
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 text-xs font-semibold">
+                                <span class="text-slate-400">Filtrar:</span>
+                                <button onclick="marcarTodosGrafico('EvolSubcat', true)" class="text-amber-400 hover:underline">Todos</button>
+                                <span class="text-slate-600">|</span>
+                                <button onclick="marcarTodosGrafico('EvolSubcat', false)" class="text-rose-400 hover:underline">Ninguno</button>
+                            </div>
+                            <button onclick="expandirGraficoModal('chartEvolucionSubcategorias', 'Evolución por Subcategoría')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" id="containerFiltrosGraficoEvolSubcat"></div>
+                    <div class="relative h-72 w-full"><canvas id="chartEvolucionSubcategorias"></canvas></div>
+                </div>
+
                 <div class="card-bg p-6 rounded-2xl md:col-span-2 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
@@ -663,7 +685,7 @@
             } else if (tabName === 'analisis') {
                 document.getElementById('viewAnalisis').classList.remove('hidden');
                 document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
-                if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
+                initChartRangeInputs();
                 initRecurrentesCheckboxesList();
                 renderFiltrosGraficosCheckboxes();
                 renderCharts();
@@ -818,7 +840,6 @@
                         const vencimientoVal = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKey] : (g.vencimiento || '');
                         const estadoVal = g.estado || 'PENDIENTE';
 
-                        // Subcategoría correcta (buscando la excepción del mes o la original del objeto)
                         const subcatIdActual = window.appState.excepcionesSubcategoria?.[gridKey] !== undefined ? window.appState.excepcionesSubcategoria[gridKey] : g.subcategoriaId;
                         const subcatObj = (window.appState.subcategorias || []).find(s => s.id === subcatIdActual);
                         const subcatNombre = subcatObj ? subcatObj.nombre : '-';
@@ -992,7 +1013,6 @@
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
 
-        // LÓGICA DE SUB. Y VISTA PREVIA A 6 MESES
         window.actualizarVistaPreviaInflacionModal = function() {
             const montoBase = parseFloat(document.getElementById('gastoMonto').value) || 0;
             const pctIndivStr = document.getElementById('gastoPctAumento').value;
@@ -1226,7 +1246,6 @@
                 window.appState.excepcionesSubcategoria[`${id}_${currentActiveMonth}`] = subcategoriaId;
                 window.appState.aumentosIndividuales[id] = pctAumentoVal;
 
-                // Propagación compuesta hacia adelante para los meses futuros
                 let [currY, currM] = currentActiveMonth.split('-').map(Number);
                 let montoPropagado = monto;
                 let fechaPropagada = vencimiento;
@@ -1287,26 +1306,48 @@
 
         window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 
-        // ---------------- SCRIPT ANÁLISIS & GRÁFICOS ----------------
-        let customRangeFrom = null; let customRangeTo = null;
-        let chartInstTotales = null; let chartInstEvolCat = null; let chartInstRecurrentesIndiv = null; let chartInstBalance = null;
+        // ---------------- SCRIPT ANÁLISIS & GRÁFICOS (ACTUALIZADO CON RANGO PERSISTENTE Y SUBCATEGORÍAS) ----------------
+        let chartInstTotales = null; let chartInstEvolCat = null; let chartInstEvolSubcat = null; let chartInstRecurrentesIndiv = null; let chartInstBalance = null;
 
         function initChartRangeInputs() {
             const currentMonth = window.appState.currentMonth || '2026-10';
-            let [cYear, cMonth] = currentMonth.split('-').map(Number);
-            let mFrom = cMonth - 3, yFrom = cYear; while (mFrom < 1) { mFrom += 12; yFrom--; }
-            const fromStr = `${yFrom}-${String(mFrom).padStart(2, '0')}`;
-            let mTo = cMonth + 3, yTo = cYear; while (mTo > 12) { mTo -= 12; yTo++; }
-            const toStr = `${yTo}-${String(mTo).padStart(2, '0')}`;
-            customRangeFrom = fromStr; customRangeTo = toStr;
-            const elFrom = document.getElementById('chartMonthFrom'); const elTo = document.getElementById('chartMonthTo');
-            if (elFrom) elFrom.value = fromStr; if (elTo) elTo.value = toStr;
+            
+            // Si el usuario ya guardó un rango personalizado en appState, lo usamos; si no, calculamos por defecto ±3 meses
+            if (!window.appState.chartRangeFrom || !window.appState.chartRangeTo) {
+                let [cYear, cMonth] = currentMonth.split('-').map(Number);
+                let mFrom = cMonth - 3, yFrom = cYear; while (mFrom < 1) { mFrom += 12; yFrom--; }
+                const fromStr = `${yFrom}-${String(mFrom).padStart(2, '0')}`;
+                let mTo = cMonth + 3, yTo = cYear; while (mTo > 12) { mTo -= 12; yTo++; }
+                const toStr = `${yTo}-${String(mTo).padStart(2, '0')}`;
+                window.appState.chartRangeFrom = fromStr;
+                window.appState.chartRangeTo = toStr;
+            }
+
+            const elFrom = document.getElementById('chartMonthFrom'); 
+            const elTo = document.getElementById('chartMonthTo');
+            if (elFrom) elFrom.value = window.appState.chartRangeFrom; 
+            if (elTo) elTo.value = window.appState.chartRangeTo;
         }
-        function resetDefaultMonthRange() { initChartRangeInputs(); renderCharts(); }
+
+        function resetDefaultMonthRange() {
+            window.appState.chartRangeFrom = null;
+            window.appState.chartRangeTo = null;
+            window.saveDataToCloud();
+            initChartRangeInputs();
+            renderCharts();
+        }
+
         function applyCustomMonthRange() {
-            const elFrom = document.getElementById('chartMonthFrom').value; const elTo = document.getElementById('chartMonthTo').value;
-            if (elFrom && elTo && elFrom <= elTo) { customRangeFrom = elFrom; customRangeTo = elTo; renderCharts(); }
+            const elFrom = document.getElementById('chartMonthFrom').value; 
+            const elTo = document.getElementById('chartMonthTo').value;
+            if (elFrom && elTo && elFrom <= elTo) {
+                window.appState.chartRangeFrom = elFrom;
+                window.appState.chartRangeTo = elTo;
+                window.saveDataToCloud();
+                renderCharts();
+            }
         }
+
         function initRecurrentesCheckboxesList() {
             const container = document.getElementById('containerFiltrosRecurrentesGrid'); if (!container) return;
             let mapIdsUnicos = new Map();
@@ -1339,6 +1380,8 @@
 
         function renderFiltrosGraficosCheckboxes() {
             const catList = window.appState.categorias || [];
+            const subcatList = window.appState.subcategorias || [];
+
             const contTotales = document.getElementById('containerFiltrosGraficoTotales');
             if (contTotales) {
                 contTotales.innerHTML = '';
@@ -1355,6 +1398,16 @@
                     contEvolCat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
                 });
             }
+            const contEvolSubcat = document.getElementById('containerFiltrosGraficoEvolSubcat');
+            if (contEvolSubcat) {
+                contEvolSubcat.innerHTML = '';
+                let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16'];
+                subcatList.forEach((sub, idx) => {
+                    const color = colorPalette[idx % colorPalette.length];
+                    const isChecked = window.filtrosGraficoEvolSubcat.length === 0 || window.filtrosGraficoEvolSubcat.includes(sub.id);
+                    contEvolSubcat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${sub.id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolSubcat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>${sub.nombre}</label>`;
+                });
+            }
             const contBalance = document.getElementById('containerFiltrosGraficoBalance');
             if (contBalance) {
                 contBalance.innerHTML = '';
@@ -1368,31 +1421,49 @@
             const val = checkbox.value; let arrRef, fullList;
             if (tipo === 'Totales') { if (window.filtrosGraficoTotales.length === 0) window.filtrosGraficoTotales = ["Gastos Totales", "Ingresos / Sueldo"]; arrRef = window.filtrosGraficoTotales; fullList = ["Gastos Totales", "Ingresos / Sueldo"]; }
             else if (tipo === 'EvolCat') { const catList = window.appState.categorias || []; if (window.filtrosGraficoEvolCat.length === 0) window.filtrosGraficoEvolCat = catList.map(c => c.nombre); arrRef = window.filtrosGraficoEvolCat; fullList = catList.map(c => c.nombre); }
+            else if (tipo === 'EvolSubcat') { const subcatList = window.appState.subcategorias || []; if (window.filtrosGraficoEvolSubcat.length === 0) window.filtrosGraficoEvolSubcat = subcatList.map(s => s.id); arrRef = window.filtrosGraficoEvolSubcat; fullList = subcatList.map(s => s.id); }
             else if (tipo === 'Balance') { if (window.filtrosGraficoBalance.length === 0) window.filtrosGraficoBalance = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; arrRef = window.filtrosGraficoBalance; fullList = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; }
+            
             if (checkbox.checked) { if (!arrRef.includes(val)) arrRef.push(val); } else { const idx = arrRef.indexOf(val); if (idx !== -1) arrRef.splice(idx, 1); }
-            if (arrRef.length === fullList.length) { if (tipo === 'Totales') window.filtrosGraficoTotales = []; if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = []; if (tipo === 'Balance') window.filtrosGraficoBalance = []; }
+            if (arrRef.length === fullList.length) { 
+                if (tipo === 'Totales') window.filtrosGraficoTotales = []; 
+                if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = []; 
+                if (tipo === 'EvolSubcat') window.filtrosGraficoEvolSubcat = []; 
+                if (tipo === 'Balance') window.filtrosGraficoBalance = []; 
+            }
             renderFiltrosGraficosCheckboxes(); renderCharts();
         };
         window.marcarTodosGrafico = function(tipo, marcar) {
             if (tipo === 'Totales') window.filtrosGraficoTotales = marcar ? [] : ['__NINGUNO__'];
             else if (tipo === 'EvolCat') window.filtrosGraficoEvolCat = marcar ? [] : ['__NINGUNO__'];
+            else if (tipo === 'EvolSubcat') window.filtrosGraficoEvolSubcat = marcar ? [] : ['__NINGUNO__'];
             else if (tipo === 'Balance') window.filtrosGraficoBalance = marcar ? [] : ['__NINGUNO__'];
             renderFiltrosGraficosCheckboxes(); renderCharts();
         };
 
         function renderCharts() {
-            if (!customRangeFrom || !customRangeTo) initChartRangeInputs();
+            if (!window.appState.chartRangeFrom || !window.appState.chartRangeTo) initChartRangeInputs();
             let labelsMonths = [], dataTotales = [], dataIngresos = [], dataResto = [];
             let catList = window.appState.categorias || [];
-            let [startYear, startMonth] = customRangeFrom.split('-').map(Number);
-            let [endYear, endMonth] = customRangeTo.split('-').map(Number);
+            let subcatList = window.appState.subcategorias || [];
+            let [startYear, startMonth] = window.appState.chartRangeFrom.split('-').map(Number);
+            let [endYear, endMonth] = window.appState.chartRangeTo.split('-').map(Number);
             let currY = startYear, currM = startMonth;
+            
             let filtrosTotales = window.filtrosGraficoTotales || [];
             let filtrosEvolCat = window.filtrosGraficoEvolCat || [];
+            let filtrosEvolSubcat = window.filtrosGraficoEvolSubcat || [];
             let filtrosBalance = window.filtrosGraficoBalance || [];
 
             let datasetsEvolCat = catList.filter(cat => filtrosEvolCat.length === 0 || filtrosEvolCat.includes(cat.nombre)).map(cat => ({ label: cat.nombre, data: [], borderColor: cat.color, backgroundColor: cat.color, borderWidth: 2, pointRadius: 3, pointStyle: 'rect', fill: false, tension: 0.3 }));
-            let mapIdToDatasetIndex = {}; let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16']; let datasetsRecurrentesIndiv = []; let colorIdx = 0; let filtrosRecGrid = window.filtrosRecurrentesGrid;
+            
+            let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16'];
+            let datasetsEvolSubcat = subcatList.filter(sub => filtrosEvolSubcat.length === 0 || filtrosEvolSubcat.includes(sub.id)).map((sub, idx) => {
+                let color = colorPalette[idx % colorPalette.length];
+                return { label: sub.nombre, subId: sub.id, data: [], borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 3, pointStyle: 'rect', fill: false, tension: 0.3 };
+            });
+
+            let mapIdToDatasetIndex = {}; let datasetsRecurrentesIndiv = []; let colorIdx = 0; let filtrosRecGrid = window.filtrosRecurrentesGrid;
 
             (window.appState.gastos || []).forEach(g => {
                 const baseEsFijo = (g.categoria || '').toLowerCase().includes('fijo') || (g.categoria || '').toLowerCase().includes('servicio');
@@ -1412,10 +1483,26 @@
                 const calc = window.getCalculatedDataForMonth(ymStr);
                 const sumaTotalMes = calc.totalFijos + calc.totalTarjetas;
                 dataTotales.push(sumaTotalMes); dataIngresos.push(calc.sueldoActual); dataResto.push(calc.sueldoActual - sumaTotalMes);
+                
                 let valoresMesRecurrente = new Array(datasetsRecurrentesIndiv.length).fill(0);
                 calc.items.forEach(item => { if (item.isRecurrente && mapIdToDatasetIndex[item.id] !== undefined) valoresMesRecurrente[mapIdToDatasetIndex[item.id]] += item.monto; });
                 datasetsRecurrentesIndiv.forEach((ds, idx) => ds.data.push(valoresMesRecurrente[idx]));
+                
                 catList.forEach(cat => { if (filtrosEvolCat.length === 0 || filtrosEvolCat.includes(cat.nombre)) { let dsObj = datasetsEvolCat.find(d => d.label === cat.nombre); if (dsObj) dsObj.data.push(calc.totalesPorCat[cat.nombre] || 0); } });
+
+                // Cálculo de totales por subcategoría en este mes
+                let totalesPorSubcatMes = {};
+                calc.items.forEach(item => {
+                    const gridKey = `${item.id}_${ymStr}`;
+                    const subId = window.appState.excepcionesSubcategoria?.[gridKey] !== undefined ? window.appState.excepcionesSubcategoria[gridKey] : item.subcategoriaId;
+                    if (subId) {
+                        totalesPorSubcatMes[subId] = (totalesPorSubcatMes[subId] || 0) + item.monto;
+                    }
+                });
+                datasetsEvolSubcat.forEach(ds => {
+                    ds.data.push(totalesPorSubcatMes[ds.subId] || 0);
+                });
+
                 currM++; if (currM > 12) { currM = 1; currY++; }
             }
 
@@ -1428,6 +1515,9 @@
 
             const ctxEvolCat = document.getElementById('chartEvolucionCategorias');
             if (ctxEvolCat) { if (chartInstEvolCat) chartInstEvolCat.destroy(); chartInstEvolCat = new Chart(ctxEvolCat, { type: 'line', data: { labels: labelsMonths, datasets: datasetsEvolCat }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
+
+            const ctxEvolSubcat = document.getElementById('chartEvolucionSubcategorias');
+            if (ctxEvolSubcat) { if (chartInstEvolSubcat) chartInstEvolSubcat.destroy(); chartInstEvolSubcat = new Chart(ctxEvolSubcat, { type: 'line', data: { labels: labelsMonths, datasets: datasetsEvolSubcat }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
 
             const ctxRecurrentesIndiv = document.getElementById('chartEvolucionRecurrentesIndiv');
             if (ctxRecurrentesIndiv) { if (chartInstRecurrentesIndiv) chartInstRecurrentesIndiv.destroy(); chartInstRecurrentesIndiv = new Chart(ctxRecurrentesIndiv, { type: 'line', data: { labels: labelsMonths, datasets: datasetsRecurrentesIndiv }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
