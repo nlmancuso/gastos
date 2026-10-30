@@ -1512,9 +1512,32 @@
             }
 
             let datasetsTotales = [];
-            if (filtrosTotales.length === 0 || filtrosTotales.includes("Gastos Totales")) datasetsTotales.push({ label: 'Gastos Totales', data: dataTotales, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
-            if (filtrosTotales.length === 0 || filtrosTotales.includes("Ingresos / Sueldo")) datasetsTotales.push({ label: 'Ingresos / Sueldo', data: dataIngresos, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, fill: true, tension: 0.3 });
-
+            if (filtrosTotales.length === 0 || filtrosTotales.includes("Gastos Totales")) {
+                datasetsTotales.push({ 
+                    label: 'Gastos Totales', 
+                    data: dataTotales, 
+                    borderColor: '#f43f5e', 
+                    backgroundColor: '#f43f5e', 
+                    borderWidth: 2, 
+                    pointRadius: 3, 
+                    pointStyle: 'rect', 
+                    fill: false, 
+                    tension: 0.3 
+                });
+            }
+            if (filtrosTotales.length === 0 || filtrosTotales.includes("Ingresos / Sueldo")) {
+                datasetsTotales.push({ 
+                    label: 'Ingresos / Sueldo', 
+                    data: dataIngresos, 
+                    borderColor: '#10b981', 
+                    backgroundColor: '#10b981', 
+                    borderWidth: 2, 
+                    pointRadius: 3, 
+                    pointStyle: 'rect', 
+                    fill: false, 
+                    tension: 0.3 
+                });
+            }
             const ctxTotales = document.getElementById('chartEvolucionTotales');
             if (ctxTotales) { if (chartInstTotales) chartInstTotales.destroy(); chartInstTotales = new Chart(ctxTotales, { type: 'line', data: { labels: labelsMonths, datasets: datasetsTotales }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
 
