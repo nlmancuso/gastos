@@ -64,6 +64,10 @@ async function enviarAlertas() {
         const targetMonth = new Date().toISOString().slice(0, 7);
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
+        console.log(`Fecha de HOY analizada por el bot: ${hoyStr}`);
+        console.log(`Fecha de MAÑANA analizada por el bot: ${manianaStr}`);
+        console.log(`Mes objetivo actual (targetMonth): ${targetMonth}`);
+
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
             const nombreCat = c.nombre || c;
@@ -85,10 +89,11 @@ async function enviarAlertas() {
 
                 let vencimientoFinal = normalizarFecha(vencimientoCrudo);
                 const catNombre = gasto.categoria || 'Otros';
-                const esTarjeta = esTarjetaMap[catNombre] ?? false;
                 const monto = parseFloat(gasto.monto) || 0;
 
-                if (!esTarjeta && (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr)) {
+                console.log(`Gasto: "${gasto.concepto}" | Categoría: ${catNombre} | Vencimiento detectado: "${vencimientoFinal}"`);
+
+                if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
                     itemsCalculados.push({
                         concepto: gasto.concepto || catNombre,
                         monto: monto,
@@ -144,16 +149,21 @@ async function enviarAlertas() {
                 });
             }
 
+            console.log(`Tarjeta/Categoría Agrupada: "${catNombre}" | Monto: ${montoTotalCat} | Vencimiento: "${vencFinalCat}"`);
+
             if (montoTotalCat > 0 && (vencFinalCat === hoyStr || vencFinalCat === manianaStr)) {
-                itemsCalculados.push({
-                    concepto: `💳 Tarjeta: ${catNombre}`,
-                    monto: montoTotalCat,
-                    categoria: catNombre,
-                    vencimiento: vencFinalCat,
-                    esTarjeta: true,
-                    estadoBadge: vencFinalCat === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
-                    badgeColor: vencFinalCat === hoyStr ? '#e11d48' : '#f59e0b'
-                });
+                // Evitar duplicar si ya se agregó individualmente
+                if (!itemsCalculados.some(i => i.categoria === catNombre && i.esTarjeta)) {
+                    itemsCalculados.push({
+                        concepto: `💳 Tarjeta: ${catNombre}`,
+                        monto: montoTotalCat,
+                        categoria: catNombre,
+                        vencimiento: vencFinalCat,
+                        esTarjeta: true,
+                        estadoBadge: vencFinalCat === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
+                        badgeColor: vencFinalCat === hoyStr ? '#e11d48' : '#f59e0b'
+                    });
+                }
             }
         });
 
@@ -168,7 +178,6 @@ async function enviarAlertas() {
         const montoTotalGeneral = itemsCalculados.reduce((acc, item) => acc + item.monto, 0);
         const cantidadUrgentes = itemsCalculados.length;
 
-        // Se agregó un padding-right de 15px en el contenedor derecho para separarlo del borde
         const listaGastosHtml = itemsCalculados.map(item => `
             <div style="padding: 15px 5px 15px 0; border-bottom: 1px solid #eaeaea;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
