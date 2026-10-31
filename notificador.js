@@ -62,11 +62,18 @@ async function enviarAlertas() {
         const vencimientosTarjetas = appState.vencimientosTarjetas || {};
 
         const targetMonth = new Date().toISOString().slice(0, 7);
+        
+        // Calculamos también el mes siguiente (ej: de 2026-10 a 2026-11) para capturar vencimientos de fin/inicio de mes
+        let [currY, currM] = targetMonth.split('-').map(Number);
+        currM++;
+        if (currM > 12) { currM = 1; currY++; }
+        const nextMonth = `${currY}-${String(currM).padStart(2, '0')}`;
+
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
         console.log(`Fecha de HOY analizada por el bot: ${hoyStr}`);
         console.log(`Fecha de MAÑANA analizada por el bot: ${manianaStr}`);
-        console.log(`Mes objetivo actual (targetMonth): ${targetMonth}`);
+        console.log(`Meses evaluados: ${targetMonth} y ${nextMonth}`);
 
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
@@ -76,11 +83,15 @@ async function enviarAlertas() {
 
         let itemsCalculados = [];
 
-        // 1. Procesar gastos de la lista principal (Revisando excepciones de grilla para el mes actual o siguiente)
+        // 1. Procesar gastos de la lista principal buscando en mes actual y siguiente
         gastosRegistrados.forEach(gasto => {
-            const gridKey = `${gasto.id}_${targetMonth}`;
-            let vencimientoCrudo = excepcionesVencGrid[gridKey] 
-                || excepcionesVenc[gridKey] 
+            const gridKeyCurrent = `${gasto.id}_${targetMonth}`;
+            const gridKeyNext = `${gasto.id}_${nextMonth}`;
+
+            let vencimientoCrudo = excepcionesVencGrid[gridKeyCurrent] 
+                || excepcionesVencGrid[gridKeyNext]
+                || excepcionesVenc[gridKeyCurrent] 
+                || excepcionesVenc[gridKeyNext]
                 || gasto.vencimiento 
                 || gasto.fechaVencimiento 
                 || '';
@@ -94,15 +105,18 @@ async function enviarAlertas() {
             }
 
             if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
-                itemsCalculados.push({
-                    concepto: gasto.concepto || catNombre,
-                    monto: monto,
-                    categoria: catNombre,
-                    vencimiento: vencimientoFinal,
-                    esTarjeta: false,
-                    estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
-                    badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
-                });
+                // Evitamos duplicados si ya se agregó
+                if (!itemsCalculados.some(i => i.concepto === (gasto.concepto || catNombre) && i.vencimiento === vencimientoFinal)) {
+                    itemsCalculados.push({
+                        concepto: gasto.concepto || catNombre,
+                        monto: monto,
+                        categoria: catNombre,
+                        vencimiento: vencimientoFinal,
+                        esTarjeta: false,
+                        estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
+                        badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
+                    });
+                }
             }
         });
 
@@ -115,6 +129,7 @@ async function enviarAlertas() {
             if (cat.esTarjeta || esTarjetaMap[catNombre]) {
                 let vencTarjetaCrudo = vencimientosTarjetas[catNombre] 
                     || vencimientosTarjetas[`${catNombre}_${targetMonth}`] 
+                    || vencimientosTarjetas[`${catNombre}_${nextMonth}`]
                     || cat.vencimiento 
                     || cat.vencimientoHabitual 
                     || '';
@@ -125,12 +140,9 @@ async function enviarAlertas() {
         });
 
         gastosRegistrados.forEach(gasto => {
-            const startYM = gasto.startMonth || targetMonth;
-            if (targetMonth >= startYM) {
-                const catNombre = gasto.categoria || '';
-                if (totalesPorTarjeta[catNombre] !== undefined) {
-                    totalesPorTarjeta[catNombre] += parseFloat(gasto.monto) || 0;
-                }
+            const catNombre = gasto.categoria || '';
+            if (totalesPorTarjeta[catNombre] !== undefined) {
+                totalesPorTarjeta[catNombre] += parseFloat(gasto.monto) || 0;
             }
         });
 
@@ -142,7 +154,8 @@ async function enviarAlertas() {
                 gastosRegistrados.forEach(g => {
                     if (g.categoria === catNombre) {
                         const gridKey = `${g.id}_${targetMonth}`;
-                        let vItem = excepcionesVencGrid[gridKey] || excepcionesVenc[gridKey] || g.vencimiento || '';
+                        const gridKeyNext = `${g.id}_${nextMonth}`;
+                        let vItem = excepcionesVencGrid[gridKey] || excepcionesVencGrid[gridKeyNext] || excepcionesVenc[gridKey] || g.vencimiento || '';
                         if (vItem) vencFinalCat = normalizarFecha(vItem);
                     }
                 });
