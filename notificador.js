@@ -76,34 +76,33 @@ async function enviarAlertas() {
 
         let itemsCalculados = [];
 
-        // 1. Procesar gastos de la lista principal
+        // 1. Procesar gastos de la lista principal (Revisando excepciones de grilla para el mes actual o siguiente)
         gastosRegistrados.forEach(gasto => {
-            const startYM = gasto.startMonth || targetMonth;
-            if (targetMonth >= startYM) {
-                const gridKey = `${gasto.id}_${targetMonth}`;
-                let vencimientoCrudo = excepcionesVencGrid[gridKey] 
-                    || excepcionesVenc[gridKey] 
-                    || gasto.vencimiento 
-                    || gasto.fechaVencimiento 
-                    || '';
+            const gridKey = `${gasto.id}_${targetMonth}`;
+            let vencimientoCrudo = excepcionesVencGrid[gridKey] 
+                || excepcionesVenc[gridKey] 
+                || gasto.vencimiento 
+                || gasto.fechaVencimiento 
+                || '';
 
-                let vencimientoFinal = normalizarFecha(vencimientoCrudo);
-                const catNombre = gasto.categoria || 'Otros';
-                const monto = parseFloat(gasto.monto) || 0;
+            let vencimientoFinal = normalizarFecha(vencimientoCrudo);
+            const catNombre = gasto.categoria || 'Otros';
+            const monto = parseFloat(gasto.monto) || 0;
 
+            if (vencimientoFinal) {
                 console.log(`Gasto: "${gasto.concepto}" | Categoría: ${catNombre} | Vencimiento detectado: "${vencimientoFinal}"`);
+            }
 
-                if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
-                    itemsCalculados.push({
-                        concepto: gasto.concepto || catNombre,
-                        monto: monto,
-                        categoria: catNombre,
-                        vencimiento: vencimientoFinal,
-                        esTarjeta: false,
-                        estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
-                        badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
-                    });
-                }
+            if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
+                itemsCalculados.push({
+                    concepto: gasto.concepto || catNombre,
+                    monto: monto,
+                    categoria: catNombre,
+                    vencimiento: vencimientoFinal,
+                    esTarjeta: false,
+                    estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
+                    badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
+                });
             }
         });
 
@@ -152,7 +151,6 @@ async function enviarAlertas() {
             console.log(`Tarjeta/Categoría Agrupada: "${catNombre}" | Monto: ${montoTotalCat} | Vencimiento: "${vencFinalCat}"`);
 
             if (montoTotalCat > 0 && (vencFinalCat === hoyStr || vencFinalCat === manianaStr)) {
-                // Evitar duplicar si ya se agregó individualmente
                 if (!itemsCalculados.some(i => i.categoria === catNombre && i.esTarjeta)) {
                     itemsCalculados.push({
                         concepto: `💳 Tarjeta: ${catNombre}`,
@@ -230,7 +228,7 @@ async function enviarAlertas() {
             html: contenidoHtml
         });
 
-        console.log("Correo de alerta enviado exitosamente con diseño ajustado.");
+        console.log("Correo de alerta enviado exitosamente.");
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
