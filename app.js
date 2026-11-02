@@ -165,7 +165,7 @@ onAuthStateChanged(auth, async (user) => {
         window.showLoading();
         
         // Ejecutamos la migración una sola vez al detectar sesión iniciada
-        await clonarYMigrarGrupo();
+        
 
         const dLocal = new Date();
         const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
