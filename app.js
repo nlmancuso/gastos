@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, addDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -158,19 +158,14 @@ window.cerrarSesion = function() {
     signOut(auth);
 };
 
-
-
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.showLoading();
-        
-        // Ejecutamos la migración una sola vez al detectar sesión iniciada
-        
-
         const dLocal = new Date();
         const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
         
-        let grupoId = "grupo_mancusososa";
+        // Apuntando al nuevo ID seguro y dinámico en Firestore
+        let grupoId = "T3E2kcXODg2OLm7i1Roq";
 
         const docRef = doc(db, "app_data", grupoId);
         window.docRef = docRef;
