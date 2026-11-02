@@ -1352,24 +1352,27 @@ window.deleteGasto = function(id) {
     if (!gasto) return;
 
     gastoAEliminarId = id;
-    const currentMonth = window.appState.currentMonth || '2026-11';
+    const currentMonth = window.appState.currentMonth || defaultLocalMonth;
     const monthText = window.formatMonthDisplay ? window.formatMonthDisplay(currentMonth) : currentMonth;
 
-    document.getElementById('eliminarGastoNombre').innerText = `"${gasto.concepto}"`;
-    document.getElementById('eliminarGastoMesTexto').innerText = monthText;
+    const elNombre = document.getElementById('eliminarGastoNombre');
+    const elMesTexto = document.getElementById('eliminarGastoMesTexto');
+    if (elNombre) elNombre.innerText = `"${gasto.concepto}"`;
+    if (elMesTexto) elMesTexto.innerText = monthText;
     
     // Actualizar referencias del texto del mes dentro del modal
     document.querySelectorAll('.eliminarGastoMesRef').forEach(el => el.innerText = monthText);
 
-    document.getElementById('modalEliminarGasto').classList.remove('hidden');
+    const modalEliminar = document.getElementById('modalEliminarGasto');
+    if (modalEliminar) modalEliminar.classList.remove('hidden');
 };
 
-// Procesa la opción seleccionada por el usuario
+// Procesa la opción seleccionada por el usuario (Solo este mes, mes y futuros, o todo)
 window.confirmarEliminacionGasto = function(tipoEliminacion) {
     if (!gastoAEliminarId) return;
 
     const id = gastoAEliminarId;
-    const currentActiveMonth = window.appState.currentMonth || '2026-11';
+    const currentActiveMonth = window.appState.currentMonth || defaultLocalMonth;
 
     if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
     if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
@@ -1392,10 +1395,10 @@ window.confirmarEliminacionGasto = function(tipoEliminacion) {
         });
     }
 
-    if (typeof window.saveDataToCloud === 'function') window.saveDataToCloud();
+    window.saveDataToCloud();
     if (typeof window.closeModal === 'function') window.closeModal('modalEliminarGasto');
     gastoAEliminarId = null;
-    if (typeof renderApp === 'function') renderApp();
+    triggerPageRenders();
 };
 
         window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
