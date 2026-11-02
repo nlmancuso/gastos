@@ -21,6 +21,15 @@
     <link rel="prefetch" href="index.html">
     <link rel="prefetch" href="app.js">
 
+    <!-- SDK de EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+       (function(){
+          // Reemplazá con tu Public Key de EmailJS
+          emailjs.init("Zmrtl0PIB0VCdpBJg");
+       })();
+    </script>
+
     <style>
         body { background-color: #0b1120; color: #f1f5f9; font-family: ui-sans-serif, system-ui, sans-serif; }
         .card-bg { background-color: #111827; border: 1px solid #1e293b; }
