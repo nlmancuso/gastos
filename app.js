@@ -128,6 +128,31 @@ window.showApp = function() {
     if (appContent) appContent.classList.remove('hidden');
 };
 
+// Carga dinámica de las opciones del selector de vistas
+window.poblarSelectorVistas = function(vistaSeleccionadaActual) {
+    const selector = document.getElementById('selectorVista');
+    if (!selector) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    selector.innerHTML = '';
+
+    // 1. Opción Espacio Personal
+    const optPersonal = document.createElement('option');
+    optPersonal.value = "personal";
+    optPersonal.textContent = `🏠 Mi Espacio Personal (${user.email.split('@')[0]})`;
+    selector.appendChild(optPersonal);
+
+    // 2. Opción Grupo Control de Gastos
+    const optGrupo = document.createElement('option');
+    optGrupo.value = "T3E2kcXODg2OLm7i1Roq";
+    optGrupo.textContent = `👥 Grupo Control de Gastos`;
+    selector.appendChild(optGrupo);
+
+    selector.value = vistaSeleccionadaActual || "personal";
+};
+
 // Control de pestañas Login / Registro
 window.mostrarTabAuth = function(tab) {
     const formLogin = document.getElementById('formLogin');
@@ -204,6 +229,7 @@ window.handleRegister = async function(e) {
             creadoEl: new Date().toISOString()
         });
 
+        window.poblarSelectorVistas("personal");
         console.log(`✅ Usuario y Espacio Personal creados con éxito para: ${email}`);
     } catch (error) {
         console.error("Error al registrar usuario:", error);
@@ -260,8 +286,8 @@ onAuthStateChanged(auth, async (user) => {
         
         let vistaGuardada = localStorage.getItem("ultima_vista_id") || "T3E2kcXODg2OLm7i1Roq";
         
-        const selectorEl = document.getElementById('selectorVista');
-        if (selectorEl) selectorEl.value = vistaGuardada;
+        // Poblar y sincronizar el combo desplegable
+        window.poblarSelectorVistas(vistaGuardada);
 
         let targetDocId = (vistaGuardada === "personal") ? `personal_${user.uid}` : vistaGuardada;
 
