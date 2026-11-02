@@ -245,7 +245,28 @@ window.saveHormigaDataToCloud = async function() {
     } catch (e) { console.error("Error guardando hormiga:", e); }
 };
 
+// Control de visibilidad de botones exclusivos para el Administrador
+function actualizarVisibilidadBotonesAdmin() {
+    const userUid = auth.currentUser ? auth.currentUser.uid : null;
+    const grupoInfo = window.appState.grupoInfo;
+    
+    // Si no hay grupo creado o el usuario actual es el adminUid
+    const esAdmin = !grupoInfo || grupoInfo.adminUid === userUid;
+
+    const btnConfigCat = document.getElementById('btnConfigCat');
+    const btnGestionGrupo = document.getElementById('btnGestionGrupo');
+
+    if (esAdmin) {
+        if (btnConfigCat) btnConfigCat.classList.remove('hidden');
+        if (btnGestionGrupo) btnGestionGrupo.classList.remove('hidden');
+    } else {
+        if (btnConfigCat) btnConfigCat.classList.add('hidden');
+        if (btnGestionGrupo) btnGestionGrupo.classList.add('hidden');
+    }
+}
+
 function triggerPageRenders() {
+    actualizarVisibilidadBotonesAdmin();
     if (typeof renderApp === 'function') renderApp();
     if (typeof renderCharts === 'function') renderCharts();
     if (typeof renderSaldosApp === 'function') renderSaldosApp();
@@ -293,7 +314,6 @@ window.getSueldoForMonth = function(targetMonth) {
     return sueldoAplicar;
 };
 
-// HELPER DE OBTENCIÓN DE PORCENTAJE DE AUMENTO
 window.getPorcentajeAumentoGasto = function(gasto) {
     if (window.appState.aumentosIndividuales?.[gasto.id] !== undefined && window.appState.aumentosIndividuales[gasto.id] !== '') {
         return parseFloat(window.appState.aumentosIndividuales[gasto.id]) || 0;
@@ -316,13 +336,11 @@ window.getCalculatedDataForMonth = function(targetMonth) {
     const hoyStr = new Date().toISOString().slice(0, 10);
 
     (window.appState.gastos || []).forEach(gasto => {
-        // 1. Verificar si se eliminó de este mes en adelante
         const mesEliminacion = window.appState.excepcionesEliminacion?.[gasto.id];
         if (mesEliminacion && targetMonth >= mesEliminacion) {
             return;
         }
 
-        // 2. Verificar si se eliminó exclusivamente en este mes puntual
         const borradoPuntual = window.appState.excepcionesEliminacionSoloMes?.[`${gasto.id}_${targetMonth}`];
         if (borradoPuntual) {
             return;
@@ -366,7 +384,6 @@ window.getCalculatedDataForMonth = function(targetMonth) {
         const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
         const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
 
-        // CÁLCULO DE AUMENTO COMPUESTO POR INFLACIÓN SI CORRESPONDE
         const pctAumento = window.getPorcentajeAumentoGasto(gasto);
         if (isRecurrente && pctAumento > 0 && targetMonth > baseMonthStr) {
             const [bY, bM] = baseMonthStr.split('-').map(Number);
