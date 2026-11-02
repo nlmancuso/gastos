@@ -752,7 +752,6 @@ window.cancelarInvitacion = function(index) {
 
 ///////////////////////////////////////
 import { 
-    getFirestore, 
     doc, 
     getDoc, 
     collection, 
@@ -761,16 +760,13 @@ import {
 
 async function clonarYMigrarGrupo() {
     try {
-        const db = getFirestore();
-        
-        // 1. Leemos el documento original
+        // Usamos 'db' directamente si ya está inicializado en tu app.js
         const oldDocRef = doc(db, "app_data", "grupo_mancusososa");
         const oldDocSnap = await getDoc(oldDocRef);
 
         if (oldDocSnap.exists()) {
             const dataOriginal = oldDocSnap.data();
 
-            // 2. Preparamos la nueva estructura con miembros iniciales
             const nuevaData = {
                 ...dataOriginal,
                 miembros: {
@@ -778,7 +774,6 @@ async function clonarYMigrarGrupo() {
                 }
             };
 
-            // 3. Creamos el nuevo documento con ID autogenerado en app_data
             const newDocRef = await addDoc(collection(db, "app_data"), nuevaData);
 
             console.log("----------------------------------------");
@@ -794,5 +789,5 @@ async function clonarYMigrarGrupo() {
     }
 }
 
-// Ejecutamos la migración
+// Ejecutar migración al cargar
 clonarYMigrarGrupo();
