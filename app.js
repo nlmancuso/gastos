@@ -73,7 +73,8 @@ window.appState = window.appState || {
     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
     recurrentesPreferidos: [],
     sortColumn: 'concepto',
-    sortAscending: true
+    sortAscending: true,
+    grupoInfo: null
 };
 
 window.hormigaState = window.hormigaState || {
@@ -451,4 +452,241 @@ window.getCalculatedDataForMonth = function(targetMonth) {
         });
     });
     return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
+};
+
+// ==================== LÓGICA MODAL ELIMINAR GASTO (3 OPCIONES + CONFIRMACIÓN) ====================
+let gastoAEliminarId = null;
+let tipoEliminacionSeleccionado = null;
+
+window.deleteGasto = function(id) {
+    const gasto = (window.appState.gastos || []).find(g => g.id === id);
+    if (!gasto) return;
+
+    gastoAEliminarId = id;
+    tipoEliminacionSeleccionado = null;
+    const currentMonth = window.appState.currentMonth || defaultLocalMonth;
+    const monthText = window.formatMonthDisplay ? window.formatMonthDisplay(currentMonth) : currentMonth;
+
+    const elNombre = document.getElementById('eliminarGastoNombre');
+    const elMesTexto = document.getElementById('eliminarGastoMesTexto');
+    if (elNombre) elNombre.innerText = `"${gasto.concepto}"`;
+    if (elMesTexto) elMesTexto.innerText = monthText;
+    
+    const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
+    const pasoConfirmacion = document.getElementById('eliminarPasoConfirmacion');
+    if (pasoSeleccion) pasoSeleccion.classList.remove('hidden');
+    if (pasoConfirmacion) pasoConfirmacion.classList.add('hidden');
+
+    document.querySelectorAll('.eliminarGastoMesRef').forEach(el => el.innerText = monthText);
+
+    const modalEliminar = document.getElementById('modalEliminarGasto');
+    if (modalEliminar) modalEliminar.classList.remove('hidden');
+};
+
+window.solicitarConfirmacionEliminacion = function(tipoEliminacion) {
+    if (!gastoAEliminarId) return;
+
+    tipoEliminacionSeleccionado = tipoEliminacion;
+    const gasto = (window.appState.gastos || []).find(g => g.id === gastoAEliminarId);
+    const currentMonth = window.appState.currentMonth || defaultLocalMonth;
+    const monthText = window.formatMonthDisplay ? window.formatMonthDisplay(currentMonth) : currentMonth;
+
+    let textoModalidad = '';
+    if (tipoEliminacion === 'solo_mes') {
+        textoModalidad = `ÚNICAMENTE para el mes de ${monthText}`;
+    } else if (tipoEliminacion === 'mes_y_futuros') {
+        textoModalidad = `A PARTIR de ${monthText} y hacia todos los meses futuros`;
+    } else if (tipoEliminacion === 'todo') {
+        textoModalidad = `COMPLETAMENTE de la base de datos (todo el historial pasado, presente y futuro)`;
+    }
+
+    const txtDetalle = document.getElementById('eliminarConfirmacionDetalleText');
+    if (txtDetalle) {
+        txtDetalle.innerHTML = `¿Realmente deseás eliminar el gasto <strong class="text-white">"${gasto ? gasto.concepto : ''}"</strong> de forma <strong class="text-amber-400">${textoModalidad}</strong>?`;
+    }
+
+    const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
+    const pasoConfirmacion = document.getElementById('eliminarPasoConfirmacion');
+    if (pasoSeleccion) pasoSeleccion.classList.add('hidden');
+    if (pasoConfirmacion) pasoConfirmacion.classList.remove('hidden');
+};
+
+window.volverASeleccionEliminacion = function() {
+    tipoEliminacionSeleccionado = null;
+    const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
+    const pasoConfirmacion = document.getElementById('eliminarPasoConfirmacion');
+    if (pasoSeleccion) pasoSeleccion.classList.remove('hidden');
+    if (pasoConfirmacion) pasoConfirmacion.classList.add('hidden');
+};
+
+window.ejecutarEliminacionGasto = function() {
+    if (!gastoAEliminarId || !tipoEliminacionSeleccionado) return;
+
+    const id = gastoAEliminarId;
+    const tipo = tipoEliminacionSeleccionado;
+    const currentActiveMonth = window.appState.currentMonth || defaultLocalMonth;
+
+    if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
+    if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
+
+    if (tipo === 'solo_mes') {
+        window.appState.excepcionesEliminacionSoloMes[`${id}_${currentActiveMonth}`] = true;
+    } else if (tipo === 'mes_y_futuros') {
+        window.appState.excepcionesEliminacion[id] = currentActiveMonth;
+    } else if (tipo === 'todo') {
+        window.appState.gastos = (window.appState.gastos || []).filter(g => g.id !== id);
+        delete window.appState.excepcionesEliminacion[id];
+        if (window.appState.aumentosIndividuales) delete window.appState.aumentosIndividuales[id];
+        
+        Object.keys(window.appState.excepcionesEliminacionSoloMes || {}).forEach(k => {
+            if (k.startsWith(`${id}_`)) delete window.appState.excepcionesEliminacionSoloMes[k];
+        });
+    }
+
+    window.saveDataToCloud();
+    if (typeof window.closeModal === 'function') window.closeModal('modalEliminarGasto');
+    gastoAEliminarId = null;
+    tipoEliminacionSeleccionado = null;
+    triggerPageRenders();
+};
+
+// ==================== LÓGICA MODAL GESTIÓN DE GRUPO (MULTI-USUARIO) ====================
+window.openModalGestionGrupo = function() {
+    renderMiembrosGrupo();
+    const modal = document.getElementById('modalGestionGrupo');
+    if (modal) modal.classList.remove('hidden');
+};
+
+function renderMiembrosGrupo() {
+    const container = document.getElementById('listaMiembrosGrupo');
+    const containerPendientes = document.getElementById('containerInvitacionesPendientes');
+    const listaPendientes = document.getElementById('listaInvitacionesPendientes');
+    const badgeCant = document.getElementById('badgeCantMiembros');
+    if (!container) return;
+
+    container.innerHTML = '';
+    
+    const userEmail = auth.currentUser ? auth.currentUser.email : 'usuario@ejemplo.com';
+    const userUid = auth.currentUser ? auth.currentUser.uid : 'uid_actual';
+
+    if (!window.appState.grupoInfo) {
+        window.appState.grupoInfo = {
+            adminUid: userUid,
+            miembros: {
+                [userUid]: { email: userEmail, rol: 'admin' }
+            },
+            invitacionesPendientes: []
+        };
+    }
+
+    const grupoInfo = window.appState.grupoInfo;
+    const esAdmin = grupoInfo.adminUid === userUid;
+
+    const formInvitar = document.getElementById('containerFormInvitar');
+    if (formInvitar) {
+        if (esAdmin) formInvitar.classList.remove('hidden');
+        else formInvitar.classList.add('hidden');
+    }
+
+    const miembrosArr = Object.entries(grupoInfo.miembros || {});
+    if (badgeCant) badgeCant.innerText = `${miembrosArr.length} activo(s)`;
+
+    miembrosArr.forEach(([uid, info]) => {
+        const esElAdmin = uid === grupoInfo.adminUid;
+        const esYoMismo = uid === userUid;
+
+        container.innerHTML += `
+            <div class="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg ${esElAdmin ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60' : 'bg-slate-900 text-slate-400'} flex items-center justify-center font-bold text-[11px]">
+                        <i class="fa-solid ${esElAdmin ? 'fa-crown' : 'fa-user'}"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-white block">${info.email} ${esYoMismo ? '<span class="text-[10px] text-emerald-400 font-normal">(Tú)</span>' : ''}</span>
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold">${info.rol || 'miembro'}</span>
+                    </div>
+                </div>
+                ${(esAdmin && !esYoMismo) ? `
+                    <div class="flex items-center gap-1.5">
+                        <select onchange="cambiarRolMiembro('${uid}', this.value)" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300">
+                            <option value="editor" ${info.rol === 'editor' ? 'selected' : ''}>Editor</option>
+                            <option value="lector" ${info.rol === 'lector' ? 'selected' : ''}>Lector</option>
+                        </select>
+                        <button onclick="removerMiembroGrupo('${uid}')" class="text-rose-400 hover:text-rose-300 p-1.5" title="Quitar miembro"><i class="fa-solid fa-user-xmark"></i></button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+
+    const pendientes = grupoInfo.invitacionesPendientes || [];
+    if (pendientes.length > 0 && listaPendientes && containerPendientes) {
+        containerPendientes.classList.remove('hidden');
+        listaPendientes.innerHTML = '';
+        pendientes.forEach((inv, idx) => {
+            listaPendientes.innerHTML += `
+                <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-xs">
+                    <span class="text-slate-400">${inv.email} <span class="text-[10px] text-amber-400">(${inv.rol})</span></span>
+                    ${esAdmin ? `<button onclick="cancelarInvitacion(${idx})" class="text-rose-400 hover:text-rose-300 p-1"><i class="fa-solid fa-xmark"></i></button>` : ''}
+                </div>
+            `;
+        });
+    } else if (containerPendientes) {
+        containerPendientes.classList.add('hidden');
+    }
+}
+
+window.handleInvitarMiembro = function(e) {
+    e.preventDefault();
+    const emailInput = document.getElementById('inputInvitarEmail');
+    const rolSelect = document.getElementById('selectInvitarRol');
+    if (!emailInput) return;
+
+    const email = emailInput.value.trim().toLowerCase();
+    const rol = rolSelect ? rolSelect.value : 'editor';
+
+    if (!email) return;
+
+    if (!window.appState.grupoInfo) {
+        window.appState.grupoInfo = { adminUid: auth.currentUser.uid, miembros: {}, invitacionesPendientes: [] };
+    }
+    if (!window.appState.grupoInfo.invitacionesPendientes) {
+        window.appState.grupoInfo.invitacionesPendientes = [];
+    }
+
+    const yaEsMiembro = Object.values(window.appState.grupoInfo.miembros || {}).some(m => m.email === email);
+    if (yaEsMiembro) {
+        alert("Ese usuario ya pertenece al grupo.");
+        return;
+    }
+
+    window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
+    emailInput.value = '';
+
+    window.saveDataToCloud();
+    renderMiembrosGrupo();
+};
+
+window.cambiarRolMiembro = function(uid, nuevoRol) {
+    if (window.appState.grupoInfo?.miembros?.[uid]) {
+        window.appState.grupoInfo.miembros[uid].rol = nuevoRol;
+        window.saveDataToCloud();
+        renderMiembrosGrupo();
+    }
+};
+
+window.removerMiembroGrupo = function(uid) {
+    if (confirm("¿Seguro de remover a este integrante del grupo?")) {
+        delete window.appState.grupoInfo.miembros[uid];
+        window.saveDataToCloud();
+        renderMiembrosGrupo();
+    }
+};
+
+window.cancelarInvitacion = function(index) {
+    if (window.appState.grupoInfo?.invitacionesPendientes) {
+        window.appState.grupoInfo.invitacionesPendientes.splice(index, 1);
+        window.saveDataToCloud();
+        renderMiembrosGrupo();
+    }
 };
