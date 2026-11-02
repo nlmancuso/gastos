@@ -663,6 +663,55 @@
         </div>
     </div>
 
+    <!-- MODAL ELIMINAR GASTO (3 OPCIONES) -->
+<div id="modalEliminarGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+    <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-base font-bold text-rose-400 flex items-center gap-2">
+                <i class="fa-solid fa-trash-can"></i> Eliminar Gasto
+            </h3>
+            <button type="button" onclick="closeModal('modalEliminarGasto')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <p class="text-xs text-slate-300 mb-4">
+            ¿Cómo querés eliminar el gasto <strong id="eliminarGastoNombre" class="text-white"></strong> para el mes <span id="eliminarGastoMesTexto" class="font-bold text-amber-400"></span>?
+        </p>
+
+        <div class="space-y-3">
+            <!-- Opción 1: Solo este mes -->
+            <button onclick="confirmarEliminacionGasto('solo_mes')" class="w-full text-left p-3.5 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-xl transition group">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white group-hover:text-amber-400">1. Solo este mes</span>
+                    <i class="fa-solid fa-calendar-day text-slate-500 group-hover:text-amber-400 text-xs"></i>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Oculta el gasto únicamente en <span class="eliminarGastoMesRef text-slate-300"></span>. Permanece en los meses pasados y futuros.</p>
+            </button>
+
+            <!-- Opción 2: Este mes y futuros -->
+            <button onclick="confirmarEliminacionGasto('mes_y_futuros')" class="w-full text-left p-3.5 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-xl transition group">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white group-hover:text-amber-400">2. Este mes y los futuros</span>
+                    <i class="fa-solid fa-calendar-plus text-slate-500 group-hover:text-amber-400 text-xs"></i>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Da de baja el gasto a partir de <span class="eliminarGastoMesRef text-slate-300"></span> en adelante. El historial anterior se mantiene.</p>
+            </button>
+
+            <!-- Opción 3: Todo el historial -->
+            <button onclick="confirmarEliminacionGasto('todo')" class="w-full text-left p-3.5 bg-rose-950/40 hover:bg-rose-900/40 border border-rose-900/60 hover:border-rose-700 rounded-xl transition group">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-rose-300 group-hover:text-rose-200">3. Todo el historial (Eliminar completo)</span>
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-xs"></i>
+                </div>
+                <p class="text-[11px] text-rose-300/70 mt-1">Borra el gasto completamente de la base de datos (pasado, presente y futuro).</p>
+            </button>
+        </div>
+
+        <div class="flex justify-end pt-4 mt-2 border-t border-slate-800">
+            <button type="button" onclick="closeModal('modalEliminarGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700">Cancelar</button>
+        </div>
+    </div>
+</div>
+
     <script>
         let currentActiveTab = 'planilla';
 
@@ -1295,15 +1344,59 @@
             renderApp();
         };
 
-        window.deleteGasto = function(id) {
-            if (confirm("¿Estás seguro de eliminar este gasto a partir de este mes? Los meses anteriores se mantendrán intactos.")) {
-                const currentActiveMonth = window.appState.currentMonth || '2026-10';
-                if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
-                window.appState.excepcionesEliminacion[id] = currentActiveMonth;
-                window.saveDataToCloud();
-                renderApp();
-            }
-        };
+let gastoAEliminarId = null;
+
+// Dispara el modal con la información del mes y del gasto seleccionado
+window.deleteGasto = function(id) {
+    const gasto = (window.appState.gastos || []).find(g => g.id === id);
+    if (!gasto) return;
+
+    gastoAEliminarId = id;
+    const currentMonth = window.appState.currentMonth || '2026-11';
+    const monthText = window.formatMonthDisplay ? window.formatMonthDisplay(currentMonth) : currentMonth;
+
+    document.getElementById('eliminarGastoNombre').innerText = `"${gasto.concepto}"`;
+    document.getElementById('eliminarGastoMesTexto').innerText = monthText;
+    
+    // Actualizar referencias del texto del mes dentro del modal
+    document.querySelectorAll('.eliminarGastoMesRef').forEach(el => el.innerText = monthText);
+
+    document.getElementById('modalEliminarGasto').classList.remove('hidden');
+};
+
+// Procesa la opción seleccionada por el usuario
+window.confirmarEliminacionGasto = function(tipoEliminacion) {
+    if (!gastoAEliminarId) return;
+
+    const id = gastoAEliminarId;
+    const currentActiveMonth = window.appState.currentMonth || '2026-11';
+
+    if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
+    if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
+
+    if (tipoEliminacion === 'solo_mes') {
+        // Guarda la excepción puntual de este mes único
+        window.appState.excepcionesEliminacionSoloMes[`${id}_${currentActiveMonth}`] = true;
+    } else if (tipoEliminacion === 'mes_y_futuros') {
+        // Corta la validez a partir de este mes en adelante
+        window.appState.excepcionesEliminacion[id] = currentActiveMonth;
+    } else if (tipoEliminacion === 'todo') {
+        // Elimina el gasto definitivamente del array principal y borra sus excepciones
+        window.appState.gastos = (window.appState.gastos || []).filter(g => g.id !== id);
+        delete window.appState.excepcionesEliminacion[id];
+        if (window.appState.aumentosIndividuales) delete window.appState.aumentosIndividuales[id];
+        
+        // Limpia excepciones asociadas a este ID
+        Object.keys(window.appState.excepcionesEliminacionSoloMes || {}).forEach(k => {
+            if (k.startsWith(`${id}_`)) delete window.appState.excepcionesEliminacionSoloMes[k];
+        });
+    }
+
+    if (typeof window.saveDataToCloud === 'function') window.saveDataToCloud();
+    if (typeof window.closeModal === 'function') window.closeModal('modalEliminarGasto');
+    gastoAEliminarId = null;
+    if (typeof renderApp === 'function') renderApp();
+};
 
         window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 
