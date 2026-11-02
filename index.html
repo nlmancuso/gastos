@@ -78,14 +78,22 @@
                     <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
-                        <i class="fa-solid fa-plus"></i> Nuevo Gasto
-                    </button>
-                    <button onclick="openModalCatGeneral()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition" title="Configurar Categorías"><i class="fa-solid fa-gear text-sm"></i></button>
-                    <button onclick="openModalGestionGrupo()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-emerald-400 transition" title="Gestionar Grupo Familiar"><i class="fa-solid fa-users text-sm"></i></button>
-                    <button onclick="cerrarSesion()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition" title="Cerrar Sesión"><i class="fa-solid fa-right-from-bracket text-sm"></i></button>
-                    <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronizado
+                    <div class="flex items-center gap-3">
+                        <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Nuevo Gasto
+                        </button>
+                        <!-- Botón Configurar Categorías (Sólo Admin) -->
+                        <button id="btnConfigCat" onclick="openModalCatGeneral()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition hidden" title="Configurar Categorías"><i class="fa-solid fa-gear text-sm"></i></button>
+                        
+                        <!-- Botón Gestionar Grupo (Sólo Admin) -->
+                        <button id="btnGestionGrupo" onclick="openModalGestionGrupo()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-emerald-400 transition hidden" title="Gestión del Grupo Familiar">
+                            <i class="fa-solid fa-users text-sm"></i>
+                        </button>
+                    
+                        <button onclick="cerrarSesion()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition" title="Cerrar Sesión"><i class="fa-solid fa-right-from-bracket text-sm"></i></button>
+                        <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronizado
+                        </div>
                     </div>
                 </div>
             </div>
@@ -735,7 +743,7 @@
         </div>
 
         <div class="space-y-4 overflow-y-auto pr-1">
-            <!-- SECCIÓN: INVITAR NUEVO MIEMBRO (SOLO VISIBLE PARA ADMIN) -->
+            <!-- SECCIÓN: INVITAR NUEVO MIEMBRO -->
             <div id="containerFormInvitar" class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
                 <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <i class="fa-solid fa-user-plus"></i> Invitar nuevo integrante
@@ -758,17 +766,13 @@
                     <span>Integrantes del Grupo</span>
                     <span id="badgeCantMiembros" class="text-[10px] bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full font-mono">1 activo</span>
                 </h4>
-                <div id="listaMiembrosGrupo" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    <!-- Se puebla dinámicamente -->
-                </div>
+                <div id="listaMiembrosGrupo" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
             </div>
 
             <!-- SECCIÓN: INVITACIONES PENDIENTES -->
             <div id="containerInvitacionesPendientes" class="space-y-2 hidden">
                 <h4 class="text-xs font-bold text-amber-400/80 uppercase tracking-wider">Invitaciones Pendientes</h4>
-                <div id="listaInvitacionesPendientes" class="space-y-1.5">
-                    <!-- Se puebla dinámicamente -->
-                </div>
+                <div id="listaInvitacionesPendientes" class="space-y-1.5"></div>
             </div>
         </div>
 
