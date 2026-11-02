@@ -663,7 +663,7 @@
         </div>
     </div>
 
-    <!-- MODAL ELIMINAR GASTO (3 OPCIONES) -->
+<!-- MODAL ELIMINAR GASTO (3 OPCIONES CON CONFIRMACIÓN) -->
 <div id="modalEliminarGasto" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
     <div class="card-bg rounded-2xl shadow-2xl max-w-md w-full p-6 text-white border border-slate-700 relative">
         <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
@@ -673,41 +673,53 @@
             <button type="button" onclick="closeModal('modalEliminarGasto')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
         </div>
         
-        <p class="text-xs text-slate-300 mb-4">
-            ¿Cómo querés eliminar el gasto <strong id="eliminarGastoNombre" class="text-white"></strong> para el mes <span id="eliminarGastoMesTexto" class="font-bold text-amber-400"></span>?
-        </p>
+        <!-- PASO 1: SELECCIÓN DE OPCIÓN -->
+        <div id="eliminarPasoSeleccion">
+            <p class="text-xs text-slate-300 mb-4">
+                ¿Cómo querés eliminar el gasto <strong id="eliminarGastoNombre" class="text-white"></strong> para el mes <span id="eliminarGastoMesTexto" class="font-bold text-amber-400"></span>?
+            </p>
 
-        <div class="space-y-3">
-            <!-- Opción 1: Solo este mes -->
-            <button onclick="confirmarEliminacionGasto('solo_mes')" class="w-full text-left p-3.5 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-xl transition group">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-white group-hover:text-amber-400">1. Solo este mes</span>
-                    <i class="fa-solid fa-calendar-day text-slate-500 group-hover:text-amber-400 text-xs"></i>
-                </div>
-                <p class="text-[11px] text-slate-400 mt-1">Oculta el gasto únicamente en <span class="eliminarGastoMesRef text-slate-300"></span>. Permanece en los meses pasados y futuros.</p>
-            </button>
+            <div class="space-y-3">
+                <button onclick="solicitarConfirmacionEliminacion('solo_mes')" class="w-full text-left p-3.5 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-xl transition group">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-white group-hover:text-amber-400">1. Solo este mes</span>
+                        <i class="fa-solid fa-calendar-day text-slate-500 group-hover:text-amber-400 text-xs"></i>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">Oculta el gasto únicamente en <span class="eliminarGastoMesRef text-slate-300"></span>.</p>
+                </button>
 
-            <!-- Opción 2: Este mes y futuros -->
-            <button onclick="confirmarEliminacionGasto('mes_y_futuros')" class="w-full text-left p-3.5 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-xl transition group">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-white group-hover:text-amber-400">2. Este mes y los futuros</span>
-                    <i class="fa-solid fa-calendar-plus text-slate-500 group-hover:text-amber-400 text-xs"></i>
-                </div>
-                <p class="text-[11px] text-slate-400 mt-1">Da de baja el gasto a partir de <span class="eliminarGastoMesRef text-slate-300"></span> en adelante. El historial anterior se mantiene.</p>
-            </button>
+                <button onclick="solicitarConfirmacionEliminacion('mes_y_futuros')" class="w-full text-left p-3.5 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-xl transition group">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-white group-hover:text-amber-400">2. Este mes y los futuros</span>
+                        <i class="fa-solid fa-calendar-plus text-slate-500 group-hover:text-amber-400 text-xs"></i>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">Da de baja el gasto a partir de <span class="eliminarGastoMesRef text-slate-300"></span> en adelante.</p>
+                </button>
 
-            <!-- Opción 3: Todo el historial -->
-            <button onclick="confirmarEliminacionGasto('todo')" class="w-full text-left p-3.5 bg-rose-950/40 hover:bg-rose-900/40 border border-rose-900/60 hover:border-rose-700 rounded-xl transition group">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-rose-300 group-hover:text-rose-200">3. Todo el historial (Eliminar completo)</span>
-                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-xs"></i>
-                </div>
-                <p class="text-[11px] text-rose-300/70 mt-1">Borra el gasto completamente de la base de datos (pasado, presente y futuro).</p>
-            </button>
+                <button onclick="solicitarConfirmacionEliminacion('todo')" class="w-full text-left p-3.5 bg-rose-950/40 hover:bg-rose-900/40 border border-rose-900/60 hover:border-rose-700 rounded-xl transition group">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-rose-300 group-hover:text-rose-200">3. Todo el historial</span>
+                        <i class="fa-solid fa-triangle-exclamation text-rose-500 text-xs"></i>
+                    </div>
+                    <p class="text-[11px] text-rose-300/70 mt-1">Borra el gasto completamente de la base de datos.</p>
+                </button>
+            </div>
+
+            <div class="flex justify-end pt-4 mt-2 border-t border-slate-800">
+                <button type="button" onclick="closeModal('modalEliminarGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700">Cancelar</button>
+            </div>
         </div>
 
-        <div class="flex justify-end pt-4 mt-2 border-t border-slate-800">
-            <button type="button" onclick="closeModal('modalEliminarGasto')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700">Cancelar</button>
+        <!-- PASO 2: CONFIRMACIÓN FINAL -->
+        <div id="eliminarPasoConfirmacion" class="hidden space-y-4">
+            <div class="p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 leading-relaxed">
+                <p id="eliminarConfirmacionDetalleText"></p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button type="button" onclick="volverASeleccionEliminacion()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700">Atrás</button>
+                <button type="button" onclick="ejecutarEliminacionGasto()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-lg transition">Sí, Confirmar Borrado</button>
+            </div>
         </div>
     </div>
 </div>
@@ -1345,13 +1357,15 @@
         };
 
 let gastoAEliminarId = null;
+let tipoEliminacionSeleccionado = null;
 
-// Dispara el modal con la información del mes y del gasto seleccionado
+// Dispara el modal inicial con la información del gasto y el mes
 window.deleteGasto = function(id) {
     const gasto = (window.appState.gastos || []).find(g => g.id === id);
     if (!gasto) return;
 
     gastoAEliminarId = id;
+    tipoEliminacionSeleccionado = null;
     const currentMonth = window.appState.currentMonth || defaultLocalMonth;
     const monthText = window.formatMonthDisplay ? window.formatMonthDisplay(currentMonth) : currentMonth;
 
@@ -1360,36 +1374,77 @@ window.deleteGasto = function(id) {
     if (elNombre) elNombre.innerText = `"${gasto.concepto}"`;
     if (elMesTexto) elMesTexto.innerText = monthText;
     
-    // Actualizar referencias del texto del mes dentro del modal
+    // Resetear vistas del modal a la selección inicial
+    const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
+    const pasoConfirmacion = document.getElementById('eliminarPasoConfirmacion');
+    if (pasoSeleccion) pasoSeleccion.classList.remove('hidden');
+    if (pasoConfirmacion) pasoConfirmacion.classList.add('hidden');
+
     document.querySelectorAll('.eliminarGastoMesRef').forEach(el => el.innerText = monthText);
 
     const modalEliminar = document.getElementById('modalEliminarGasto');
     if (modalEliminar) modalEliminar.classList.remove('hidden');
 };
 
-// Procesa la opción seleccionada por el usuario (Solo este mes, mes y futuros, o todo)
-window.confirmarEliminacionGasto = function(tipoEliminacion) {
+// Solicita la confirmación final mostrando qué opción se eligió
+window.solicitarConfirmacionEliminacion = function(tipoEliminacion) {
     if (!gastoAEliminarId) return;
 
+    tipoEliminacionSeleccionado = tipoEliminacion;
+    const gasto = (window.appState.gastos || []).find(g => g.id === gastoAEliminarId);
+    const currentMonth = window.appState.currentMonth || defaultLocalMonth;
+    const monthText = window.formatMonthDisplay ? window.formatMonthDisplay(currentMonth) : currentMonth;
+
+    let textoModalidad = '';
+    if (tipoEliminacion === 'solo_mes') {
+        textoModalidad = `ÚNICAMENTE para el mes de ${monthText}`;
+    } else if (tipoEliminacion === 'mes_y_futuros') {
+        textoModalidad = `A PARTIR de ${monthText} y hacia todos los meses futuros`;
+    } else if (tipoEliminacion === 'todo') {
+        textoModalidad = `COMPLETAMENTE de la base de datos (todo el historial pasado, presente y futuro)`;
+    }
+
+    const txtDetalle = document.getElementById('eliminarConfirmacionDetalleText');
+    if (txtDetalle) {
+        txtDetalle.innerHTML = `¿Realmente deseás eliminar el gasto <strong class="text-white">"${gasto ? gasto.concepto : ''}"</strong> de forma <strong class="text-amber-400">${textoModalidad}</strong>?`;
+    }
+
+    // Alternar vista del modal hacia el paso de confirmación
+    const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
+    const pasoConfirmacion = document.getElementById('eliminarPasoConfirmacion');
+    if (pasoSeleccion) pasoSeleccion.classList.add('hidden');
+    if (pasoConfirmacion) pasoConfirmacion.classList.remove('hidden');
+};
+
+// Cancela la confirmación y vuelve a la lista de opciones de borrado
+window.volverASeleccionEliminacion = function() {
+    tipoEliminacionSeleccionado = null;
+    const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
+    const pasoConfirmacion = document.getElementById('eliminarPasoConfirmacion');
+    if (pasoSeleccion) pasoSeleccion.classList.remove('hidden');
+    if (pasoConfirmacion) pasoConfirmacion.classList.add('hidden');
+};
+
+// Ejecuta la eliminación definitiva una vez confirmado por el usuario
+window.ejecutarEliminacionGasto = function() {
+    if (!gastoAEliminarId || !tipoEliminacionSeleccionado) return;
+
     const id = gastoAEliminarId;
+    const tipo = tipoEliminacionSeleccionado;
     const currentActiveMonth = window.appState.currentMonth || defaultLocalMonth;
 
     if (!window.appState.excepcionesEliminacion) window.appState.excepcionesEliminacion = {};
     if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
 
-    if (tipoEliminacion === 'solo_mes') {
-        // Guarda la excepción puntual de este mes único
+    if (tipo === 'solo_mes') {
         window.appState.excepcionesEliminacionSoloMes[`${id}_${currentActiveMonth}`] = true;
-    } else if (tipoEliminacion === 'mes_y_futuros') {
-        // Corta la validez a partir de este mes en adelante
+    } else if (tipo === 'mes_y_futuros') {
         window.appState.excepcionesEliminacion[id] = currentActiveMonth;
-    } else if (tipoEliminacion === 'todo') {
-        // Elimina el gasto definitivamente del array principal y borra sus excepciones
+    } else if (tipo === 'todo') {
         window.appState.gastos = (window.appState.gastos || []).filter(g => g.id !== id);
         delete window.appState.excepcionesEliminacion[id];
         if (window.appState.aumentosIndividuales) delete window.appState.aumentosIndividuales[id];
         
-        // Limpia excepciones asociadas a este ID
         Object.keys(window.appState.excepcionesEliminacionSoloMes || {}).forEach(k => {
             if (k.startsWith(`${id}_`)) delete window.appState.excepcionesEliminacionSoloMes[k];
         });
@@ -1398,6 +1453,7 @@ window.confirmarEliminacionGasto = function(tipoEliminacion) {
     window.saveDataToCloud();
     if (typeof window.closeModal === 'function') window.closeModal('modalEliminarGasto');
     gastoAEliminarId = null;
+    tipoEliminacionSeleccionado = null;
     triggerPageRenders();
 };
 
