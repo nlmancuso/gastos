@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
@@ -128,6 +128,29 @@ window.showApp = function() {
     if (appContent) appContent.classList.remove('hidden');
 };
 
+// Control de pestañas Login / Registro
+window.mostrarTabAuth = function(tab) {
+    const formLogin = document.getElementById('formLogin');
+    const formRegister = document.getElementById('formRegister');
+    const btnLogin = document.getElementById('btnTabLogin');
+    const btnRegister = document.getElementById('btnTabRegister');
+    const loginError = document.getElementById('loginError');
+
+    if (loginError) loginError.classList.add('hidden');
+
+    if (tab === 'login') {
+        formLogin.classList.remove('hidden');
+        formRegister.classList.add('hidden');
+        btnLogin.className = "flex-1 pb-3 text-sm font-bold text-amber-500 border-b-2 border-amber-500";
+        btnRegister.className = "flex-1 pb-3 text-sm font-bold text-slate-400 hover:text-slate-200";
+    } else {
+        formLogin.classList.add('hidden');
+        formRegister.classList.remove('hidden');
+        btnRegister.className = "flex-1 pb-3 text-sm font-bold text-emerald-400 border-b-2 border-emerald-400";
+        btnLogin.className = "flex-1 pb-3 text-sm font-bold text-slate-400 hover:text-slate-200";
+    }
+};
+
 window.handleLogin = async function(e) {
     if (e) e.preventDefault();
     const emailEl = document.getElementById('loginEmail');
@@ -153,12 +176,55 @@ window.handleLogin = async function(e) {
     }
 };
 
+// Manejar Registro y creación automática del Espacio Personal
+window.handleRegister = async function(e) {
+    if (e) e.preventDefault();
+    const emailEl = document.getElementById('registerEmail');
+    const passEl = document.getElementById('registerPassword');
+    const loginError = document.getElementById('loginError');
+
+    if (!emailEl || !passEl) return;
+    const email = emailEl.value.trim().toLowerCase();
+    const pass = passEl.value;
+
+    if (loginError) loginError.classList.add('hidden');
+    window.showLoading();
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        const user = userCredential.user;
+
+        const personalDocId = `personal_${user.uid}`;
+        const personalDocRef = doc(db, "app_data", personalDocId);
+
+        localStorage.setItem("ultima_vista_id", "personal");
+
+        await setDoc(personalDocRef, {
+            appState: JSON.parse(JSON.stringify(window.appState)),
+            creadoEl: new Date().toISOString()
+        });
+
+        console.log(`✅ Usuario y Espacio Personal creados con éxito para: ${email}`);
+    } catch (error) {
+        console.error("Error al registrar usuario:", error);
+        window.showLogin();
+        window.mostrarTabAuth('register');
+        if (loginError) {
+            let msg = "No se pudo crear la cuenta.";
+            if (error.code === 'auth/email-already-in-use') msg = "El correo ya se encuentra registrado.";
+            if (error.code === 'auth/weak-password') msg = "La contraseña debe tener al menos 6 caracteres.";
+            loginError.innerText = msg;
+            loginError.classList.remove('hidden');
+        }
+    }
+};
+
 window.cerrarSesion = function() {
     window.showLogin();
     signOut(auth);
 };
 
-// Cambiar entre Espacio Personal y Grupo Control de Gastos desde el Selector
+// Cambiar entre Espacio Personal y Grupos desde el selector (combo)
 window.cambiarVistaSeleccionada = async function(vistaId) {
     if (!vistaId) return;
     
@@ -192,7 +258,6 @@ onAuthStateChanged(auth, async (user) => {
         const dLocal = new Date();
         const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
         
-        // Recuperamos la última vista seleccionada (por defecto usa el ID seguro del Grupo Control de Gastos)
         let vistaGuardada = localStorage.getItem("ultima_vista_id") || "T3E2kcXODg2OLm7i1Roq";
         
         const selectorEl = document.getElementById('selectorVista');
