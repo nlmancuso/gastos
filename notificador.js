@@ -43,7 +43,7 @@ function obtenerFechasHoyMañana() {
 
 async function enviarAlertas() {
     try {
-        console.log("Conectando a Firebase para extracción sincronizada de tarjetas y gastos...");
+        console.log("Conectando a Firebase para extracción de gastos y estados...");
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
@@ -59,21 +59,13 @@ async function enviarAlertas() {
         const categoriasConfig = appState.categorias || [];
         const excepcionesVencGrid = appState.excepcionesVencimientoGrid || {};
         const excepcionesVenc = appState.excepcionesVencimiento || {};
+        const excepcionesEstado = appState.excepcionesEstado || {};
         const vencimientosTarjetas = appState.vencimientosTarjetas || {};
 
         const targetMonth = new Date().toISOString().slice(0, 7);
-        
-        // Calculamos también el mes siguiente (ej: de 2026-10 a 2026-11) para capturar vencimientos de fin/inicio de mes
-        let [currY, currM] = targetMonth.split('-').map(Number);
-        currM++;
-        if (currM > 12) { currM = 1; currY++; }
-        const nextMonth = `${currY}-${String(currM).padStart(2, '0')}`;
-
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
-        console.log(`Fecha de HOY analizada por el bot: ${hoyStr}`);
-        console.log(`Fecha de MAÑANA analizada por el bot: ${manianaStr}`);
-        console.log(`Meses evaluados: ${targetMonth} y ${nextMonth}`);
+        console.log(`Fecha de HOY: ${hoyStr} | MAÑANA: ${manianaStr}`);
 
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
@@ -83,29 +75,51 @@ async function enviarAlertas() {
 
         let itemsCalculados = [];
 
-        // 1. Procesar gastos de la lista principal buscando en mes actual y siguiente
+        // 1. Procesar gastos individuales
         gastosRegistrados.forEach(gasto => {
             const gridKeyCurrent = `${gasto.id}_${targetMonth}`;
-            const gridKeyNext = `${gasto.id}_${nextMonth}`;
 
-            let vencimientoCrudo = excepcionesVencGrid[gridKeyCurrent] 
-                || excepcionesVencGrid[gridKeyNext]
-                || excepcionesVenc[gridKeyCurrent] 
-                || excepcionesVenc[gridKeyNext]
-                || gasto.vencimiento 
-                || gasto.fechaVencimiento 
-                || '';
+            // Buscar fecha de vencimiento
+            let vencimientoCrudo = gasto.vencimiento || gasto.fechaVencimiento || '';
+            Object.keys(excepcionesVencGrid).forEach(key => {
+                if (key.startsWith(`${gasto.id}_`) && excepcionesVencGrid[key]) vencimientoCrudo = excepcionesVencGrid[key];
+            });
+            Object.keys(excepcionesVenc).forEach(key => {
+                if (key.startsWith(`${gasto.id}_`) && excepcionesVenc[key]) vencimientoCrudo = excepcionesVenc[key];
+            });
 
             let vencimientoFinal = normalizarFecha(vencimientoCrudo);
             const catNombre = gasto.categoria || 'Otros';
             const monto = parseFloat(gasto.monto) || 0;
 
-            if (vencimientoFinal) {
-                console.log(`Gasto: "${gasto.concepto}" | Categoría: ${catNombre} | Vencimiento detectado: "${vencimientoFinal}"`);
+            // Obtener el estado (PAGADO, VENCIDO, PENDIENTE) desde las excepciones del mes o del objeto
+            let estadoGasto = excepcionesEstado[`${gasto.id}_${targetMonth}`] || gasto.estado || 'PENDIENTE';
+
+            // DESCARTAR SI YA ESTÁ PAGADO
+            if (estadoGasto === 'PAGADO') {
+                return; 
             }
 
-            if (vencimientoFinal === hoyStr || vencimientoFinal === manianaStr) {
-                // Evitamos duplicados si ya se agregó
+            // Evaluar si entra en la alerta: 
+            // - Si vence hoy
+            // - Si vence mañana
+            // - O si ya pasó la fecha (vencido) y no está pagado
+            const esHoy = vencimientoFinal === hoyStr;
+            const esManiana = vencimientoFinal === manianaStr;
+            const estaVencidoPasado = vencimientoFinal && vencimientoFinal < hoyStr;
+
+            if (esHoy || esManiana || estaVencidoPasado) {
+                let estadoBadge = 'VENCE HOY';
+                let badgeColor = '#e11d48'; // Rojo
+
+                if (esManiana) {
+                    estadoBadge = 'VENCE MAÑANA';
+                    badgeColor = '#f59e0b'; // Amarillo/Naranja
+                } else if (estaVencidoPasado) {
+                    estadoBadge = '¡VENCIDO!';
+                    badgeColor = '#991b1b'; // Rojo oscuro
+                }
+
                 if (!itemsCalculados.some(i => i.concepto === (gasto.concepto || catNombre) && i.vencimiento === vencimientoFinal)) {
                     itemsCalculados.push({
                         concepto: gasto.concepto || catNombre,
@@ -113,8 +127,8 @@ async function enviarAlertas() {
                         categoria: catNombre,
                         vencimiento: vencimientoFinal,
                         esTarjeta: false,
-                        estadoBadge: vencimientoFinal === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
-                        badgeColor: vencimientoFinal === hoyStr ? '#e11d48' : '#f59e0b'
+                        estadoBadge: estadoBadge,
+                        badgeColor: badgeColor
                     });
                 }
             }
@@ -127,13 +141,12 @@ async function enviarAlertas() {
         categoriasConfig.forEach(cat => {
             const catNombre = cat.nombre || cat;
             if (cat.esTarjeta || esTarjetaMap[catNombre]) {
-                let vencTarjetaCrudo = vencimientosTarjetas[catNombre] 
-                    || vencimientosTarjetas[`${catNombre}_${targetMonth}`] 
-                    || vencimientosTarjetas[`${catNombre}_${nextMonth}`]
-                    || cat.vencimiento 
-                    || cat.vencimientoHabitual 
-                    || '';
-                
+                let vencTarjetaCrudo = '';
+                Object.keys(vencimientosTarjetas).forEach(k => {
+                    if (k.startsWith(catNombre)) vencTarjetaCrudo = vencimientosTarjetas[k];
+                });
+                if (!vencTarjetaCrudo) vencTarjetaCrudo = cat.vencimiento || cat.vencimientoHabitual || '';
+
                 fechasTarjetas[catNombre] = normalizarFecha(vencTarjetaCrudo);
                 totalesPorTarjeta[catNombre] = 0;
             }
@@ -150,20 +163,14 @@ async function enviarAlertas() {
             const montoTotalCat = totalesPorTarjeta[catNombre];
             let vencFinalCat = fechasTarjetas[catNombre];
 
-            if (!vencFinalCat) {
-                gastosRegistrados.forEach(g => {
-                    if (g.categoria === catNombre) {
-                        const gridKey = `${g.id}_${targetMonth}`;
-                        const gridKeyNext = `${g.id}_${nextMonth}`;
-                        let vItem = excepcionesVencGrid[gridKey] || excepcionesVencGrid[gridKeyNext] || excepcionesVenc[gridKey] || g.vencimiento || '';
-                        if (vItem) vencFinalCat = normalizarFecha(vItem);
-                    }
-                });
-            }
+            const esHoy = vencFinalCat === hoyStr;
+            const esManiana = vencFinalCat === manianaStr;
+            const estaVencidoPasado = vencFinalCat && vencFinalCat < hoyStr;
 
-            console.log(`Tarjeta/Categoría Agrupada: "${catNombre}" | Monto: ${montoTotalCat} | Vencimiento: "${vencFinalCat}"`);
+            if (montoTotalCat > 0 && (esHoy || esManiana || estaVencidoPasado)) {
+                let estadoBadge = esHoy ? 'VENCE HOY' : (esManiana ? 'VENCE MAÑANA' : '¡VENCIDO!');
+                let badgeColor = esHoy ? '#e11d48' : (esManiana ? '#f59e0b' : '#991b1b');
 
-            if (montoTotalCat > 0 && (vencFinalCat === hoyStr || vencFinalCat === manianaStr)) {
                 if (!itemsCalculados.some(i => i.categoria === catNombre && i.esTarjeta)) {
                     itemsCalculados.push({
                         concepto: `💳 Tarjeta: ${catNombre}`,
@@ -171,15 +178,15 @@ async function enviarAlertas() {
                         categoria: catNombre,
                         vencimiento: vencFinalCat,
                         esTarjeta: true,
-                        estadoBadge: vencFinalCat === hoyStr ? 'VENCE HOY' : 'VENCE MAÑANA',
-                        badgeColor: vencFinalCat === hoyStr ? '#e11d48' : '#f59e0b'
+                        estadoBadge: estadoBadge,
+                        badgeColor: badgeColor
                     });
                 }
             }
         });
 
         if (itemsCalculados.length === 0) {
-            console.log("No hay vencimientos exactos para hoy ni para mañana.");
+            console.log("No hay vencimientos pendientes, de hoy ni de mañana.");
             return;
         }
 
@@ -214,7 +221,7 @@ async function enviarAlertas() {
                     <div style="background-color: #0f172a; padding: 25px; text-align: center; color: white;">
                         <div style="font-size: 24px; margin-bottom: 6px;">🔔</div>
                         <h2 style="margin: 0; font-size: 20px; font-weight: bold;">Alerta de Vencimientos</h2>
-                        <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">Vencimientos para hoy y mañana</p>
+                        <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">Incluye vencidos pendientes, hoy y mañana</p>
                     </div>
                     <div style="background-color: #1e293b; padding: 15px 25px; display: flex; justify-content: space-around; color: white; text-align: center;">
                         <div>
@@ -222,12 +229,12 @@ async function enviarAlertas() {
                             <div style="font-size: 18px; font-weight: bold; margin-top: 4px; color: #38bdf8;">$${montoTotalGeneral.toLocaleString('es-AR')}</div>
                         </div>
                         <div style="border-left: 1px solid #334155; padding-left: 20px;">
-                            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Vencimientos</div>
-                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px; color: #f43f5e;">${cantidadUrgentes} alerta(s)</div>
+                            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Alertas</div>
+                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px; color: #f43f5e;">${cantidadUrgentes} ítem(s)</div>
                         </div>
                     </div>
                     <div style="padding: 25px;">
-                        <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #334155; text-transform: uppercase;">Detalle Urgente</h4>
+                        <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #334155; text-transform: uppercase;">Detalle de Urgencias</h4>
                         <div>${listaGastosHtml}</div>
                     </div>
                 </div>
@@ -237,11 +244,11 @@ async function enviarAlertas() {
         await resend.emails.send({
             from: 'Control de Gastos <onboarding@resend.dev>',
             to: destinatarios.length > 0 ? destinatarios : ['delivered@resend.dev'],
-            subject: `🚨 Alerta de Pagos: $${montoTotalGeneral.toLocaleString('es-AR')} vencen hoy/mañana`,
+            subject: `🚨 Alerta de Pagos: $${montoTotalGeneral.toLocaleString('es-AR')} pendientes/vencidos`,
             html: contenidoHtml
         });
 
-        console.log("Correo de alerta enviado exitosamente.");
+        console.log("Correo de alerta con vencidos enviado exitosamente.");
     } catch (error) {
         console.error("Error al enviar el correo:", error);
         process.exit(1);
