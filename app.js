@@ -65,6 +65,7 @@ window.appState = window.appState || {
     excepcionesVencimientoGrid: {},
     excepcionesEstado: {},
     excepcionesEliminacion: {},
+    excepcionesEliminacionSoloMes: {},
     aumentosIndividuales: {},
     subcategorias: JSON.parse(JSON.stringify(subcategoriasDefault)),
     sueldos: {},
@@ -180,6 +181,7 @@ onAuthStateChanged(auth, async (user) => {
                     window.appState = { ...window.appState, ...data.appState };
                     if (!window.appState.subcategorias) window.appState.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
                     if (!window.appState.aumentosIndividuales) window.appState.aumentosIndividuales = {};
+                    if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
                     if (!window.appState.currentMonth) window.appState.currentMonth = currentLocalMonthStr;
                 }
             } else {
@@ -313,8 +315,15 @@ window.getCalculatedDataForMonth = function(targetMonth) {
     const hoyStr = new Date().toISOString().slice(0, 10);
 
     (window.appState.gastos || []).forEach(gasto => {
+        // 1. Verificar si se eliminó de este mes en adelante
         const mesEliminacion = window.appState.excepcionesEliminacion?.[gasto.id];
         if (mesEliminacion && targetMonth >= mesEliminacion) {
+            return;
+        }
+
+        // 2. Verificar si se eliminó exclusivamente en este mes puntual
+        const borradoPuntual = window.appState.excepcionesEliminacionSoloMes?.[`${gasto.id}_${targetMonth}`];
+        if (borradoPuntual) {
             return;
         }
 
@@ -393,7 +402,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
                     const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
                     let estadoAplicar = estadoGuardado || (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar ? 'VENCIDO' : 'PENDIENTE');
 
-                    generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: `Cuota ${i + 1}/${totalCuotas}`, monto: montoCuota, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false });
+                    generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: `Cuota ${i + 1}/${totalCuotas}`, monto: montoCuota, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false, subcategoriaId: gasto.subcategoriaId });
                 }
             }
         } else if (isRecurrente) {
@@ -417,7 +426,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
                 let estadoAplicar = estadoGuardado || (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar ? 'VENCIDO' : 'PENDIENTE');
 
                 const tipoStr = (baseEsFijo || catEsFijo) ? 'Recurrente' : 'Débito Automático';
-                generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: true });
+                generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: tipoStr, monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: true, subcategoriaId: gasto.subcategoriaId });
             }
         } else {
             if (targetMonth === startYM) {
@@ -428,7 +437,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
                 const estadoGuardado = window.appState.excepcionesEstado?.[estadoKey];
                 let estadoAplicar = estadoGuardado || (vencimientoAplicar && vencimientoAplicar !== 'dd/mm/aaaa' && hoyStr > vencimientoAplicar ? 'VENCIDO' : 'PENDIENTE');
 
-                generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'Débito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false });
+                generatedItems.push({ id: gasto.id, concepto: gasto.concepto, categoria: categoriaAplicar, tipo: 'Débito', monto: montoAplicar, vencimiento: vencimientoAplicar, estado: estadoAplicar, isRecurrente: false, subcategoriaId: gasto.subcategoriaId });
             }
         }
 
