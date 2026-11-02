@@ -702,9 +702,10 @@ window.handleInvitarMiembro = function(e) {
         return;
     }
 
-    // Parámetros para EmailJS
+// Parámetros formateados según la plantilla de EmailJS
     const templateParams = {
-        to_email: email,
+        to_email: email,                          // Para el campo "To Email" de EmailJS
+        para_correo_electrónico: email,           // Por si la plantilla usa la etiqueta traducida
         rol_invitado: rol.toUpperCase(),
         remitente: auth.currentUser.email || 'Administrador'
     };
