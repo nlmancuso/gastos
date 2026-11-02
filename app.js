@@ -748,3 +748,51 @@ window.cancelarInvitacion = function(index) {
         renderMiembrosGrupo();
     }
 };
+
+
+///////////////////////////////////////
+import { 
+    getFirestore, 
+    doc, 
+    getDoc, 
+    collection, 
+    addDoc 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+async function clonarYMigrarGrupo() {
+    try {
+        const db = getFirestore();
+        
+        // 1. Leemos el documento original
+        const oldDocRef = doc(db, "app_data", "grupo_mancusososa");
+        const oldDocSnap = await getDoc(oldDocRef);
+
+        if (oldDocSnap.exists()) {
+            const dataOriginal = oldDocSnap.data();
+
+            // 2. Preparamos la nueva estructura con miembros iniciales
+            const nuevaData = {
+                ...dataOriginal,
+                miembros: {
+                    "controlgastos5@gmail.com": "ADMIN"
+                }
+            };
+
+            // 3. Creamos el nuevo documento con ID autogenerado en app_data
+            const newDocRef = await addDoc(collection(db, "app_data"), nuevaData);
+
+            console.log("----------------------------------------");
+            console.log("¡MIGRACIÓN EXITOSA!");
+            console.log("Tu nuevo ID de grupo es:", newDocRef.id);
+            console.log("----------------------------------------");
+            alert(`Nuevo grupo creado con ID: ${newDocRef.id}`);
+        } else {
+            console.error("No se encontró el documento grupo_mancusososa");
+        }
+    } catch (error) {
+        console.error("Error durante la migración:", error);
+    }
+}
+
+// Ejecutamos la migración
+clonarYMigrarGrupo();
