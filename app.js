@@ -245,7 +245,7 @@ window.saveHormigaDataToCloud = async function() {
     } catch (e) { console.error("Error guardando hormiga:", e); }
 };
 
-// Control de visibilidad de botones exclusivos para el Administrador (Fuerza admin para nicolaslmancuso@gmail.com)
+// Control de visibilidad de botones exclusivos para el Administrador
 function actualizarVisibilidadBotonesAdmin() {
     const user = auth.currentUser;
     const userEmail = user ? user.email : '';
@@ -494,7 +494,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
     return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
 };
 
-// ==================== LÓGICA MODAL ELIMINAR GASTO (3 OPCIONES + CONFIRMACIÓN) ====================
+// ==================== LÓGICA MODAL ELIMINAR GASTO ====================
 let gastoAEliminarId = null;
 let tipoEliminacionSeleccionado = null;
 
@@ -590,7 +590,7 @@ window.ejecutarEliminacionGasto = function() {
     triggerPageRenders();
 };
 
-// ==================== LÓGICA MODAL GESTIÓN DE GRUPO (MULTI-USUARIO) ====================
+// ==================== LÓGICA MODAL GESTIÓN DE GRUPO (MULTI-USUARIO + EMAILJS) ====================
 window.openModalGestionGrupo = function() {
     renderMiembrosGrupo();
     const modal = document.getElementById('modalGestionGrupo');
@@ -698,6 +698,25 @@ window.handleInvitarMiembro = function(e) {
     if (yaEsMiembro) {
         alert("Ese usuario ya pertenece al grupo.");
         return;
+    }
+
+    // Parámetros para la plantilla de EmailJS
+    const templateParams = {
+        to_email: email,
+        rol_invitado: rol.toUpperCase(),
+        remitente: auth.currentUser.email || 'Administrador'
+    };
+
+    // Envío del mail mediante EmailJS
+    if (typeof emailjs !== 'undefined') {
+        emailjs.send('service_hib3aln', 'template_9tbnrfg', templateParams)
+            .then(function(response) {
+                console.log('Correo de invitación enviado con éxito!', response.status, response.text);
+                alert(`¡Invitación enviada con éxito a ${email}!`);
+            }, function(error) {
+                console.error('Error al enviar el correo vía EmailJS:', error);
+                alert('La invitación se guardó en el sistema, pero hubo un detalle al enviar el correo electrónico.');
+            });
     }
 
     window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
