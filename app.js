@@ -678,6 +678,8 @@ function renderMiembrosGrupo() {
 
 window.handleInvitarMiembro = function(e) {
     e.preventDefault();
+    console.log("--> Iniciando envío de invitación...");
+
     const emailInput = document.getElementById('inputInvitarEmail');
     const rolSelect = document.getElementById('selectInvitarRol');
     if (!emailInput) return;
@@ -700,23 +702,27 @@ window.handleInvitarMiembro = function(e) {
         return;
     }
 
-    // Parámetros para la plantilla de EmailJS
+    // Parámetros para EmailJS
     const templateParams = {
         to_email: email,
         rol_invitado: rol.toUpperCase(),
         remitente: auth.currentUser.email || 'Administrador'
     };
 
-    // Envío del mail mediante EmailJS
+    // Verificación e intento de envío
     if (typeof emailjs !== 'undefined') {
+        console.log("Enviando mail a través de EmailJS con params:", templateParams);
         emailjs.send('service_hib3aln', 'template_9tbnrfg', templateParams)
             .then(function(response) {
-                console.log('Correo de invitación enviado con éxito!', response.status, response.text);
+                console.log('✅ Correo de invitación enviado con éxito!', response.status, response.text);
                 alert(`¡Invitación enviada con éxito a ${email}!`);
             }, function(error) {
-                console.error('Error al enviar el correo vía EmailJS:', error);
-                alert('La invitación se guardó en el sistema, pero hubo un detalle al enviar el correo electrónico.');
+                console.error('❌ Error devuelto por EmailJS:', error);
+                alert('La invitación se guardó, pero EmailJS devolvió un error: ' + JSON.stringify(error));
             });
+    } else {
+        console.warn("⚠️ El SDK de EmailJS (emailjs) no está cargado en index.html. Agregá el script de CDN.");
+        alert("Atención: Falta cargar el SDK de EmailJS en el archivo index.html.");
     }
 
     window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
@@ -724,14 +730,6 @@ window.handleInvitarMiembro = function(e) {
 
     window.saveDataToCloud();
     renderMiembrosGrupo();
-};
-
-window.cambiarRolMiembro = function(uid, nuevoRol) {
-    if (window.appState.grupoInfo?.miembros?.[uid]) {
-        window.appState.grupoInfo.miembros[uid].rol = nuevoRol;
-        window.saveDataToCloud();
-        renderMiembrosGrupo();
-    }
 };
 
 window.removerMiembroGrupo = function(uid) {
