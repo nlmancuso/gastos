@@ -81,6 +81,13 @@
                     <div class="w-10 h-10 rounded-xl bg-emerald-950 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-wallet text-xl"></i></div>
                     <div><h1 class="text-xl font-bold text-white">Control de Gastos</h1><p class="text-xs text-slate-400" id="grupoStatus">Cargando...</p></div>
                 </div>
+                <div class="flex items-center gap-3">
+    <!-- Selector de Vistas (Combo) -->
+    <select id="selectorVista" onchange="cambiarVistaSeleccionada(this.value)" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+        <option value="personal">🏠 Mi Espacio Personal (Super Admin)</option>
+        <option value="T3E2kcXODg2OLm7i1Roq">👥 Grupo Control de Gastos</option>
+    </select>
+</div>
                 <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
                     <button onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-left"></i></button>
                     <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center">Cargando...</span>
