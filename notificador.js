@@ -43,7 +43,7 @@ function obtenerFechasHoyMañana() {
 
 async function enviarAlertas() {
     try {
-        console.log("Conectando a Firebase para extracción de gastos y estados...");
+        console.log("Conectando a Firebase para extracción sincronizada de tarjetas, gastos y estados...");
         const grupoId = "grupo_mancusososa";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
@@ -63,9 +63,17 @@ async function enviarAlertas() {
         const vencimientosTarjetas = appState.vencimientosTarjetas || {};
 
         const targetMonth = new Date().toISOString().slice(0, 7);
+        
+        let [currY, currM] = targetMonth.split('-').map(Number);
+        currM++;
+        if (currM > 12) { currM = 1; currY++; }
+        const nextMonth = `${currY}-${String(currM).padStart(2, '0')}`;
+
         const { hoyStr, manianaStr } = obtenerFechasHoyMañana();
 
-        console.log(`Fecha de HOY: ${hoyStr} | MAÑANA: ${manianaStr}`);
+        console.log(`Fecha de HOY analizada por el bot: ${hoyStr}`);
+        console.log(`Fecha de MAÑANA analizada por el bot: ${manianaStr}`);
+        console.log(`Meses evaluados: ${targetMonth} y ${nextMonth}`);
 
         let esTarjetaMap = {};
         categoriasConfig.forEach(c => {
@@ -75,35 +83,33 @@ async function enviarAlertas() {
 
         let itemsCalculados = [];
 
-        // 1. Procesar gastos individuales
+        // 1. Procesar gastos de la lista principal buscando en mes actual y siguiente
         gastosRegistrados.forEach(gasto => {
             const gridKeyCurrent = `${gasto.id}_${targetMonth}`;
+            const gridKeyNext = `${gasto.id}_${nextMonth}`;
 
-            // Buscar fecha de vencimiento
-            let vencimientoCrudo = gasto.vencimiento || gasto.fechaVencimiento || '';
-            Object.keys(excepcionesVencGrid).forEach(key => {
-                if (key.startsWith(`${gasto.id}_`) && excepcionesVencGrid[key]) vencimientoCrudo = excepcionesVencGrid[key];
-            });
-            Object.keys(excepcionesVenc).forEach(key => {
-                if (key.startsWith(`${gasto.id}_`) && excepcionesVenc[key]) vencimientoCrudo = excepcionesVenc[key];
-            });
+            let vencimientoCrudo = excepcionesVencGrid[gridKeyCurrent] 
+                || excepcionesVencGrid[gridKeyNext]
+                || excepcionesVenc[gridKeyCurrent] 
+                || excepcionesVenc[gridKeyNext]
+                || gasto.vencimiento 
+                || gasto.fechaVencimiento 
+                || '';
 
             let vencimientoFinal = normalizarFecha(vencimientoCrudo);
             const catNombre = gasto.categoria || 'Otros';
             const monto = parseFloat(gasto.monto) || 0;
 
-            // Obtener el estado (PAGADO, VENCIDO, PENDIENTE) desde las excepciones del mes o del objeto
-            let estadoGasto = excepcionesEstado[`${gasto.id}_${targetMonth}`] || gasto.estado || 'PENDIENTE';
-
-            // DESCARTAR SI YA ESTÁ PAGADO
+            // Verificar si el gasto ya fue marcado como PAGADO en este mes
+            let estadoGasto = excepcionesEstado[gridKeyCurrent] || excepcionesEstado[gridKeyNext] || gasto.estado || 'PENDIENTE';
             if (estadoGasto === 'PAGADO') {
-                return; 
+                return; // Descarta si ya está pagado
             }
 
-            // Evaluar si entra en la alerta: 
-            // - Si vence hoy
-            // - Si vence mañana
-            // - O si ya pasó la fecha (vencido) y no está pagado
+            if (vencimientoFinal) {
+                console.log(`Gasto: "${gasto.concepto}" | Categoría: ${catNombre} | Vencimiento: "${vencimientoFinal}" | Estado: ${estadoGasto}`);
+            }
+
             const esHoy = vencimientoFinal === hoyStr;
             const esManiana = vencimientoFinal === manianaStr;
             const estaVencidoPasado = vencimientoFinal && vencimientoFinal < hoyStr;
@@ -141,12 +147,13 @@ async function enviarAlertas() {
         categoriasConfig.forEach(cat => {
             const catNombre = cat.nombre || cat;
             if (cat.esTarjeta || esTarjetaMap[catNombre]) {
-                let vencTarjetaCrudo = '';
-                Object.keys(vencimientosTarjetas).forEach(k => {
-                    if (k.startsWith(catNombre)) vencTarjetaCrudo = vencimientosTarjetas[k];
-                });
-                if (!vencTarjetaCrudo) vencTarjetaCrudo = cat.vencimiento || cat.vencimientoHabitual || '';
-
+                let vencTarjetaCrudo = vencimientosTarjetas[catNombre] 
+                    || vencimientosTarjetas[`${catNombre}_${targetMonth}`] 
+                    || vencimientosTarjetas[`${catNombre}_${nextMonth}`]
+                    || cat.vencimiento 
+                    || cat.vencimientoHabitual 
+                    || '';
+                
                 fechasTarjetas[catNombre] = normalizarFecha(vencTarjetaCrudo);
                 totalesPorTarjeta[catNombre] = 0;
             }
@@ -162,6 +169,19 @@ async function enviarAlertas() {
         Object.keys(totalesPorTarjeta).forEach(catNombre => {
             const montoTotalCat = totalesPorTarjeta[catNombre];
             let vencFinalCat = fechasTarjetas[catNombre];
+
+            if (!vencFinalCat) {
+                gastosRegistrados.forEach(g => {
+                    if (g.categoria === catNombre) {
+                        const gridKey = `${g.id}_${targetMonth}`;
+                        const gridKeyNext = `${g.id}_${nextMonth}`;
+                        let vItem = excepcionesVencGrid[gridKey] || excepcionesVencGrid[gridKeyNext] || excepcionesVenc[gridKey] || g.vencimiento || '';
+                        if (vItem) vencFinalCat = normalizarFecha(vItem);
+                    }
+                });
+            }
+
+            console.log(`Tarjeta/Categoría Agrupada: "${catNombre}" | Monto: ${montoTotalCat} | Vencimiento: "${vencFinalCat}"`);
 
             const esHoy = vencFinalCat === hoyStr;
             const esManiana = vencFinalCat === manianaStr;
