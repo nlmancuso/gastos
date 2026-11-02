@@ -247,11 +247,13 @@ window.saveHormigaDataToCloud = async function() {
 
 // Control de visibilidad de botones exclusivos para el Administrador
 function actualizarVisibilidadBotonesAdmin() {
-    const userUid = auth.currentUser ? auth.currentUser.uid : null;
+    const user = auth.currentUser;
+    const userUid = user ? user.uid : null;
+    const userEmail = user ? user.email : '';
     const grupoInfo = window.appState.grupoInfo;
     
-    // Si no hay grupo creado o el usuario actual es el adminUid
-    const esAdmin = !grupoInfo || grupoInfo.adminUid === userUid;
+    // Si es tu correo principal, o no hay grupo creado, o tu UID coincide con el adminUid
+    const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || !grupoInfo || grupoInfo.adminUid === userUid;
 
     const btnConfigCat = document.getElementById('btnConfigCat');
     const btnGestionGrupo = document.getElementById('btnGestionGrupo');
