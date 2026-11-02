@@ -158,36 +158,7 @@ window.cerrarSesion = function() {
     signOut(auth);
 };
 
-// Función de migración (se dispara sólo cuando estás autenticado)
-async function clonarYMigrarGrupo() {
-    try {
-        const oldDocRef = doc(db, "app_data", "grupo_mancusososa");
-        const oldDocSnap = await getDoc(oldDocRef);
 
-        if (oldDocSnap.exists()) {
-            const dataOriginal = oldDocSnap.data();
-
-            const nuevaData = {
-                ...dataOriginal,
-                miembros: {
-                    "controlgastos5@gmail.com": "ADMIN"
-                }
-            };
-
-            const newDocRef = await addDoc(collection(db, "app_data"), nuevaData);
-
-            console.log("----------------------------------------");
-            console.log("¡MIGRACIÓN EXITOSA!");
-            console.log("Tu nuevo ID de grupo es:", newDocRef.id);
-            console.log("----------------------------------------");
-            alert(`¡Migración exitosa!\nNuevo ID del grupo: ${newDocRef.id}`);
-        } else {
-            console.log("El documento grupo_mancusososa ya no existe o ya fue migrado.");
-        }
-    } catch (error) {
-        console.error("Error durante la migración:", error);
-    }
-}
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
