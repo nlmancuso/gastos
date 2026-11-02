@@ -245,25 +245,46 @@ window.saveHormigaDataToCloud = async function() {
     } catch (e) { console.error("Error guardando hormiga:", e); }
 };
 
-// Control de visibilidad de botones exclusivos para el Administrador
+// Control de visibilidad de botones exclusivos para el Administrador (Fuerza admin para nicolaslmancuso@gmail.com)
 function actualizarVisibilidadBotonesAdmin() {
     const user = auth.currentUser;
-    const userUid = user ? user.uid : null;
     const userEmail = user ? user.email : '';
-    const grupoInfo = window.appState.grupoInfo;
-    
-    // Si es tu correo principal, o no hay grupo creado, o tu UID coincide con el adminUid
-    const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || !grupoInfo || grupoInfo.adminUid === userUid;
+    const userUid = user ? user.uid : null;
+
+    if (window.appState && !window.appState.grupoInfo && userUid) {
+        window.appState.grupoInfo = {
+            adminUid: userUid,
+            miembros: {
+                [userUid]: { email: userEmail, rol: 'admin' }
+            },
+            invitacionesPendientes: []
+        };
+    }
+
+    const grupoInfo = window.appState ? window.appState.grupoInfo : null;
+    const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || !grupoInfo || (grupoInfo && grupoInfo.adminUid === userUid);
 
     const btnConfigCat = document.getElementById('btnConfigCat');
     const btnGestionGrupo = document.getElementById('btnGestionGrupo');
 
     if (esAdmin) {
-        if (btnConfigCat) btnConfigCat.classList.remove('hidden');
-        if (btnGestionGrupo) btnGestionGrupo.classList.remove('hidden');
+        if (btnConfigCat) {
+            btnConfigCat.classList.remove('hidden');
+            btnConfigCat.style.display = 'inline-flex';
+        }
+        if (btnGestionGrupo) {
+            btnGestionGrupo.classList.remove('hidden');
+            btnGestionGrupo.style.display = 'inline-flex';
+        }
     } else {
-        if (btnConfigCat) btnConfigCat.classList.add('hidden');
-        if (btnGestionGrupo) btnGestionGrupo.classList.add('hidden');
+        if (btnConfigCat) {
+            btnConfigCat.classList.add('hidden');
+            btnConfigCat.style.display = 'none';
+        }
+        if (btnGestionGrupo) {
+            btnGestionGrupo.classList.add('hidden');
+            btnGestionGrupo.style.display = 'none';
+        }
     }
 }
 
@@ -599,7 +620,7 @@ function renderMiembrosGrupo() {
     }
 
     const grupoInfo = window.appState.grupoInfo;
-    const esAdmin = grupoInfo.adminUid === userUid;
+    const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || grupoInfo.adminUid === userUid;
 
     const formInvitar = document.getElementById('containerFormInvitar');
     if (formInvitar) {
@@ -611,7 +632,7 @@ function renderMiembrosGrupo() {
     if (badgeCant) badgeCant.innerText = `${miembrosArr.length} activo(s)`;
 
     miembrosArr.forEach(([uid, info]) => {
-        const esElAdmin = uid === grupoInfo.adminUid;
+        const esElAdmin = uid === grupoInfo.adminUid || info.email === "nicolaslmancuso@gmail.com";
         const esYoMismo = uid === userUid;
 
         container.innerHTML += `
@@ -622,7 +643,7 @@ function renderMiembrosGrupo() {
                     </div>
                     <div>
                         <span class="font-bold text-white block">${info.email} ${esYoMismo ? '<span class="text-[10px] text-emerald-400 font-normal">(Tú)</span>' : ''}</span>
-                        <span class="text-[10px] text-slate-500 uppercase font-semibold">${info.rol || 'miembro'}</span>
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold">${esElAdmin ? 'admin' : (info.rol || 'miembro')}</span>
                     </div>
                 </div>
                 ${(esAdmin && !esYoMismo) ? `
