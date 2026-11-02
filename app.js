@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import {  doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -158,14 +158,48 @@ window.cerrarSesion = function() {
     signOut(auth);
 };
 
+// Función de migración (se dispara sólo cuando estás autenticado)
+async function clonarYMigrarGrupo() {
+    try {
+        const oldDocRef = doc(db, "app_data", "grupo_mancusososa");
+        const oldDocSnap = await getDoc(oldDocRef);
+
+        if (oldDocSnap.exists()) {
+            const dataOriginal = oldDocSnap.data();
+
+            const nuevaData = {
+                ...dataOriginal,
+                miembros: {
+                    "controlgastos5@gmail.com": "ADMIN"
+                }
+            };
+
+            const newDocRef = await addDoc(collection(db, "app_data"), nuevaData);
+
+            console.log("----------------------------------------");
+            console.log("¡MIGRACIÓN EXITOSA!");
+            console.log("Tu nuevo ID de grupo es:", newDocRef.id);
+            console.log("----------------------------------------");
+            alert(`¡Migración exitosa!\nNuevo ID del grupo: ${newDocRef.id}`);
+        } else {
+            console.log("El documento grupo_mancusososa ya no existe o ya fue migrado.");
+        }
+    } catch (error) {
+        console.error("Error durante la migración:", error);
+    }
+}
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.showLoading();
+        
+        // Ejecutamos la migración una sola vez al detectar sesión iniciada
+        await clonarYMigrarGrupo();
+
         const dLocal = new Date();
         const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
         
         let grupoId = "grupo_mancusososa";
-        if (user.email === "nicolaslmancuso@gmail.com") grupoId = "grupo_mancusososa";
 
         const docRef = doc(db, "app_data", grupoId);
         window.docRef = docRef;
@@ -245,7 +279,6 @@ window.saveHormigaDataToCloud = async function() {
     } catch (e) { console.error("Error guardando hormiga:", e); }
 };
 
-// Control de visibilidad de botones exclusivos para el Administrador
 function actualizarVisibilidadBotonesAdmin() {
     const user = auth.currentUser;
     const userEmail = user ? user.email : '';
@@ -494,7 +527,7 @@ window.getCalculatedDataForMonth = function(targetMonth) {
     return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
 };
 
-// ==================== LÓGICA MODAL ELIMINAR GASTO ====================
+// Modal Eliminar Gasto
 let gastoAEliminarId = null;
 let tipoEliminacionSeleccionado = null;
 
@@ -590,7 +623,7 @@ window.ejecutarEliminacionGasto = function() {
     triggerPageRenders();
 };
 
-// ==================== LÓGICA MODAL GESTIÓN DE GRUPO (MULTI-USUARIO + EMAILJS) ====================
+// Modal Gestión de Grupo
 window.openModalGestionGrupo = function() {
     renderMiembrosGrupo();
     const modal = document.getElementById('modalGestionGrupo');
@@ -702,15 +735,13 @@ window.handleInvitarMiembro = function(e) {
         return;
     }
 
-// Parámetros formateados según la plantilla de EmailJS
     const templateParams = {
-        to_email: email,                          // Para el campo "To Email" de EmailJS
-        para_correo_electrónico: email,           // Por si la plantilla usa la etiqueta traducida
+        to_email: email,
+        para_correo_electrónico: email,
         rol_invitado: rol.toUpperCase(),
         remitente: auth.currentUser.email || 'Administrador'
     };
 
-    // Verificación e intento de envío
     if (typeof emailjs !== 'undefined') {
         console.log("Enviando mail a través de EmailJS con params:", templateParams);
         emailjs.send('service_hib3aln', 'template_9tbnrfg', templateParams)
@@ -722,8 +753,8 @@ window.handleInvitarMiembro = function(e) {
                 alert('La invitación se guardó, pero EmailJS devolvió un error: ' + JSON.stringify(error));
             });
     } else {
-        console.warn("⚠️ El SDK de EmailJS (emailjs) no está cargado en index.html. Agregá el script de CDN.");
-        alert("Atención: Falta cargar el SDK de EmailJS en el archivo index.html.");
+        console.warn("⚠️ El SDK de EmailJS no está cargado.");
+        alert("Atención: Falta cargar el SDK de EmailJS en index.html.");
     }
 
     window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
@@ -748,46 +779,3 @@ window.cancelarInvitacion = function(index) {
         renderMiembrosGrupo();
     }
 };
-
-
-///////////////////////////////////////
-import { 
-    doc, 
-    getDoc, 
-    collection, 
-    addDoc 
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-async function clonarYMigrarGrupo() {
-    try {
-        // Usamos 'db' directamente si ya está inicializado en tu app.js
-        const oldDocRef = doc(db, "app_data", "grupo_mancusososa");
-        const oldDocSnap = await getDoc(oldDocRef);
-
-        if (oldDocSnap.exists()) {
-            const dataOriginal = oldDocSnap.data();
-
-            const nuevaData = {
-                ...dataOriginal,
-                miembros: {
-                    "controlgastos5@gmail.com": "ADMIN"
-                }
-            };
-
-            const newDocRef = await addDoc(collection(db, "app_data"), nuevaData);
-
-            console.log("----------------------------------------");
-            console.log("¡MIGRACIÓN EXITOSA!");
-            console.log("Tu nuevo ID de grupo es:", newDocRef.id);
-            console.log("----------------------------------------");
-            alert(`Nuevo grupo creado con ID: ${newDocRef.id}`);
-        } else {
-            console.error("No se encontró el documento grupo_mancusososa");
-        }
-    } catch (error) {
-        console.error("Error durante la migración:", error);
-    }
-}
-
-// Ejecutar migración al cargar
-clonarYMigrarGrupo();
