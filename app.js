@@ -158,18 +158,51 @@ window.cerrarSesion = function() {
     signOut(auth);
 };
 
+// Cambiar entre Espacio Personal y Grupo Control de Gastos desde el Selector
+window.cambiarVistaSeleccionada = async function(vistaId) {
+    if (!vistaId) return;
+    
+    localStorage.setItem("ultima_vista_id", vistaId);
+    window.showLoading();
+
+    let targetDocId = (vistaId === "personal") ? `personal_${auth.currentUser.uid}` : vistaId;
+
+    window.currentGrupo = targetDocId;
+    window.docRef = doc(db, "app_data", targetDocId);
+
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+
+    unsubscribeSnapshot = onSnapshot(window.docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.appState) {
+                window.appState = { ...window.appState, ...data.appState };
+            }
+        } else {
+            window.saveDataToCloud();
+        }
+        triggerPageRenders();
+        window.showApp();
+    });
+};
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.showLoading();
         const dLocal = new Date();
         const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
         
-        // Apuntando al nuevo ID seguro y dinámico en Firestore
-        let grupoId = "T3E2kcXODg2OLm7i1Roq";
+        // Recuperamos la última vista seleccionada (por defecto usa el ID seguro del Grupo Control de Gastos)
+        let vistaGuardada = localStorage.getItem("ultima_vista_id") || "T3E2kcXODg2OLm7i1Roq";
+        
+        const selectorEl = document.getElementById('selectorVista');
+        if (selectorEl) selectorEl.value = vistaGuardada;
 
-        const docRef = doc(db, "app_data", grupoId);
+        let targetDocId = (vistaGuardada === "personal") ? `personal_${user.uid}` : vistaGuardada;
+
+        const docRef = doc(db, "app_data", targetDocId);
         window.docRef = docRef;
-        window.currentGrupo = grupoId;
+        window.currentGrupo = targetDocId;
         window.docHormigaRef = doc(db, "app_data_hormiga", user.uid);
 
         if (unsubscribeSnapshot) unsubscribeSnapshot();
