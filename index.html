@@ -82,6 +82,7 @@
                         <i class="fa-solid fa-plus"></i> Nuevo Gasto
                     </button>
                     <button onclick="openModalCatGeneral()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition" title="Configurar Categorías"><i class="fa-solid fa-gear text-sm"></i></button>
+                    <button onclick="openModalGestionGrupo()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-emerald-400 transition" title="Gestionar Grupo Familiar"><i class="fa-solid fa-users text-sm"></i></button>
                     <button onclick="cerrarSesion()" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-rose-400 transition" title="Cerrar Sesión"><i class="fa-solid fa-right-from-bracket text-sm"></i></button>
                     <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronizado
@@ -723,7 +724,59 @@
         </div>
     </div>
 </div>
+<!-- MODAL GESTIÓN DE GRUPO Y MIEMBROS (MULTI-USUARIO) -->
+<div id="modalGestionGrupo" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+    <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+                <i class="fa-solid fa-users-gear"></i> Gestión del Grupo Familiar
+            </h3>
+            <button type="button" onclick="closeModal('modalGestionGrupo')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
 
+        <div class="space-y-4 overflow-y-auto pr-1">
+            <!-- SECCIÓN: INVITAR NUEVO MIEMBRO (SOLO VISIBLE PARA ADMIN) -->
+            <div id="containerFormInvitar" class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-plus"></i> Invitar nuevo integrante
+                </h4>
+                <form onsubmit="handleInvitarMiembro(event)" class="flex flex-col sm:flex-row gap-2">
+                    <input type="email" id="inputInvitarEmail" required placeholder="correo@ejemplo.com" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <select id="selectInvitarRol" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                        <option value="editor">Editor (Ver y Modificar)</option>
+                        <option value="lector">Lector (Solo Ver)</option>
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-paper-plane"></i> Invitar
+                    </button>
+                </form>
+            </div>
+
+            <!-- SECCIÓN: LISTA DE MIEMBROS ACTIVOS -->
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Integrantes del Grupo</span>
+                    <span id="badgeCantMiembros" class="text-[10px] bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full font-mono">1 activo</span>
+                </h4>
+                <div id="listaMiembrosGrupo" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Se puebla dinámicamente -->
+                </div>
+            </div>
+
+            <!-- SECCIÓN: INVITACIONES PENDIENTES -->
+            <div id="containerInvitacionesPendientes" class="space-y-2 hidden">
+                <h4 class="text-xs font-bold text-amber-400/80 uppercase tracking-wider">Invitaciones Pendientes</h4>
+                <div id="listaInvitacionesPendientes" class="space-y-1.5">
+                    <!-- Se puebla dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-4 mt-2 border-t border-slate-800">
+            <button type="button" onclick="closeModal('modalGestionGrupo')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700">Cerrar</button>
+        </div>
+    </div>
+</div>
     <script>
         let currentActiveTab = 'planilla';
 
