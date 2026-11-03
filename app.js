@@ -1473,7 +1473,7 @@ window.cancelarInvitacion = function(index) {
 };
 
 window.verificarLeonelaDirecto = async function() {
-    await setDoc(doc(db, "app_data", "personal_J8oEEtIg6VXTC0hA2XNH1y9OfZZ2"), { emailVerificado: true }, { merge: true });
+    await setDoc(doc(db, "app_data", "personal_Ax3bwHzylYbXjCOGy5Y85e0Iu8R2"), { emailVerificado: true }, { merge: true });
     console.log("¡Cuenta de Leonela verificada con éxito!");
     alert("¡Cuenta verificada con éxito! Ya puede iniciar sesión.");
 };
