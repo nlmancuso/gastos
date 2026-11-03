@@ -144,8 +144,8 @@ function aplicarRestriccionesInterfaz() {
             #appContent button i.fa-pen, #appContent button i.fa-trash-can, #appContent button i.fa-trash {
                 display: none !important;
             }
-            /* Deshabilitar inputs y selects ÚNICAMENTE dentro del contenido principal de la app (#appContent) */
-            #appContent select, 
+            /* Deshabilitar selects (EXCEPTO EL SELECTOR DE VISTAS), inputs y textareas en la app */
+            #appContent select:not(#selectorVista), 
             #appContent input, 
             #appContent textarea, 
             #appContent [onclick*="sort"], 
@@ -162,7 +162,6 @@ function aplicarRestriccionesInterfaz() {
         styleTag.innerHTML = '';
     }
 
-    // Ocultar botones dentro de #appContent por coincidencia de texto
     const appContent = document.getElementById('appContent');
     if (appContent) {
         const botones = appContent.querySelectorAll('button');
