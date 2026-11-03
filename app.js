@@ -1471,3 +1471,13 @@ window.cancelarInvitacion = function(index) {
         renderMiembrosGrupo();
     }
 };
+
+window.verificarLeonela = async function(uid) {
+    try {
+        await updateDoc(doc(db, "app_data", `personal_${uid}`), { emailVerificado: true });
+        console.log("¡Cuenta de Leonela verificada con éxito!");
+        window.location.reload();
+    } catch (e) {
+        console.error("Error al verificar:", e);
+    }
+};
