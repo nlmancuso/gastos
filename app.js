@@ -144,13 +144,15 @@ function aplicarRestriccionesInterfaz() {
             #appContent button i.fa-pen, #appContent button i.fa-trash-can, #appContent button i.fa-trash {
                 display: none !important;
             }
-            /* Deshabilitar selects (EXCEPTO EL SELECTOR DE VISTAS), inputs y textareas en la app */
+            /* Deshabilitar selects (excepto selector de vistas), inputs, textareas y BLOQUEAR ORDENAMIENTO DE GRILLA */
             #appContent select:not(#selectorVista), 
             #appContent input, 
             #appContent textarea, 
             #appContent [onclick*="sort"], 
             #appContent [onclick*="ordenar"], 
             #appContent th.cursor-pointer,
+            #appContent th[onclick],
+            #appContent thead th,
             #appContent input[type="date"], 
             #appContent .fecha-vencimiento {
                 pointer-events: none !important;
