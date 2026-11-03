@@ -134,18 +134,25 @@ function aplicarRestriccionesInterfaz() {
 
     if (!esEditor) {
         styleTag.innerHTML = `
-            button[onclick*="edit"], 
-            button[onclick*="delete"], 
-            button[onclick*="openModal"],
-            button[onclick*="NuevaCuenta"],
-            button[onclick*="Gasto"],
-            .btn-editar, .btn-eliminar, .btn-nuevo,
-            button i.fa-pen, button i.fa-trash-can, button i.fa-trash {
+            /* Ocultar botones de editar, eliminar, crear en la app principal (excluyendo login) */
+            #appContent button[onclick*="edit"], 
+            #appContent button[onclick*="delete"], 
+            #appContent button[onclick*="openModal"],
+            #appContent button[onclick*="NuevaCuenta"],
+            #appContent button[onclick*="Gasto"],
+            #appContent .btn-editar, #appContent .btn-eliminar, #appContent .btn-nuevo,
+            #appContent button i.fa-pen, #appContent button i.fa-trash-can, #appContent button i.fa-trash {
                 display: none !important;
             }
-            select, input, textarea, 
-            [onclick*="sort"], [onclick*="ordenar"], th.cursor-pointer,
-            input[type="date"], .fecha-vencimiento {
+            /* Deshabilitar inputs y selects ÚNICAMENTE dentro del contenido principal de la app (#appContent) */
+            #appContent select, 
+            #appContent input, 
+            #appContent textarea, 
+            #appContent [onclick*="sort"], 
+            #appContent [onclick*="ordenar"], 
+            #appContent th.cursor-pointer,
+            #appContent input[type="date"], 
+            #appContent .fecha-vencimiento {
                 pointer-events: none !important;
                 opacity: 0.9;
                 cursor: default !important;
@@ -155,13 +162,17 @@ function aplicarRestriccionesInterfaz() {
         styleTag.innerHTML = '';
     }
 
-    const botones = document.querySelectorAll('button');
-    botones.forEach(btn => {
-        const txt = btn.textContent.toLowerCase();
-        if (txt.includes('nuevo gasto') || txt.includes('nueva cuenta') || txt.includes('agregar')) {
-            btn.style.display = esEditor ? 'flex' : 'none';
-        }
-    });
+    // Ocultar botones dentro de #appContent por coincidencia de texto
+    const appContent = document.getElementById('appContent');
+    if (appContent) {
+        const botones = appContent.querySelectorAll('button');
+        botones.forEach(btn => {
+            const txt = btn.textContent.toLowerCase();
+            if (txt.includes('nuevo gasto') || txt.includes('nueva cuenta') || txt.includes('agregar')) {
+                btn.style.display = esEditor ? 'flex' : 'none';
+            }
+        });
+    }
 }
 
 const originalRenderApp = window.renderApp || function(){};
