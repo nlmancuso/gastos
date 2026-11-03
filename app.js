@@ -1479,6 +1479,34 @@ window.cancelarInvitacion = function(index) {
     }
 };
 
+window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
+    if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
+    
+    // Encontrar el gasto actual para conocer su categoría
+    const gasto = (window.appState.gastos || []).find(g => g.id === gastoId);
+    if (!gasto) return;
+
+    // Verificar si la categoría es tarjeta o comparte vencimiento único en bloque
+    const catObj = (window.appState.categorias || []).find(c => c.nombre === gasto.categoria);
+    const esEnBloque = catObj ? catObj.vencimientoUnicoEnBloque : false;
+
+    if (esEnBloque) {
+        // Si es tarjeta/bloque, aplicar el estado a TODOS los ítems de esa misma categoría en el mes actual
+        const datosCalculados = window.getCalculatedDataForMonth(monthStr);
+        datosCalculados.items.forEach(item => {
+            if (item.categoria === gasto.categoria) {
+                window.appState.excepcionesEstado[`${item.id}_${monthStr}`] = nuevoEstado;
+            }
+        });
+    } else {
+        // Si es un gasto individual común, afecta solo a su propio ID
+        window.appState.excepcionesEstado[`${gastoId}_${monthStr}`] = nuevoEstado;
+    }
+
+    window.saveDataToCloud(); 
+    renderApp();
+};
+
 window.verificarLeonelaDirecto = async function() {
     await setDoc(doc(db, "app_data", "personal_Ax3bwHzylYbXjCOGy5Y85e0Iu8R2"), { emailVerificado: true }, { merge: true });
     console.log("¡Cuenta de Leonela verificada con éxito!");
