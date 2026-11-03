@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs, onSnapshot, collection, addDoc, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -20,6 +20,259 @@ window.auth = auth;
 
 let unsubscribeSnapshot = null;
 let unsubscribeHormiga = null;
+let unsubscribeInvitaciones = null;
+
+// Helpers globales para Modales Estéticos
+window.mostrarNotificacion = function(titulo, mensaje, tipo = 'info', callback = null) {
+    const modal = document.getElementById('modalNotificacion');
+    const elTitulo = document.getElementById('modalNotiTitulo');
+    const elMensaje = document.getElementById('modalNotiMensaje');
+    const elIcono = document.getElementById('modalNotiIcono');
+    const elBoton = document.getElementById('modalNotiBoton');
+
+    if (!modal) {
+        if (callback) callback();
+        return;
+    }
+
+    elTitulo.innerText = titulo;
+    elMensaje.innerText = mensaje;
+    window._notificaciónCallback = callback;
+
+    if (tipo === 'exito') {
+        elIcono.className = 'w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        elIcono.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        elBoton.className = 'w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-colors shadow-lg shadow-emerald-500/10';
+    } else if (tipo === 'error') {
+        elIcono.className = 'w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl bg-rose-500/10 text-rose-400 border border-rose-500/20';
+        elIcono.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+        elBoton.className = 'w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-rose-500 hover:bg-rose-400 text-white transition-colors shadow-lg shadow-rose-500/10';
+    } else {
+        elIcono.className = 'w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        elIcono.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+        elBoton.className = 'w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors shadow-lg shadow-amber-500/10';
+    }
+
+    modal.classList.remove('hidden');
+};
+
+window.cerrarModalNotificacion = function() {
+    const modal = document.getElementById('modalNotificacion');
+    if (modal) modal.classList.add('hidden');
+    if (typeof window._notificaciónCallback === 'function') {
+        const cb = window._notificaciónCallback;
+        window._notificaciónCallback = null;
+        cb();
+    }
+};
+
+window.mostrarMensajeApp = function(titulo, mensaje, tipo = 'info') {
+    if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(titulo, mensaje, tipo);
+    } else if (typeof window.mostrarModalAlert === 'function') {
+        window.mostrarModalAlert(titulo, mensaje);
+    } else if (typeof window.showToast === 'function') {
+        window.showToast(mensaje, 'warning');
+    }
+};
+
+// ==========================================
+// CONTROL DE PERMISOS Y ROLES (LECTOR / EDITOR)
+// ==========================================
+
+window.esUsuarioEditor = function() {
+    const user = auth.currentUser;
+    if (!user) return false;
+    
+    if (user.email === "nicolaslmancuso@gmail.com") {
+        return true;
+    }
+
+    const grupoInfo = window.appState?.grupoInfo;
+    
+    if (!window.currentGrupo || window.currentGrupo === `personal_${user.uid}`) {
+        return true;
+    }
+
+    if (!grupoInfo) return false;
+
+    if (grupoInfo.adminUid === user.uid) return true;
+
+    const miembros = grupoInfo.miembros || {};
+    const emailActual = user.email.toLowerCase();
+    
+    let rolMiembro = null;
+    if (miembros[user.uid]) {
+        rolMiembro = miembros[user.uid].rol;
+    } else {
+        const miembroEncontrado = Object.values(miembros).find(m => (m.email || "").toLowerCase() === emailActual);
+        if (miembroEncontrado) {
+            rolMiembro = miembroEncontrado.rol;
+        }
+    }
+
+    if (rolMiembro === 'lector') {
+        return false;
+    }
+
+    return rolMiembro !== 'lector';
+};
+
+// ==========================================
+// APLICACIÓN DE ESTILOS Y RESTRICCIONES VISUALES
+// ==========================================
+
+function aplicarRestriccionesInterfaz() {
+    const esEditor = window.esUsuarioEditor();
+
+    let styleTag = document.getElementById('estilos-modo-lector');
+    if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'estilos-modo-lector';
+        document.head.appendChild(styleTag);
+    }
+
+    if (!esEditor) {
+        styleTag.innerHTML = `
+            button[onclick*="edit"], 
+            button[onclick*="delete"], 
+            button[onclick*="openModal"],
+            button[onclick*="NuevaCuenta"],
+            button[onclick*="Gasto"],
+            .btn-editar, .btn-eliminar, .btn-nuevo,
+            button i.fa-pen, button i.fa-trash-can, button i.fa-trash {
+                display: none !important;
+            }
+            select, input, textarea, 
+            [onclick*="sort"], [onclick*="ordenar"], th.cursor-pointer,
+            input[type="date"], .fecha-vencimiento {
+                pointer-events: none !important;
+                opacity: 0.9;
+                cursor: default !important;
+            }
+        `;
+    } else {
+        styleTag.innerHTML = '';
+    }
+
+    const botones = document.querySelectorAll('button');
+    botones.forEach(btn => {
+        const txt = btn.textContent.toLowerCase();
+        if (txt.includes('nuevo gasto') || txt.includes('nueva cuenta') || txt.includes('agregar')) {
+            btn.style.display = esEditor ? 'flex' : 'none';
+        }
+    });
+}
+
+const originalRenderApp = window.renderApp || function(){};
+window.renderApp = function() {
+    if (typeof originalRenderApp === 'function') {
+        originalRenderApp();
+    }
+    setTimeout(aplicarRestriccionesInterfaz, 100);
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(aplicarRestriccionesInterfaz, 500);
+});
+
+const observer = new MutationObserver(() => {
+    if (!window.esUsuarioEditor()) {
+        aplicarRestriccionesInterfaz();
+    }
+});
+observer.observe(document.body, { childList: true, subtree: true });
+
+// ==========================================
+// INTERCEPTAR FUNCIONES DE ESCRITURA
+// ==========================================
+
+const verificarEscritura = () => {
+    if (!window.esUsuarioEditor()) {
+        window.mostrarNotificacion("Acceso Restringido", "Modo Lector: No tienes permisos para realizar modificaciones en este grupo.", "error");
+        return false;
+    }
+    return true;
+};
+
+if (typeof window.saveCuenta === 'function') {
+    const orig = window.saveCuenta;
+    window.saveCuenta = function(...args) { if (!verificarEscritura()) return; return orig.apply(this, args); };
+}
+if (typeof window.deleteCuenta === 'function') {
+    const orig = window.deleteCuenta;
+    window.deleteCuenta = function(...args) { if (!verificarEscritura()) return; return orig.apply(this, args); };
+}
+if (typeof window.saveGasto === 'function') {
+    const orig = window.saveGasto;
+    window.saveGasto = function(...args) { if (!verificarEscritura()) return; return orig.apply(this, args); };
+}
+if (typeof window.deleteGasto === 'function') {
+    const orig = window.deleteGasto;
+    window.deleteGasto = function(...args) { if (!verificarEscritura()) return; return orig.apply(this, args); };
+}
+
+// ==========================================
+// PERSISTENCIA DE CAMBIO DE ROL DIRECTA CON SPINNER
+// ==========================================
+
+
+window.cambiarRolMiembro = async function(uidMiembro, nuevoRol) {
+    let loaderDiv = document.getElementById('loader-cambio-rol');
+    if (!loaderDiv) {
+        loaderDiv = document.createElement('div');
+        loaderDiv.id = 'loader-cambio-rol';
+        loaderDiv.style.cssText = "position:fixed; top:20px; right:20px; background:#1e293b; color:#fff; padding:12px 20px; border-radius:8px; z-index:99999; box-shadow:0 4px 12px rgba(0,0,0,0.3); display:flex; align-items:center; gap:10px; font-family:sans-serif; font-size:14px;";
+        loaderDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="color:#38bdf8; font-size:16px;"></i> Guardando cambios...`;
+        document.body.appendChild(loaderDiv);
+    } else {
+        loaderDiv.style.display = 'flex';
+    }
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            if (loaderDiv) loaderDiv.style.display = 'none';
+            return;
+        }
+
+        // Apuntamos directamente a tu documento personal que es el que estás compartiendo
+        const docIdPersonal = `personal_${user.uid}`;
+
+        if (typeof db !== 'undefined') {
+            // Actualizar en memoria local
+            if (window.appState?.grupoInfo?.miembros?.[uidMiembro]) {
+                window.appState.grupoInfo.miembros[uidMiembro].rol = nuevoRol;
+            }
+            
+            // Persistir los cambios en Firestore en tu documento personal
+            await updateDoc(doc(db, "app_data", docIdPersonal), {
+                [`appState.grupoInfo.miembros.${uidMiembro}.rol`]: nuevoRol
+            });
+
+            console.log(`Rol actualizado en Firebase para ${uidMiembro} -> ${nuevoRol}`);
+            
+            if (typeof window.showToast === 'function') {
+                window.showToast(`Rol actualizado a ${nuevoRol.toUpperCase()} correctamente`, 'success');
+            } else {
+                window.mostrarNotificacion("¡Éxito!", `Rol actualizado a ${nuevoRol.toUpperCase()} correctamente.`, "exito");
+            }
+
+            if (typeof window.renderModalGrupo === 'function') {
+                window.renderModalGrupo();
+            } else if (typeof window.renderApp === 'function') {
+                window.renderApp();
+            }
+        }
+    } catch (error) {
+        console.error("Error al actualizar el rol en Firebase:", error);
+        window.mostrarNotificacion("Error", "Hubo un problema al guardar el cambio de rol en la base de datos.", "error");
+    } finally {
+        if (loaderDiv) {
+            loaderDiv.style.display = 'none';
+        }
+    }
+};
 
 const categoriasDefault = [
     { nombre: "Gastos Fijo", color: "#10b981", esTarjeta: false, vencimientoUnicoEnBloque: false },
@@ -51,12 +304,7 @@ const categoriasHormigaDefault = [
 const dInit = new Date();
 const defaultLocalMonth = `${dInit.getFullYear()}-${String(dInit.getMonth() + 1).padStart(2, '0')}`;
 
-if (auth.currentUser) {
-    const loginOverlay = document.getElementById('loginOverlay');
-    if (loginOverlay) loginOverlay.classList.add('hidden');
-}
-
-window.appState = window.appState || {
+const appStateLimpioBase = {
     currentMonth: defaultLocalMonth,
     gastos: [],
     excepcionesMonto: {},
@@ -77,6 +325,13 @@ window.appState = window.appState || {
     grupoInfo: null
 };
 
+if (auth.currentUser) {
+    const loginOverlay = document.getElementById('loginOverlay');
+    if (loginOverlay) loginOverlay.classList.add('hidden');
+}
+
+window.appState = window.appState || JSON.parse(JSON.stringify(appStateLimpioBase));
+
 window.hormigaState = window.hormigaState || {
     gastos: [],
     categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
@@ -94,12 +349,6 @@ window.filtrosGraficoBalance = [];
 window.filtrosRecurrentesGrid = [];
 
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-window.guardarNuevoOrdenItems = function(categoria, nuevosIdsOrdenados) {
-    if (!window.appState.ordenItemsCategoria) window.appState.ordenItemsCategoria = {};
-    window.appState.ordenItemsCategoria[categoria] = nuevosIdsOrdenados;
-    window.saveDataToCloud();
-};
 
 window.showLoading = function() {
     const login = document.getElementById('loginOverlay');
@@ -128,32 +377,100 @@ window.showApp = function() {
     if (appContent) appContent.classList.remove('hidden');
 };
 
-// Carga dinámica de las opciones del selector de vistas
-window.poblarSelectorVistas = function(vistaSeleccionadaActual) {
+window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
     const selector = document.getElementById('selectorVista');
     if (!selector) return;
 
     const user = auth.currentUser;
     if (!user) return;
 
-    selector.innerHTML = '';
+    const valorGuardadoPrevio = vistaSeleccionadaActual || localStorage.getItem("ultima_vista_id") || "personal";
+    
+    if (selector.options.length === 0) {
+        const optDefault = document.createElement('option');
+        optDefault.value = "personal";
+        optDefault.textContent = "🏠 Mi Espacio Personal";
+        selector.appendChild(optDefault);
+        selector.value = "personal";
+    }
 
-    // 1. Opción Espacio Personal
-    const optPersonal = document.createElement('option');
-    optPersonal.value = "personal";
-    optPersonal.textContent = `🏠 Mi Espacio Personal (${user.email.split('@')[0]})`;
-    selector.appendChild(optPersonal);
+    try {
+        const emailActual = user.email.toLowerCase();
 
-    // 2. Opción Grupo Control de Gastos
-    const optGrupo = document.createElement('option');
-    optGrupo.value = "T3E2kcXODg2OLm7i1Roq";
-    optGrupo.textContent = `👥 Grupo Control de Gastos`;
-    selector.appendChild(optGrupo);
+        const qAceptados = query(
+            collection(db, "invitaciones"),
+            where("destinatarioEmail", "==", emailActual),
+            where("estado", "==", "ACEPTADO")
+        );
+        const snapAceptados = await getDocs(qAceptados);
+        
+        const mapaInvitantes = {};
+        snapAceptados.forEach(d => {
+            const data = d.data();
+            if (data.grupoId) {
+                mapaInvitantes[data.grupoId] = data.remitenteEmail;
+            }
+        });
 
-    selector.value = vistaSeleccionadaActual || "personal";
+        const gruposPermitidosIds = new Set(Object.keys(mapaInvitantes));
+
+        const querySnapshot = await getDocs(collection(db, "app_data"));
+        const mapaCreadores = {};
+
+        querySnapshot.forEach((docSnap) => {
+            if (docSnap.id.startsWith("personal_")) return;
+
+            const docData = docSnap.data();
+            const grupoInfo = docData.appState?.grupoInfo;
+
+            if (grupoInfo) {
+                const miembros = grupoInfo.miembros || {};
+                const esMiembroUID = miembros[user.uid] !== undefined;
+                const esMiembroEmail = Object.values(miembros).some(m => (m.email || "").toLowerCase() === emailActual);
+
+                if (esMiembroUID || esMiembroEmail || gruposPermitidosIds.has(docSnap.id)) {
+                    gruposPermitidosIds.add(docSnap.id);
+                    if (grupoInfo.adminUid && miembros[grupoInfo.adminUid]) {
+                        mapaCreadores[docSnap.id] = miembros[grupoInfo.adminUid].email;
+                    }
+                }
+            }
+        });
+
+        selector.innerHTML = '';
+
+        const optPersonal = document.createElement('option');
+        optPersonal.value = "personal";
+        optPersonal.textContent = "🏠 Mi Espacio Personal";
+        selector.appendChild(optPersonal);
+
+        for (const grupoId of gruposPermitidosIds) {
+            const grupoRef = doc(db, "app_data", grupoId);
+            const grupoSnap = await getDoc(grupoRef);
+
+            if (grupoSnap.exists()) {
+                const docData = grupoSnap.data();
+                const grupoInfo = docData.appState?.grupoInfo;
+
+                let hostEmail = mapaInvitantes[grupoId] || mapaCreadores[grupoId] || '';
+                let usuarioTag = hostEmail ? ` (${hostEmail.split('@')[0]})` : '';
+
+                const optGrupo = document.createElement('option');
+                optGrupo.value = grupoId;
+                optGrupo.textContent = `👥 ${grupoInfo?.nombreGrupo || 'Grupo Control de Gastos'}${usuarioTag}`;
+                selector.appendChild(optGrupo);
+            }
+        }
+
+        const existeOpcion = Array.from(selector.options).some(opt => opt.value === valorGuardadoPrevio);
+        selector.value = existeOpcion ? valorGuardadoPrevio : "personal";
+
+    } catch (e) {
+        console.error("Error al poblar los grupos en el selector:", e);
+        selector.value = "personal";
+    }
 };
 
-// Control de pestañas Login / Registro
 window.mostrarTabAuth = function(tab) {
     const formLogin = document.getElementById('formLogin');
     const formRegister = document.getElementById('formRegister');
@@ -201,7 +518,6 @@ window.handleLogin = async function(e) {
     }
 };
 
-// Manejar Registro y creación automática del Espacio Personal
 window.handleRegister = async function(e) {
     if (e) e.preventDefault();
     const emailEl = document.getElementById('registerEmail');
@@ -219,18 +535,37 @@ window.handleRegister = async function(e) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
 
+        const linkVerificacion = `https://nlmancuso.github.io/gastos/?verified=true&uid=${user.uid}`;
+
+        try {
+            if (typeof emailjs !== 'undefined') {
+                await emailjs.send('service_hib3aln', 'template_j01kfcn', {
+                    to_email: email,
+                    to_name: email.split('@')[0],
+                    link_verificacion: linkVerificacion
+                });
+            }
+        } catch (emailErr) {
+            console.error("Error al enviar email mediante EmailJS:", emailErr);
+        }
+
         const personalDocId = `personal_${user.uid}`;
         const personalDocRef = doc(db, "app_data", personalDocId);
 
         localStorage.setItem("ultima_vista_id", "personal");
 
         await setDoc(personalDocRef, {
-            appState: JSON.parse(JSON.stringify(window.appState)),
-            creadoEl: new Date().toISOString()
+            appState: JSON.parse(JSON.stringify(appStateLimpioBase)),
+            creadoEl: new Date().toISOString(),
+            emailVerificado: true
         });
 
-        window.poblarSelectorVistas("personal");
-        console.log(`✅ Usuario y Espacio Personal creados con éxito para: ${email}`);
+        window.showApp();
+        window.mostrarNotificacion(
+            "¡Cuenta creada con éxito!",
+            "Tu cuenta ha sido registrada y verificada automáticamente para el entorno de pruebas.",
+            "exito"
+        );
     } catch (error) {
         console.error("Error al registrar usuario:", error);
         window.showLogin();
@@ -250,7 +585,30 @@ window.cerrarSesion = function() {
     signOut(auth);
 };
 
-// Cambiar entre Espacio Personal y Grupos desde el selector (combo)
+async function verificarDesdeURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isVerified = urlParams.get('verified') === 'true';
+    const uid = urlParams.get('uid');
+
+    if (isVerified && uid) {
+        try {
+            const personalDocRef = doc(db, "app_data", `personal_${uid}`);
+            await setDoc(personalDocRef, { emailVerificado: true }, { merge: true });
+
+            window.mostrarNotificacion(
+                "¡Cuenta verificada con éxito!",
+                "Tu correo ha sido confirmado con éxito. Ya podés iniciar sesión.",
+                "exito",
+                () => { window.location.replace(window.location.pathname); }
+            );
+        } catch (e) {
+            console.error("Error al actualizar verificación en base de datos:", e);
+        }
+    }
+}
+
+verificarDesdeURL();
+
 window.cambiarVistaSeleccionada = async function(vistaId) {
     if (!vistaId) return;
     
@@ -264,14 +622,22 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
 
     if (unsubscribeSnapshot) unsubscribeSnapshot();
 
-    unsubscribeSnapshot = onSnapshot(window.docRef, (docSnap) => {
+    unsubscribeSnapshot = onSnapshot(window.docRef, async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.appState) {
                 window.appState = { ...window.appState, ...data.appState };
             }
         } else {
-            window.saveDataToCloud();
+            if (targetDocId.startsWith("personal_")) {
+                window.appState = JSON.parse(JSON.stringify(appStateLimpioBase));
+                await setDoc(window.docRef, { 
+                    appState: window.appState, 
+                    creadoEl: new Date().toISOString() 
+                });
+            } else {
+                window.saveDataToCloud();
+            }
         }
         triggerPageRenders();
         window.showApp();
@@ -281,16 +647,40 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.showLoading();
+
+        const esAdminPrincipal = user.email === "nicolaslmancuso@gmail.com";
+        let estaVerificado = esAdminPrincipal;
+
+        if (!esAdminPrincipal) {
+            try {
+                const docRef = doc(db, "app_data", `personal_${user.uid}`);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    estaVerificado = docSnap.data().emailVerificado === true;
+                }
+            } catch (e) {
+                console.error("Error al verificar estado en Firestore:", e);
+            }
+        }
+
+        if (!estaVerificado) {
+            await signOut(auth);
+            window.showLogin();
+            window.mostrarNotificacion(
+                "Cuenta pendiente de activación",
+                "Tu cuenta aún no ha sido verificada. Por favor hacé clic en el botón del correo que te enviamos para poder ingresar.",
+                "info"
+            );
+            return;
+        }
+
         const dLocal = new Date();
         const currentLocalMonthStr = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}`;
         
-        let vistaGuardada = localStorage.getItem("ultima_vista_id") || "T3E2kcXODg2OLm7i1Roq";
-        
-        // Poblar y sincronizar el combo desplegable
-        window.poblarSelectorVistas(vistaGuardada);
+        let vistaGuardada = localStorage.getItem("ultima_vista_id") || "personal";
+        await window.poblarSelectorVistas(vistaGuardada);
 
         let targetDocId = (vistaGuardada === "personal") ? `personal_${user.uid}` : vistaGuardada;
-
         const docRef = doc(db, "app_data", targetDocId);
         window.docRef = docRef;
         window.currentGrupo = targetDocId;
@@ -299,7 +689,7 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeSnapshot) unsubscribeSnapshot();
         if (unsubscribeHormiga) unsubscribeHormiga();
 
-        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+        unsubscribeSnapshot = onSnapshot(docRef, async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.appState) {
@@ -310,7 +700,15 @@ onAuthStateChanged(auth, async (user) => {
                     if (!window.appState.currentMonth) window.appState.currentMonth = currentLocalMonthStr;
                 }
             } else {
-                window.saveDataToCloud();
+                if (targetDocId.startsWith("personal_")) {
+                    window.appState = JSON.parse(JSON.stringify(appStateLimpioBase));
+                    await setDoc(docRef, { 
+                        appState: window.appState, 
+                        creadoEl: new Date().toISOString() 
+                    });
+                } else {
+                    window.saveDataToCloud();
+                }
             }
             triggerPageRenders();
             window.showApp();
@@ -345,6 +743,8 @@ onAuthStateChanged(auth, async (user) => {
             triggerPageRenders();
         });
 
+        escucharInvitacionesUsuario(user.email);
+
         const userName = user.email ? user.email.split('@')[0] : 'Usuario';
         const grupoDisplay = document.getElementById('grupoStatus');
         if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName}`;
@@ -352,8 +752,173 @@ onAuthStateChanged(auth, async (user) => {
         window.showLogin();
         if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
         if (unsubscribeHormiga) { unsubscribeHormiga(); unsubscribeHormiga = null; }
+        if (unsubscribeInvitaciones) { unsubscribeInvitaciones(); unsubscribeInvitaciones = null; }
     }
 });
+
+function escucharInvitacionesUsuario(userEmail) {
+    if (unsubscribeInvitaciones) unsubscribeInvitaciones();
+
+    const q = query(collection(db, "invitaciones"));
+
+    unsubscribeInvitaciones = onSnapshot(q, (snapshot) => {
+        const invitaciones = [];
+        const emailActual = userEmail.trim().toLowerCase();
+
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const destino = (data.destinatarioEmail || "").trim().toLowerCase();
+
+            if (destino === emailActual) {
+                if (data.estado === "PENDIENTE" || data.estado === "ACEPTADO") {
+                    invitaciones.push({ id: docSnap.id, ...data });
+                }
+            }
+        });
+        window.renderBandejaNotificaciones(invitaciones);
+    });
+}
+
+window.toggleBandejaNotificaciones = function() {
+    const drop = document.getElementById('dropdownNotificaciones');
+    if (drop) drop.classList.toggle('hidden');
+};
+
+window.renderBandejaNotificaciones = function(invitaciones) {
+    const badge = document.getElementById('badgeNotificaciones');
+    const lista = document.getElementById('listaNotificaciones');
+    if (!badge || !lista) return;
+
+    const pendientes = invitaciones.filter(i => i.estado === "PENDIENTE");
+
+    if (pendientes.length > 0) {
+        badge.innerText = pendientes.length;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+
+    if (invitaciones.length > 0) {
+        lista.innerHTML = '';
+        invitaciones.forEach(inv => {
+            if (inv.estado === "PENDIENTE") {
+                lista.innerHTML += `
+                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
+                        <p class="text-slate-300">
+                            <strong class="text-amber-400">${inv.remitenteEmail}</strong> te invitó a unirte a <strong>${inv.grupoNombre}</strong> (${inv.rol}).
+                        </p>
+                        <div class="flex gap-2 justify-end">
+                            <button onclick="responderInvitacion('${inv.id}', '${inv.grupoId}', '${inv.rol}', 'RECHAZADO')" class="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg font-semibold text-[11px]">
+                                Rechazar
+                            </button>
+                            <button onclick="responderInvitacion('${inv.id}', '${inv.grupoId}', '${inv.rol}', 'ACEPTADO')" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg font-bold text-[11px]">
+                                Aceptar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (inv.estado === "ACEPTADO") {
+                lista.innerHTML += `
+                    <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">✓ Pertenece al grupo</span>
+                            <span class="text-slate-500 text-[10px]">${inv.rol}</span>
+                        </div>
+                        <p class="text-slate-300 text-[11px]">
+                            <strong>${inv.grupoNombre}</strong> (Invitado por ${inv.remitenteEmail})
+                        </p>
+                        <div class="flex justify-end">
+                            <button onclick="salirDelGrupoConId('${inv.id}', '${inv.grupoId}')" class="px-2 py-0.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 rounded-lg font-medium text-[10px] transition-colors">
+                                Salir del grupo
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    } else {
+        lista.innerHTML = `<p class="text-xs text-slate-500 text-center py-2">No tenés notificaciones pendientes.</p>`;
+    }
+};
+
+window.responderInvitacion = async function(invitacionId, grupoId, rol, nuevoEstado) {
+    try {
+        const user = auth.currentUser;
+        const invRef = doc(db, "invitaciones", invitacionId);
+        await updateDoc(invRef, { estado: nuevoEstado });
+
+        const grupoRef = doc(db, "app_data", grupoId);
+        const grupoSnap = await getDoc(grupoRef);
+
+        if (grupoSnap.exists()) {
+            const data = grupoSnap.data();
+            const appState = data.appState || {};
+            const grupoInfo = appState.grupoInfo || { miembros: {}, invitacionesPendientes: [] };
+            
+            if (!grupoInfo.miembros) grupoInfo.miembros = {};
+            
+            if (grupoInfo.invitacionesPendientes) {
+                grupoInfo.invitacionesPendientes = grupoInfo.invitacionesPendientes.filter(
+                    inv => inv.email.toLowerCase() !== user.email.toLowerCase()
+                );
+            }
+
+            if (nuevoEstado === 'ACEPTADO') {
+                grupoInfo.miembros[user.uid] = { email: user.email, rol: rol };
+            }
+
+            await updateDoc(grupoRef, { "appState.grupoInfo": grupoInfo });
+        }
+
+        if (nuevoEstado === 'ACEPTADO') {
+            window.mostrarNotificacion("¡Unión exitosa!", "Te uniste al grupo con éxito.", "exito", async () => {
+                await window.poblarSelectorVistas(grupoId);
+                window.cambiarVistaSeleccionada(grupoId);
+            });
+        } else {
+            window.mostrarNotificacion("Invitación rechazada", "Has rechazado la invitación.", "info");
+        }
+    } catch (e) {
+        console.error("Error al responder invitación:", e);
+    }
+};
+
+window.salirDelGrupoConId = async function(invitacionId, grupoId) {
+    window.mostrarNotificacion(
+        "Confirmar salida",
+        "¿Deseás salir de este grupo? Ya no tendrás acceso a sus datos.",
+        "error",
+        async () => {
+            try {
+                const user = auth.currentUser;
+
+                if (invitacionId) {
+                    const invRef = doc(db, "invitaciones", invitacionId);
+                    await updateDoc(invRef, { estado: "RECHAZADO" });
+                }
+
+                const grupoRef = doc(db, "app_data", grupoId);
+                const grupoSnap = await getDoc(grupoRef);
+
+                if (grupoSnap.exists()) {
+                    const data = grupoSnap.data();
+                    const miembros = data.appState.grupoInfo?.miembros || {};
+                    delete miembros[user.uid];
+                    await updateDoc(grupoRef, { "appState.grupoInfo.miembros": miembros });
+                }
+
+                await window.poblarSelectorVistas("personal");
+                window.cambiarVistaSeleccionada("personal");
+            } catch (e) {
+                console.error("Error al salir del grupo:", e);
+            }
+        }
+    );
+};
+
+window.salirDelGrupoActual = async function() {
+    window.salirDelGrupoConId("", window.currentGrupo);
+};
 
 window.saveDataToCloud = async function() {
     try {
@@ -391,23 +956,11 @@ function actualizarVisibilidadBotonesAdmin() {
     const btnGestionGrupo = document.getElementById('btnGestionGrupo');
 
     if (esAdmin) {
-        if (btnConfigCat) {
-            btnConfigCat.classList.remove('hidden');
-            btnConfigCat.style.display = 'inline-flex';
-        }
-        if (btnGestionGrupo) {
-            btnGestionGrupo.classList.remove('hidden');
-            btnGestionGrupo.style.display = 'inline-flex';
-        }
+        if (btnConfigCat) { btnConfigCat.classList.remove('hidden'); btnConfigCat.style.display = 'inline-flex'; }
+        if (btnGestionGrupo) { btnGestionGrupo.classList.remove('hidden'); btnGestionGrupo.style.display = 'inline-flex'; }
     } else {
-        if (btnConfigCat) {
-            btnConfigCat.classList.add('hidden');
-            btnConfigCat.style.display = 'none';
-        }
-        if (btnGestionGrupo) {
-            btnGestionGrupo.classList.add('hidden');
-            btnGestionGrupo.style.display = 'none';
-        }
+        if (btnConfigCat) { btnConfigCat.classList.add('hidden'); btnConfigCat.style.display = 'none'; }
+        if (btnGestionGrupo) { btnGestionGrupo.classList.add('hidden'); btnGestionGrupo.style.display = 'none'; }
     }
 }
 
@@ -483,14 +1036,10 @@ window.getCalculatedDataForMonth = function(targetMonth) {
 
     (window.appState.gastos || []).forEach(gasto => {
         const mesEliminacion = window.appState.excepcionesEliminacion?.[gasto.id];
-        if (mesEliminacion && targetMonth >= mesEliminacion) {
-            return;
-        }
+        if (mesEliminacion && targetMonth >= mesEliminacion) return;
 
         const borradoPuntual = window.appState.excepcionesEliminacionSoloMes?.[`${gasto.id}_${targetMonth}`];
-        if (borradoPuntual) {
-            return;
-        }
+        if (borradoPuntual) return;
 
         const excepcionCatKey = `${gasto.id}_${targetMonth}`;
         const categoriaAplicar = window.appState.excepcionesCategoria?.[excepcionCatKey] ?? gasto.categoria;
@@ -617,11 +1166,14 @@ window.getCalculatedDataForMonth = function(targetMonth) {
     return { sueldoActual, items, totalFijos, totalTarjetas, totalesPorCat };
 };
 
-// Modal Eliminar Gasto
 let gastoAEliminarId = null;
 let tipoEliminacionSeleccionado = null;
 
 window.deleteGasto = function(id) {
+    if (!window.esUsuarioEditor()) {
+        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+        return;
+    }
     const gasto = (window.appState.gastos || []).find(g => g.id === id);
     if (!gasto) return;
 
@@ -683,6 +1235,10 @@ window.volverASeleccionEliminacion = function() {
 };
 
 window.ejecutarEliminacionGasto = function() {
+    if (!window.esUsuarioEditor()) {
+        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+        return;
+    }
     if (!gastoAEliminarId || !tipoEliminacionSeleccionado) return;
 
     const id = gastoAEliminarId;
@@ -713,7 +1269,6 @@ window.ejecutarEliminacionGasto = function() {
     triggerPageRenders();
 };
 
-// Modal Gestión de Grupo
 window.openModalGestionGrupo = function() {
     renderMiembrosGrupo();
     const modal = document.getElementById('modalGestionGrupo');
@@ -771,7 +1326,7 @@ function renderMiembrosGrupo() {
                 </div>
                 ${(esAdmin && !esYoMismo) ? `
                     <div class="flex items-center gap-1.5">
-                        <select onchange="cambiarRolMiembro('${uid}', this.value)" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300">
+                        <select onchange="cambiarRolMiembro('${uid}', this.value)" data-uid-miembro="${uid}" class="select-rol-miembro bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300">
                             <option value="editor" ${info.rol === 'editor' ? 'selected' : ''}>Editor</option>
                             <option value="lector" ${info.rol === 'lector' ? 'selected' : ''}>Lector</option>
                         </select>
@@ -799,17 +1354,18 @@ function renderMiembrosGrupo() {
     }
 }
 
-window.handleInvitarMiembro = function(e) {
-    e.preventDefault();
-    console.log("--> Iniciando envío de invitación...");
-
+window.handleInvitarMiembro = async function(e) {
+    if (e) e.preventDefault();
+    if (!window.esUsuarioEditor()) {
+        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+        return;
+    }
     const emailInput = document.getElementById('inputInvitarEmail');
     const rolSelect = document.getElementById('selectInvitarRol');
     if (!emailInput) return;
 
     const email = emailInput.value.trim().toLowerCase();
     const rol = rolSelect ? rolSelect.value : 'editor';
-
     if (!email) return;
 
     if (!window.appState.grupoInfo) {
@@ -821,48 +1377,83 @@ window.handleInvitarMiembro = function(e) {
 
     const yaEsMiembro = Object.values(window.appState.grupoInfo.miembros || {}).some(m => m.email === email);
     if (yaEsMiembro) {
-        alert("Ese usuario ya pertenece al grupo.");
+        window.mostrarNotificacion("Aviso", "Ese usuario ya pertenece al grupo.", "info");
         return;
     }
 
-    const templateParams = {
-        to_email: email,
-        para_correo_electrónico: email,
-        rol_invitado: rol.toUpperCase(),
-        remitente: auth.currentUser.email || 'Administrador'
-    };
+    try {
+        await addDoc(collection(db, "invitaciones"), {
+            grupoId: window.currentGrupo,
+            grupoNombre: "Grupo Control de Gastos",
+            remitenteEmail: auth.currentUser.email,
+            destinatarioEmail: email,
+            rol: rol,
+            estado: "PENDIENTE",
+            fecha: new Date().toISOString()
+        });
 
-    if (typeof emailjs !== 'undefined') {
-        console.log("Enviando mail a través de EmailJS con params:", templateParams);
-        emailjs.send('service_hib3aln', 'template_9tbnrfg', templateParams)
-            .then(function(response) {
-                console.log('✅ Correo de invitación enviado con éxito!', response.status, response.text);
-                alert(`¡Invitación enviada con éxito a ${email}!`);
-            }, function(error) {
-                console.error('❌ Error devuelto por EmailJS:', error);
-                alert('La invitación se guardó, pero EmailJS devolvió un error: ' + JSON.stringify(error));
+        if (typeof emailjs !== 'undefined') {
+            emailjs.send('service_hib3aln', 'template_9tbnrfg', {
+                to_email: email,
+                para_correo_electrónico: email,
+                rol_invitado: rol.toUpperCase(),
+                remitente: auth.currentUser.email
             });
-    } else {
-        console.warn("⚠️ El SDK de EmailJS no está cargado.");
-        alert("Atención: Falta cargar el SDK de EmailJS en index.html.");
+        }
+
+        window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
+        emailInput.value = '';
+
+        window.saveDataToCloud();
+        renderMiembrosGrupo();
+        window.mostrarNotificacion("¡Invitación enviada!", `Se envió con éxito la invitación a ${email}.`, "exito");
+    } catch (err) {
+        console.error("Error al enviar invitación:", err);
     }
-
-    window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
-    emailInput.value = '';
-
-    window.saveDataToCloud();
-    renderMiembrosGrupo();
 };
 
 window.removerMiembroGrupo = function(uid) {
-    if (confirm("¿Seguro de remover a este integrante del grupo?")) {
-        delete window.appState.grupoInfo.miembros[uid];
-        window.saveDataToCloud();
-        renderMiembrosGrupo();
+    if (!window.esUsuarioEditor()) {
+        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+        return;
     }
+    window.mostrarNotificacion(
+        "Quitar integrante",
+        "¿Seguro que deseás remover a este integrante del grupo?",
+        "error",
+        async () => {
+            try {
+                if (window.appState.grupoInfo && window.appState.grupoInfo.miembros) {
+                    const miembroRemovido = window.appState.grupoInfo.miembros[uid];
+                    const emailRemovido = miembroRemovido ? miembroRemovido.email : null;
+
+                    delete window.appState.grupoInfo.miembros[uid];
+                    await window.saveDataToCloud();
+
+                    if (emailRemovido) {
+                        const qInv = query(
+                            collection(db, "invitaciones"),
+                            where("grupoId", "==", window.currentGrupo),
+                            where("destinatarioEmail", "==", emailRemovido.toLowerCase())
+                        );
+                        const snapInv = await getDocs(qInv);
+                        snapInv.forEach(async (invDoc) => {
+                            await updateDoc(doc(db, "invitaciones", invDoc.id), { estado: "RECHAZADO" });
+                        });
+                    }
+
+                    renderMiembrosGrupo();
+                    window.mostrarNotificacion("Integrante removido", "El usuario ya no forma parte del grupo.", "exito");
+                }
+            } catch (e) {
+                console.error("Error al remover miembro:", e);
+            }
+        }
+    );
 };
 
 window.cancelarInvitacion = function(index) {
+    if (!window.esUsuarioEditor()) return;
     if (window.appState.grupoInfo?.invitacionesPendientes) {
         window.appState.grupoInfo.invitacionesPendientes.splice(index, 1);
         window.saveDataToCloud();
