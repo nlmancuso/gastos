@@ -1472,12 +1472,8 @@ window.cancelarInvitacion = function(index) {
     }
 };
 
-window.verificarLeonela = async function(uid) {
-    try {
-        await updateDoc(doc(db, "app_data", `personal_${uid}`), { emailVerificado: true });
-        console.log("¡Cuenta de Leonela verificada con éxito!");
-        window.location.reload();
-    } catch (e) {
-        console.error("Error al verificar:", e);
-    }
+window.verificarLeonelaDirecto = async function() {
+    await setDoc(doc(db, "app_data", "personal_J8oEEtIg6VXTC0hA2XNH1y9OfZZ2"), { emailVerificado: true }, { merge: true });
+    console.log("¡Cuenta de Leonela verificada con éxito!");
+    alert("¡Cuenta verificada con éxito! Ya puede iniciar sesión.");
 };
