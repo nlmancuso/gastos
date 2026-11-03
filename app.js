@@ -144,7 +144,7 @@ function aplicarRestriccionesInterfaz() {
             #appContent button i.fa-pen, #appContent button i.fa-trash-can, #appContent button i.fa-trash {
                 display: none !important;
             }
-            /* Deshabilitar selects (excepto selector de vistas), inputs, textareas y BLOQUEAR ORDENAMIENTO DE GRILLA */
+            /* Deshabilitar selects (excepto selector de vistas), inputs, textareas y BLOQUEAR ORDENAMIENTO Y ARRASTRE DE FILAS */
             #appContent select:not(#selectorVista), 
             #appContent input, 
             #appContent textarea, 
@@ -154,7 +154,13 @@ function aplicarRestriccionesInterfaz() {
             #appContent th[onclick],
             #appContent thead th,
             #appContent input[type="date"], 
-            #appContent .fecha-vencimiento {
+            #appContent .fecha-vencimiento,
+            #appContent [draggable],
+            #appContent .drag-handle,
+            #appContent .handle,
+            #appContent tr[draggable],
+            #appContent td:has(i.fa-grip-vertical),
+            #appContent i.fa-grip-vertical {
                 pointer-events: none !important;
                 opacity: 0.9;
                 cursor: default !important;
