@@ -1055,9 +1055,9 @@
                                 <td class="px-4 py-3 text-right font-extrabold text-white">${fmt(g.monto)}</td>
                                 <td class="px-4 py-3 text-center">
                                     <select onchange="actualizarEstadoGasto('${g.id}', '${currentMonth}', this.value)" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-bold ${estadoVal === 'PAGADO' ? 'text-emerald-400' : (estadoVal === 'VENCIDO' ? 'text-rose-400' : 'text-amber-500')} focus:outline-none cursor-pointer">
-                                        <option value="PENDIENTE" ${estadoVal === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
-                                        <option value="PAGADO" ${estadoVal === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
-                                        <option value="VENCIDO" ${estadoVal === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
+                                        <option value="PENDIENTE" class="bg-slate-900 text-slate-200" ${estadoVal === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
+                                        <option value="PAGADO" class="bg-slate-900 text-emerald-400" ${estadoVal === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
+                                        <option value="VENCIDO" class="bg-slate-900 text-rose-400" ${estadoVal === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
                                     </select>
                                 </td>
                                 <td class="px-4 py-3 text-right">
