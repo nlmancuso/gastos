@@ -39,6 +39,11 @@
         .tab-btn-active { border-bottom: 2px solid #10b981; color: #10b981; font-weight: 700; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
         .dragging { opacity: 0.4; background-color: #1e293b !important; }
+        /* Forzar fondo oscuro en todos los menús desplegables select de la app */
+select option {
+    background-color: #020617 !important; /* bg-slate-950 */
+    color: #f8fafc !important; /* text-slate-50 */
+}
     </style>
 </head>
 <body class="min-h-screen pb-12">
