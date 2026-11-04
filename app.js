@@ -234,7 +234,6 @@ if (typeof window.deleteGasto === 'function') {
 // PERSISTENCIA DE CAMBIO DE ROL DIRECTA CON SPINNER
 // ==========================================
 
-
 window.cambiarRolMiembro = async function(uidMiembro, nuevoRol) {
     let loaderDiv = document.getElementById('loader-cambio-rol');
     if (!loaderDiv) {
@@ -254,16 +253,13 @@ window.cambiarRolMiembro = async function(uidMiembro, nuevoRol) {
             return;
         }
 
-        // Apuntamos directamente a tu documento personal que es el que estás compartiendo
         const docIdPersonal = `personal_${user.uid}`;
 
         if (typeof db !== 'undefined') {
-            // Actualizar en memoria local
             if (window.appState?.grupoInfo?.miembros?.[uidMiembro]) {
                 window.appState.grupoInfo.miembros[uidMiembro].rol = nuevoRol;
             }
             
-            // Persistir los cambios en Firestore en tu documento personal
             await updateDoc(doc(db, "app_data", docIdPersonal), {
                 [`appState.grupoInfo.miembros.${uidMiembro}.rol`]: nuevoRol
             });
@@ -1482,16 +1478,13 @@ window.cancelarInvitacion = function(index) {
 window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
     if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
     
-    // Encontrar el gasto actual para conocer su categoría
     const gasto = (window.appState.gastos || []).find(g => g.id === gastoId);
     if (!gasto) return;
 
-    // Verificar si la categoría es tarjeta o comparte vencimiento único en bloque
     const catObj = (window.appState.categorias || []).find(c => c.nombre === gasto.categoria);
     const esEnBloque = catObj ? catObj.vencimientoUnicoEnBloque : false;
 
     if (esEnBloque) {
-        // Si es tarjeta/bloque, aplicar el estado a TODOS los ítems de esa misma categoría en el mes actual
         const datosCalculados = window.getCalculatedDataForMonth(monthStr);
         datosCalculados.items.forEach(item => {
             if (item.categoria === gasto.categoria) {
@@ -1499,12 +1492,220 @@ window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
             }
         });
     } else {
-        // Si es un gasto individual común, afecta solo a su propio ID
         window.appState.excepcionesEstado[`${gastoId}_${monthStr}`] = nuevoEstado;
     }
 
     window.saveDataToCloud(); 
     renderApp();
+};
+
+window.actualizarEstadoGastoMasivo = function(gastoId, nuevoEstado) {
+    if (!window.esUsuarioEditor()) {
+        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+        return;
+    }
+
+    const currentMonth = window.appState.currentMonth || defaultLocalMonth;
+    const gasto = (window.appState.gastos || []).find(g => g.id === gastoId);
+    if (!gasto) return;
+
+    const catObj = (window.appState.categorias || categoriasDefault).find(c => c.nombre === gasto.categoria);
+    const esEnBloque = catObj ? catObj.vencimientoUnicoEnBloque : false;
+
+    if (!window.appState.excepcionesEstado) {
+        window.appState.excepcionesEstado = {};
+    }
+
+    if (esEnBloque) {
+        const datosCalculados = window.getCalculatedDataForMonth(currentMonth);
+        datosCalculados.items.forEach(item => {
+            if (item.categoria === gasto.categoria) {
+                const estadoKey = `${item.id}_${currentMonth}`;
+                window.appState.excepcionesEstado[estadoKey] = nuevoEstado;
+            }
+        });
+    } else {
+        const estadoKey = `${gastoId}_${currentMonth}`;
+        window.appState.excepcionesEstado[estadoKey] = nuevoEstado;
+    }
+
+    window.saveDataToCloud();
+    renderApp();
+};
+
+// ==========================================
+// RENDERIZADO DE PLANILLA AGRUPADA (COLUMNAS DINÁMICAS SEGÚN MODO BLOQUE)
+// ==========================================
+
+window.renderPlanillaAgrupadaTabla = function(items) {
+    const container = document.getElementById('containerPlanillaAgrupada');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const filtrosActivos = window.filtrosTemporales || [];
+    let itemsFiltrados = items.filter(item => filtrosActivos.length === 0 || filtrosActivos.includes(item.categoria));
+
+    if (itemsFiltrados.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 italic text-center py-8">No hay gastos que coincidan con los filtros seleccionados.</p>';
+        return;
+    }
+
+    let grupos = {};
+    itemsFiltrados.forEach(item => {
+        if (!grupos[item.categoria]) grupos[item.categoria] = [];
+        grupos[item.categoria].push(item);
+    });
+
+    const ordenGuardado = window.appState.ordenItemsCategoria || {};
+    Object.keys(grupos).forEach(cat => {
+        if (ordenGuardado[cat]) {
+            const idsOrden = ordenGuardado[cat];
+            grupos[cat].sort((a, b) => {
+                let idxA = idsOrden.indexOf(a.id);
+                let idxB = idsOrden.indexOf(b.id);
+                if (idxA === -1) idxA = 999;
+                if (idxB === -1) idxB = 999;
+                return idxA - idxB;
+            });
+        }
+    });
+
+    const catList = window.appState.categorias || categoriasDefault;
+    const currentMonth = window.appState.currentMonth || defaultLocalMonth;
+    const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+
+    Object.entries(grupos).forEach(([categoria, gastosCat]) => {
+        const catObj = catList.find(c => c.nombre === categoria);
+        const colorCat = catObj ? catObj.color : '#64748b';
+        const totalCat = gastosCat.reduce((acc, g) => acc + g.monto, 0);
+        const isAbierto = window.categoriasAbiertasMap[categoria] === true;
+        const esBloque = catObj ? catObj.vencimientoUnicoEnBloque : false;
+
+        let vencimientoGrupo = '';
+        gastosCat.forEach(g => { if (g.vencimiento && !vencimientoGrupo) vencimientoGrupo = g.vencimiento; });
+        const gridKeyFirst = `${gastosCat[0]?.id}_${currentMonth}`;
+        const vencimientoValFirst = window.appState.excepcionesVencimientoGrid?.[gridKeyFirst] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKeyFirst] : vencimientoGrupo;
+        
+        const estadoValFirst = gastosCat[0]?.estado || 'PENDIENTE';
+
+        let rowsHtml = '';
+        if (isAbierto) {
+            rowsHtml = gastosCat.map(g => {
+                const gridKey = `${g.id}_${currentMonth}`;
+                const vencimientoVal = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKey] : (g.vencimiento || '');
+                const estadoVal = g.estado || 'PENDIENTE';
+
+                const subcatIdActual = window.appState.excepcionesSubcategoria?.[gridKey] !== undefined ? window.appState.excepcionesSubcategoria[gridKey] : g.subcategoriaId;
+                const subcatObj = (window.appState.subcategorias || []).find(s => s.id === subcatIdActual);
+                const subcatNombre = subcatObj ? subcatObj.nombre : '-';
+
+                const pctIndiv = window.appState.aumentosIndividuales?.[g.id];
+                let pctDisplay = '-';
+                if (pctIndiv !== undefined && pctIndiv !== '') {
+                    pctDisplay = `${pctIndiv}% <span class="text-[10px] text-amber-400" title="Individual">(Ind)</span>`;
+                } else if (subcatObj && subcatObj.porcentajeAumento) {
+                    pctDisplay = `${subcatObj.porcentajeAumento}% <span class="text-[10px] text-slate-500" title="Subcategoría">(Sub)</span>`;
+                }
+
+                let vencimientoCellHtml = '';
+                let estadoCellHtml = '';
+
+                if (!esBloque) {
+                    vencimientoCellHtml = `
+                        <td class="px-4 py-3">
+                            <input type="date" value="${vencimientoVal}" onchange="actualizarVencimientoGrid('${g.id}', '${currentMonth}', this.value, '${categoria}')" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs ${vencimientoVal ? 'text-amber-400 font-bold border-amber-800/60 bg-amber-950/60' : 'text-slate-300'} focus:outline-none">
+                        </td>
+                    `;
+                    estadoCellHtml = `
+                        <td class="px-4 py-3 text-center">
+                            <select onchange="actualizarEstadoGasto('${g.id}', '${currentMonth}', this.value)" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-bold ${estadoVal === 'PAGADO' ? 'text-emerald-400' : (estadoVal === 'VENCIDO' ? 'text-rose-400' : 'text-amber-500')} focus:outline-none cursor-pointer">
+                                <option value="PENDIENTE" ${estadoVal === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
+                                <option value="PAGADO" ${estadoVal === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
+                                <option value="VENCIDO" ${estadoVal === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
+                            </select>
+                        </td>
+                    `;
+                }
+
+                return `
+                    <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event, '${categoria}')" data-id="${g.id}" class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs cursor-default">
+                        <td class="px-4 py-3 text-white font-bold flex items-center gap-2">
+                            <span class="text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing p-1"><i class="fa-solid fa-grip-vertical"></i></span>
+                            ${g.concepto}
+                        </td>
+                        <td class="px-4 py-3 text-slate-400">${g.tipo}</td>
+                        <td class="px-4 py-3 text-slate-300 font-medium">${subcatNombre}</td>
+                        ${vencimientoCellHtml}
+                        <td class="px-4 py-3 font-mono text-amber-300 font-bold">${pctDisplay}</td>
+                        <td class="px-4 py-3 text-right font-extrabold text-white">${fmt(g.monto)}</td>
+                        ${estadoCellHtml}
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <button onclick="editGasto('${g.id}')" class="text-slate-400 hover:text-white p-1" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deleteGasto('${g.id}')" class="text-slate-400 hover:text-rose-400 p-1" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        let controlesCabeceraHtml = '';
+        if (esBloque) {
+            controlesCabeceraHtml = `
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                    <div class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase">Venc:</span>
+                        <input type="date" value="${vencimientoValFirst || ''}" onchange="actualizarVencimientoGrid('${gastosCat[0]?.id}', '${currentMonth}', this.value, '${categoria}')" class="bg-transparent text-amber-400 font-bold text-xs outline-none cursor-pointer">
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase">Estado:</span>
+                        <select onchange="actualizarEstadoGastoMasivo('${gastosCat[0]?.id}', this.value)" class="bg-transparent text-xs font-bold ${estadoValFirst === 'PAGADO' ? 'text-emerald-400' : (estadoValFirst === 'VENCIDO' ? 'text-rose-400' : 'text-amber-500')} outline-none cursor-pointer">
+                            <option value="PENDIENTE" ${estadoValFirst === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
+                            <option value="PAGADO" ${estadoValFirst === 'PAGADO' ? 'selected' : ''}>PAGADO</option>
+                            <option value="VENCIDO" ${estadoValFirst === 'VENCIDO' ? 'selected' : ''}>VENCIDO</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML += `
+            <div class="bg-slate-900/60 rounded-xl overflow-hidden border border-slate-800/80 mb-3">
+                <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 cursor-pointer select-none" onclick="toggleCategoriaAcordeon('${categoria}')">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <i class="fa-solid fa-chevron-${isAbierto ? 'down' : 'right'} text-xs text-slate-400"></i>
+                        <span class="w-3 h-3 rounded-full" style="background-color: ${colorCat};"></span>
+                        <span class="text-sm font-bold text-white">${categoria}</span>
+                        <span class="text-[11px] bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-semibold">${gastosCat.length} ítem${gastosCat.length === 1 ? '' : 's'}</span>
+                        ${controlesCabeceraHtml}
+                    </div>
+                    <span class="text-sm font-extrabold text-emerald-400 shrink-0">TOTAL: ${fmt(totalCat)}</span>
+                </div>
+                ${isAbierto ? `
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="table-header text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <th class="px-4 py-3">CONCEPTO</th>
+                                    <th class="px-4 py-3">TIPO / CUOTAS</th>
+                                    <th class="px-4 py-3">SUB CATEGORIA</th>
+                                    ${!esBloque ? '<th class="px-4 py-3">VENCIMIENTO</th>' : ''}
+                                    <th class="px-4 py-3">% INFLACION</th>
+                                    <th class="px-4 py-3 text-right">MONTO</th>
+                                    ${!esBloque ? '<th class="px-4 py-3 text-center">ESTADO</th>' : ''}
+                                    <th class="px-4 py-3 text-right">ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 text-sm font-medium">
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
 };
 
 window.verificarLeonelaDirecto = async function() {
@@ -1562,7 +1763,7 @@ window.limpiarEspacioLeonela = async function() {
         await setDoc(doc(db, "app_data", `personal_${uidLeonela}`), {
             appState: appStateLimpioTotal,
             emailVerificado: true
-        }, { merge: false }); // Reemplazo total para asegurar que no queden datos viejos
+        }, { merge: false });
 
         console.log("¡Espacio personal de Leonela limpiado por completo!");
         alert("Espacio personal de Leonela blanqueado en todos los meses con éxito.");
