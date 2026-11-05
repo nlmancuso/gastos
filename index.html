@@ -439,12 +439,15 @@ select option {
                         <h3 class="text-base font-bold text-white">Detalle de gastos del mes</h3>
                         <span id="badgeGastoMensualMes" class="text-xs font-semibold bg-slate-800 text-sky-400 px-3 py-0.5 rounded-full border border-slate-700">Cargando...</span>
                     </div>
-                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400">
-                        Categoría
-                        <select id="filtroGastoMensualCategoria" onchange="filtrarGastosMensuales(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white">
-                            <option value="">Todas</option>
-                        </select>
-                    </label>
+                </div>
+                <div class="px-5 py-3 border-b border-slate-800 flex flex-col gap-2">
+                    <div class="flex items-center justify-end gap-2 text-xs font-semibold">
+                        <span class="text-slate-400">Filtrar:</span>
+                        <button onclick="marcarTodasCategoriasTablaGastoMensual(true)" class="text-sky-400 hover:underline">Todos</button>
+                        <span class="text-slate-600">|</span>
+                        <button onclick="marcarTodasCategoriasTablaGastoMensual(false)" class="text-rose-400 hover:underline">Ninguno</button>
+                    </div>
+                    <div id="containerFiltrosCategoriasTablaGastoMensual" class="flex flex-wrap items-center gap-1.5"></div>
                 </div>
                 <div class="max-h-[480px] overflow-auto">
                     <table class="w-full text-left border-collapse">
@@ -2358,7 +2361,7 @@ window.ejecutarEliminacionGasto = function() {
             { nombre: 'Otros', color: '#64748b' }
         ];
         let ordenGastosMensuales = { columna: 'fecha', ascendente: false };
-        let filtroCategoriaGastoMensual = '';
+        let filtrosCategoriasTablaGastoMensual = [];
         let filtrosCategoriasGraficoGastoMensual = [];
         let chartGastoMensualCategorias = null;
         let chartGastoMensualEvolucion = null;
@@ -2377,11 +2380,7 @@ window.ejecutarEliminacionGasto = function() {
         function renderSelectoresCategoriaGastoMensual() {
             const categorias = obtenerCategoriasGastoMensual();
             const selectorCategoria = document.getElementById('gastoMensualCategoria');
-            const selectorFiltro = document.getElementById('filtroGastoMensualCategoria');
             const categoriaSeleccionada = selectorCategoria.value;
-            const filtroSeleccionado = filtroCategoriaGastoMensual;
-            const categoriasHistoricas = (window.appState.gastosMensuales || []).map(gasto => gasto.categoria).filter(Boolean);
-            const opcionesFiltro = [...new Set([...categorias.map(categoria => categoria.nombre), ...categoriasHistoricas])];
 
             selectorCategoria.replaceChildren();
             categorias.forEach(categoria => {
@@ -2393,20 +2392,63 @@ window.ejecutarEliminacionGasto = function() {
             if (categorias.some(categoria => categoria.nombre === categoriaSeleccionada)) {
                 selectorCategoria.value = categoriaSeleccionada;
             }
+            renderFiltrosCategoriasTablaGastoMensual();
+        }
 
-            selectorFiltro.replaceChildren();
-            const opcionTodas = document.createElement('option');
-            opcionTodas.value = '';
-            opcionTodas.textContent = 'Todas';
-            selectorFiltro.appendChild(opcionTodas);
-            opcionesFiltro.forEach(nombre => {
-                const opcion = document.createElement('option');
-                opcion.value = nombre;
-                opcion.textContent = nombre;
-                selectorFiltro.appendChild(opcion);
+        function renderFiltrosCategoriasTablaGastoMensual() {
+            const container = document.getElementById('containerFiltrosCategoriasTablaGastoMensual');
+            if (!container) return;
+            const categorias = obtenerCategoriasGastoMensual();
+            const nombres = obtenerNombresCategoriasGastoMensual();
+            container.replaceChildren();
+            nombres.forEach((nombre, index) => {
+                const categoria = categorias.find(item => item.nombre === nombre);
+                const color = categoria?.color || ['#10b981', '#8b5cf6', '#3b82f6', '#ef4444', '#06b6d4', '#f59e0b', '#64748b'][index % 7];
+                const seleccionado = filtrosCategoriasTablaGastoMensual.length === 0
+                    || filtrosCategoriasTablaGastoMensual.includes(nombre);
+                const etiqueta = document.createElement('label');
+                etiqueta.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${seleccionado ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = nombre;
+                checkbox.checked = seleccionado;
+                checkbox.className = 'hidden';
+                checkbox.addEventListener('change', () => window.toggleFiltroCategoriaTablaGastoMensual(checkbox));
+                const punto = document.createElement('span');
+                punto.className = 'w-2 h-2 rounded-full';
+                punto.style.backgroundColor = color;
+                const texto = document.createElement('span');
+                texto.textContent = nombre;
+                etiqueta.append(checkbox, punto, texto);
+                container.appendChild(etiqueta);
             });
-            selectorFiltro.value = opcionesFiltro.includes(filtroSeleccionado) ? filtroSeleccionado : '';
-            if (!opcionesFiltro.includes(filtroSeleccionado)) filtroCategoriaGastoMensual = '';
+        }
+
+        window.toggleFiltroCategoriaTablaGastoMensual = function(checkbox) {
+            const nombres = obtenerNombresCategoriasGastoMensual();
+            if (filtrosCategoriasTablaGastoMensual.includes('__NINGUNA__')) {
+                filtrosCategoriasTablaGastoMensual = [];
+            } else if (filtrosCategoriasTablaGastoMensual.length === 0) {
+                filtrosCategoriasTablaGastoMensual = [...nombres];
+            }
+            if (checkbox.checked) {
+                if (!filtrosCategoriasTablaGastoMensual.includes(checkbox.value)) {
+                    filtrosCategoriasTablaGastoMensual.push(checkbox.value);
+                }
+            } else {
+                filtrosCategoriasTablaGastoMensual = filtrosCategoriasTablaGastoMensual.filter(nombre => nombre !== checkbox.value);
+            }
+            if (filtrosCategoriasTablaGastoMensual.length === nombres.length) {
+                filtrosCategoriasTablaGastoMensual = [];
+            }
+            renderFiltrosCategoriasTablaGastoMensual();
+            renderGastoMensualApp();
+        };
+
+        window.marcarTodasCategoriasTablaGastoMensual = function(marcar) {
+            filtrosCategoriasTablaGastoMensual = marcar ? [] : ['__NINGUNA__'];
+            renderFiltrosCategoriasTablaGastoMensual();
+            renderGastoMensualApp();
         }
 
         function obtenerNombresCategoriasGastoMensual() {
@@ -2608,7 +2650,7 @@ window.ejecutarEliminacionGasto = function() {
         }
 
         window.filtrarGastosMensuales = function(categoria) {
-            filtroCategoriaGastoMensual = categoria;
+            filtrosCategoriasTablaGastoMensual = categoria ? [categoria] : [];
             renderGastoMensualApp();
         };
 
@@ -2697,10 +2739,10 @@ window.ejecutarEliminacionGasto = function() {
                 });
             }
 
-            const selectorFiltro = document.getElementById('filtroGastoMensualCategoria');
-            if (selectorFiltro) selectorFiltro.value = filtroCategoriaGastoMensual;
             const gastosFiltrados = gastosMes
-                .filter(gasto => !filtroCategoriaGastoMensual || gasto.categoria === filtroCategoriaGastoMensual)
+                .filter(gasto => filtrosCategoriasTablaGastoMensual.includes('__NINGUNA__')
+                    ? false
+                    : filtrosCategoriasTablaGastoMensual.length === 0 || filtrosCategoriasTablaGastoMensual.includes(gasto.categoria || 'Sin categoría'))
                 .sort((a, b) => {
                     const valorA = ordenGastosMensuales.columna === 'monto' ? Number(a.monto) || 0 : a[ordenGastosMensuales.columna] || '';
                     const valorB = ordenGastosMensuales.columna === 'monto' ? Number(b.monto) || 0 : b[ordenGastosMensuales.columna] || '';
@@ -2734,7 +2776,20 @@ window.ejecutarEliminacionGasto = function() {
                 concepto.textContent = gasto.concepto || '';
                 const categoria = document.createElement('td');
                 categoria.className = 'px-5 py-3.5 text-slate-300';
-                categoria.textContent = gasto.categoria || 'Sin categoría';
+                const nombreCategoria = gasto.categoria || 'Sin categoría';
+                const categoriaConfig = obtenerCategoriasGastoMensual().find(item => item.nombre === nombreCategoria);
+                const colorCategoria = categoriaConfig?.color || '#64748b';
+                const etiquetaCategoria = document.createElement('span');
+                etiquetaCategoria.className = 'px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5';
+                etiquetaCategoria.style.backgroundColor = `${colorCategoria}22`;
+                etiquetaCategoria.style.borderColor = `${colorCategoria}55`;
+                const puntoCategoria = document.createElement('span');
+                puntoCategoria.className = 'w-2 h-2 rounded-full';
+                puntoCategoria.style.backgroundColor = colorCategoria;
+                const textoCategoria = document.createElement('span');
+                textoCategoria.textContent = nombreCategoria;
+                etiquetaCategoria.append(puntoCategoria, textoCategoria);
+                categoria.appendChild(etiquetaCategoria);
                 const medioPago = document.createElement('td');
                 medioPago.className = 'px-5 py-3.5 text-slate-400 text-xs';
                 medioPago.textContent = gasto.medioPago || 'Efectivo';
@@ -3317,7 +3372,7 @@ window.ejecutarEliminacionGasto = function() {
                 modalChartInstance = null;
             }
         };
- 
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') window.cerrarGraficoModal();
         });
