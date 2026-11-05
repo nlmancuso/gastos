@@ -2365,6 +2365,7 @@ window.ejecutarEliminacionGasto = function() {
         let chartGastoMensualEvolucionCategorias = null;
         let chartGastoMensualUsuarios = null;
         let gastoMensualPendienteDeEliminar = null;
+        let guardandoGastoMensual = false;
 
         function obtenerCategoriasGastoMensual() {
             if (!Array.isArray(window.appState.categoriasGastosMensuales)) {
@@ -2961,6 +2962,7 @@ window.ejecutarEliminacionGasto = function() {
 
         window.handleSaveGastoMensual = async function(event) {
             event.preventDefault();
+            if (guardandoGastoMensual) return;
             if (!esEditorGastoMensual()) {
                 window.mostrarMensajeApp('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
                 return;
@@ -2989,6 +2991,12 @@ window.ejecutarEliminacionGasto = function() {
                 usuarioUid: usuarioActual.uid,
                 usuarioEmail: usuarioActual.email || 'Usuario sin correo'
             };
+            const formulario = document.getElementById('formGastoMensual');
+            const botonGuardar = formulario.querySelector('button[type="submit"]');
+            const textoOriginalBoton = botonGuardar.innerHTML;
+            guardandoGastoMensual = true;
+            botonGuardar.disabled = true;
+            botonGuardar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
             try {
                 await window.agregarGastoMensualCompartido(nuevoGasto);
             } catch (error) {
@@ -2998,6 +3006,10 @@ window.ejecutarEliminacionGasto = function() {
                     : 'Revisá tu conexión e intentá nuevamente.';
                 window.mostrarMensajeApp('No se pudo guardar', `El gasto no se guardó en Firestore. ${detalle}`, 'error');
                 return;
+            } finally {
+                guardandoGastoMensual = false;
+                botonGuardar.disabled = false;
+                botonGuardar.innerHTML = textoOriginalBoton;
             }
             document.getElementById('gastoMensualConcepto').value = '';
             document.getElementById('gastoMensualMonto').value = '';
