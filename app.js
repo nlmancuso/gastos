@@ -967,7 +967,11 @@ window.agregarGastoMensualCompartido = async function(gasto) {
     await updateDoc(window.docRef, {
         "appState.gastosMensuales": arrayUnion(gasto)
     });
-    window.appState.gastosMensuales = [...(window.appState.gastosMensuales || []), gasto];
+    const gastosActuales = window.appState.gastosMensuales || [];
+    window.appState.gastosMensuales = [
+        ...gastosActuales.filter(item => item.id !== gasto.id),
+        gasto
+    ];
 };
 
 window.eliminarGastoMensualCompartido = async function(gastoId) {
