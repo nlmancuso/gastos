@@ -44,7 +44,7 @@ function obtenerFechasHoyMañana() {
 async function enviarAlertas() {
     try {
         console.log("Conectando a Firebase para extracción sincronizada de tarjetas, gastos y estados...");
-        const grupoId = "grupo_mancusososa";
+        const grupoId = "personal_7MZdj30cOKSt3h38q1pBMOBdgrA2";
         const docRef = doc(db, "app_data", grupoId);
         const docSnap = await getDoc(docRef);
 
