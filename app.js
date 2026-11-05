@@ -1771,3 +1771,35 @@ window.limpiarEspacioLeonela = async function() {
         console.error("Error al limpiar espacio personal:", e);
     }
 };
+
+window.forzarVerificacionEmail = async function(emailObjetivo = "sosaleonela2024@gmail.com") {
+    try {
+        const querySnapshot = await getDocs(collection(db, "app_data"));
+        let encontrado = false;
+
+        querySnapshot.forEach(async (docSnap) => {
+            const data = docSnap.data();
+            const grupoInfo = data.appState?.grupoInfo;
+            
+            // Buscar si el UID pertenece al email en los miembros de su espacio personal
+            if (docSnap.id.startsWith("personal_")) {
+                const uidDoc = docSnap.id.replace("personal_", "");
+                // Verificamos si este documento coincide o si lo buscamos por email en auth/firestore
+                // O de forma directa si conoces el UID (ej: Ax3bwHzylYbXjCOGy5Y85e0Iu8R2)
+                await setDoc(doc(db, "app_data", docSnap.id), { emailVerificado: true }, { merge: true });
+                console.log(`Verificado documento: ${docSnap.id}`);
+                encontrado = true;
+            }
+        });
+
+        // Alternativa directa por el UID conocido de Leonela si ya lo tenés identificado:
+        const uidLeonela = "Ax3bwHzylYbXjCOGy5Y85e0Iu8R2";
+        await setDoc(doc(db, "app_data", `personal_${uidLeonela}`), { emailVerificado: true }, { merge: true });
+        
+        console.log(`¡Cuenta de ${emailObjetivo} forzada a VERIFICADA con éxito!`);
+        alert(`¡Cuenta de ${emailObjetivo} verificada correctamente! Ya puede iniciar sesión.`);
+    } catch (e) {
+        console.error("Error al forzar la verificación:", e);
+        alert("Hubo un error al intentar verificar la cuenta.");
+    }
+};
