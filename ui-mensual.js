@@ -317,14 +317,20 @@
                 .filter(gasto => gasto.fecha && gasto.fecha.slice(0, 7) === mes);
             const editor = esEditorGastoMensual();
             const formulario = document.getElementById('formGastoMensualContainer');
-            const tituloFormulario = document.getElementById('tituloFormGastoMensual');
-            const formularioCampos = document.getElementById('formGastoMensual');
+            const formularioCampos = document.getElementById('gastoMensualFields');
             const mensajeLectura = document.getElementById('gastoMensualSoloLectura');
+            const botonGuardar = document.getElementById('btnGuardarGastoUnificado');
+            const tipoGasto = document.getElementById('tipoGastoUnificado')?.value || 'grupo';
             if (formulario) formulario.classList.remove('hidden');
-            if (tituloFormulario) tituloFormulario.classList.toggle('hidden', !editor);
-            if (formularioCampos) formularioCampos.classList.toggle('hidden', !editor);
-            if (mensajeLectura) mensajeLectura.classList.toggle('hidden', editor);
-            document.getElementById('btnCategoriasGastoMensual').classList.toggle('hidden', !editor);
+            if (formularioCampos) {
+                const camposDisponibles = editor && tipoGasto === 'grupo';
+                formularioCampos.classList.toggle('hidden', !camposDisponibles);
+                formularioCampos.disabled = !camposDisponibles;
+            }
+            if (mensajeLectura) mensajeLectura.classList.toggle('hidden', editor || tipoGasto !== 'grupo');
+            if (botonGuardar) botonGuardar.classList.toggle('hidden', !editor && tipoGasto === 'grupo');
+            const botonCategorias = document.getElementById('btnCategoriasTipoGasto');
+            if (botonCategorias) botonCategorias.classList.toggle('hidden', tipoGasto === 'grupo' && !editor);
             renderSelectoresCategoriaGastoMensual();
             renderFiltrosCategoriasGraficoGastoMensual();
 

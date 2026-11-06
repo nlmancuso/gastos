@@ -158,8 +158,7 @@ select option {
                 <button onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</button>
                 <button onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</button>
                 <button onclick="switchTab('saldos')" id="btnTabSaldos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</button>
-                <button onclick="switchTab('mensual')" id="btnTabMensual" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-receipt text-sky-400"></i> Gasto Mensual</button>
-                <button onclick="switchTab('hormiga')" id="btnTabHormiga" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-cookie-bite text-amber-400"></i> Gastos Hormiga <span class="bg-amber-500/20 text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-mono">Privado</span></button>
+                <button onclick="switchTab('gastos')" id="btnTabGastos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-receipt text-sky-400"></i> Gastos del Mes y Hormiga</button>
             </div>
         </header>
 
@@ -380,62 +379,79 @@ select option {
             <div id="containerBancosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </section>
 
-        <!-- ==================== SECCIÓN 4: GASTO MENSUAL COMPARTIDO ==================== -->
-        <section id="viewMensual" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
-            <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sky-300 text-xs font-medium">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-xl bg-sky-950/80 border border-sky-800/60 flex items-center justify-center text-sky-400 shrink-0">
-                        <i class="fa-solid fa-users text-sm"></i>
+        <!-- ==================== SECCIÓN 4: GASTOS MENSUALES Y HORMIGA ==================== -->
+        <section id="viewGastos" class="hidden max-w-7xl mx-auto px-4 py-4 space-y-6">
+            <div id="resumenGastoMensual">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL DEL MES</span>
+                        <h2 id="cardGastoMensualTotal" class="text-2xl font-extrabold text-sky-400 my-1">$ 0,00</h2>
                     </div>
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">PROMEDIO DIARIO</span>
+                        <h2 id="cardGastoMensualPromedio" class="text-2xl font-extrabold text-blue-400 my-1">$ 0,00</h2>
+                    </div>
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CANTIDAD DE GASTOS</span>
+                        <h2 id="cardGastoMensualCantidad" class="text-2xl font-extrabold text-emerald-400 my-1">0 gastos</h2>
+                    </div>
+                </div>
+            </div>
+            <div id="resumenGastoHormiga" class="hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL HORMIGA (MES)</span>
+                        <h2 id="cardHormigaTotal" class="text-2xl font-extrabold text-amber-400 my-1">$ 0,00</h2>
+                    </div>
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">PROMEDIO DIARIO</span>
+                        <h2 id="cardHormigaPromedio" class="text-2xl font-extrabold text-blue-400 my-1">$ 0,00</h2>
+                    </div>
+                    <div class="card-bg p-5 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CANTIDAD DE GASTOS</span>
+                        <h2 id="cardHormigaCantidad" class="text-2xl font-extrabold text-emerald-400 my-1">0 compras</h2>
+                    </div>
+                </div>
+            </div>
+            <div id="formGastoMensualContainer" class="card-bg p-6 rounded-2xl">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
                     <div>
-                        <p class="font-bold text-sky-200">Gastos compartidos del grupo</p>
-                        <p>Los integrantes del grupo pueden consultar estos gastos. Los usuarios con permiso de escritura también pueden agregarlos y eliminarlos.</p>
+                        <h3 id="tituloFormGastoMensual" class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-plus-circle text-sky-400"></i> Registrar gasto de Grupo
+                        </h3>
+                        <p id="ayudaTipoGastoUnificado" class="mt-1 text-xs text-slate-400">Este gasto será visible para los integrantes del grupo.</p>
+                    </div>
+                    <div class="flex w-full sm:w-auto items-end gap-2">
+                        <div class="min-w-0 flex-1 sm:w-64 sm:flex-none">
+                        <label for="tipoGastoUnificado" class="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de gasto</label>
+                        <select id="tipoGastoUnificado" onchange="cambiarTipoGastoUnificado(this.value)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                            <option value="grupo">Grupo (compartido)</option>
+                            <option value="hormiga">Hormiga (privado)</option>
+                        </select>
+                        </div>
+                        <button id="btnCategoriasTipoGasto" type="button" onclick="abrirCategoriasTipoGasto()" class="hidden shrink-0 h-[42px] px-3 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center justify-center gap-2 text-xs font-semibold" title="Administrar categorías">
+                            <i class="fa-solid fa-tags"></i><span>Categorías</span>
+                        </button>
                     </div>
                 </div>
-                <button id="btnCategoriasGastoMensual" onclick="openModalCategoriasGastoMensual()" class="hidden w-full sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 shrink-0">
-                    <i class="fa-solid fa-tags"></i> Categorías
-                </button>
-            </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="card-bg p-5 rounded-2xl">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL DEL MES</span>
-                    <h2 id="cardGastoMensualTotal" class="text-2xl font-extrabold text-sky-400 my-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-5 rounded-2xl">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">PROMEDIO DIARIO</span>
-                    <h2 id="cardGastoMensualPromedio" class="text-2xl font-extrabold text-blue-400 my-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-5 rounded-2xl">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CANTIDAD DE GASTOS</span>
-                    <h2 id="cardGastoMensualCantidad" class="text-2xl font-extrabold text-emerald-400 my-1">0 gastos</h2>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div id="formGastoMensualContainer" class="card-bg p-6 rounded-2xl h-fit">
-                    <h3 id="tituloFormGastoMensual" class="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-plus-circle text-sky-400"></i> Registrar Gasto Mensual
-                    </h3>
-                    <form id="formGastoMensual" onsubmit="handleSaveGastoMensual(event)" class="space-y-4">
-                        <div>
+                <form id="formGastoMensual" onsubmit="handleSaveGastoUnificado(event)" class="space-y-4">
+                    <fieldset id="gastoMensualFields" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 border-0 p-0 m-0 min-w-0">
+                        <div class="lg:col-span-2">
                             <label for="gastoMensualConcepto" class="block text-xs font-bold text-slate-400 uppercase mb-1">Descripción</label>
                             <input type="text" id="gastoMensualConcepto" maxlength="120" required placeholder="Ej: Compra del supermercado" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label for="gastoMensualMonto" class="block text-xs font-bold text-slate-400 uppercase mb-1">Monto ($)</label>
-                                <input type="number" id="gastoMensualMonto" min="0.01" step="0.01" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
-                            </div>
-                            <div>
-                                <label for="gastoMensualFecha" class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha</label>
-                                <input type="date" id="gastoMensualFecha" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
-                            </div>
+                        <div>
+                            <label for="gastoMensualMonto" class="block text-xs font-bold text-slate-400 uppercase mb-1">Monto ($)</label>
+                            <input type="number" id="gastoMensualMonto" min="0.01" step="0.01" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                        </div>
+                        <div>
+                            <label for="gastoMensualFecha" class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha</label>
+                            <input type="date" id="gastoMensualFecha" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
                         </div>
                         <div>
                             <label for="gastoMensualCategoria" class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría</label>
-                            <select id="gastoMensualCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
-                            </select>
+                            <select id="gastoMensualCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white"></select>
                         </div>
                         <div>
                             <label for="gastoMensualMedioPago" class="block text-xs font-bold text-slate-400 uppercase mb-1">Medio de pago</label>
@@ -447,14 +463,46 @@ select option {
                                 <option value="Otros">Otros</option>
                             </select>
                         </div>
-                        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-floppy-disk"></i> Guardar gasto
-                        </button>
-                    </form>
-                    <p id="gastoMensualSoloLectura" class="hidden mt-4 text-xs text-slate-400">Tenés permiso de solo lectura en este grupo.</p>
-                </div>
+                    </fieldset>
 
-                <div class="lg:col-span-2 card-bg p-6 rounded-2xl">
+                    <fieldset id="gastoHormigaFields" disabled class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 border-0 p-0 m-0 min-w-0">
+                        <div class="lg:col-span-2">
+                            <label for="hormigaConcepto" class="block text-xs font-bold text-slate-400 uppercase mb-1">¿Qué compraste?</label>
+                            <input type="text" id="hormigaConcepto" required placeholder="Ej: Café, Galletitas..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                        </div>
+                        <div>
+                            <label for="hormigaMonto" class="block text-xs font-bold text-slate-400 uppercase mb-1">Monto ($)</label>
+                            <input type="number" id="hormigaMonto" min="0.01" step="0.01" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
+                        </div>
+                        <div>
+                            <label for="hormigaFecha" class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha</label>
+                            <input type="date" id="hormigaFecha" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
+                        </div>
+                        <div>
+                            <label for="hormigaCategoriaSelect" class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría</label>
+                            <select id="hormigaCategoriaSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white"></select>
+                        </div>
+                        <div>
+                            <label for="hormigaMedioPago" class="block text-xs font-bold text-slate-400 uppercase mb-1">Medio de pago</label>
+                            <select id="hormigaMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                                <option value="Mercado Pago" selected>Mercado Pago</option>
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Débito">Débito</option>
+                                <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <p id="gastoMensualSoloLectura" class="hidden text-xs text-slate-400">Tenés permiso de solo lectura en este grupo. Podés seguir cargando tus gastos hormiga privados.</p>
+                    <button id="btnGuardarGastoUnificado" type="submit" class="w-full sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar gasto de Grupo
+                    </button>
+                </form>
+            </div>
+
+            <!-- ==================== DETALLE Y ESTADÍSTICAS DE GRUPO ==================== -->
+            <section id="viewMensual" class="space-y-6">
+            <div class="card-bg p-6 rounded-2xl">
                     <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
                         <h3 class="text-base font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-chart-pie text-sky-400"></i> Totales por categoría
@@ -556,78 +604,11 @@ select option {
                 </div>
                 <div class="relative h-72 w-full"><canvas id="chartGastoMensualUsuarios"></canvas></div>
             </div>
-        </section>
+            </section>
 
-        <!-- ==================== SECCIÓN 4: GASTOS HORMIGA ==================== -->
-        <section id="viewHormiga" class="max-w-7xl mx-auto px-4 py-4 space-y-6 hidden">
-            <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-3 text-amber-300 text-xs font-medium">
-                    <div class="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
-                        <i class="fa-solid fa-user-lock text-sm"></i>
-                    </div>
-                    <span>Estás en tu sección personal de Gastos Hormiga. Ningún otro usuario del grupo puede ver tus gastos de esta solapa.</span>
-                </div>
-                <button onclick="openModalCatHormiga()" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider shrink-0">
-                    <i class="fa-solid fa-tags text-slate-950"></i> Categorías Hormiga
-                </button>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="card-bg p-5 rounded-2xl">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL HORMIGA (MES)</span>
-                    <h2 id="cardHormigaTotal" class="text-2xl font-extrabold text-amber-400 my-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-5 rounded-2xl">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">PROMEDIO DIARIO</span>
-                    <h2 id="cardHormigaPromedio" class="text-2xl font-extrabold text-blue-400 my-1">$ 0,00</h2>
-                </div>
-                <div class="card-bg p-5 rounded-2xl">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CANTIDAD DE GASTOS</span>
-                    <h2 id="cardHormigaCantidad" class="text-2xl font-extrabold text-emerald-400 my-1">0 compras</h2>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="card-bg p-6 rounded-2xl h-fit">
-                    <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-plus-circle text-amber-400"></i> Registrar Gasto Hormiga
-                    </h3>
-                    <form onsubmit="handleSaveGastoHormiga(event)" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">¿QUÉ COMPRASTE?</label>
-                            <input type="text" id="hormigaConcepto" required placeholder="Ej: Café, Galletitas..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MONTO ($)</label>
-                                <input type="number" step="0.01" id="hormigaMonto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">FECHA</label>
-                                <input type="date" id="hormigaFecha" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CATEGORÍA</label>
-                            <select id="hormigaCategoriaSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white"></select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">MEDIO DE PAGO</label>
-                            <select id="hormigaMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
-                                <option value="Mercado Pago" selected>Mercado Pago</option>
-                                <option value="Efectivo">Efectivo</option>
-                                <option value="Débito">Débito</option>
-                                <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
-                                <option value="Otros">Otros</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 mt-2">
-                            <i class="fa-solid fa-cookie"></i> Guardar Gasto Hormiga
-                        </button>
-                    </form>
-                </div>
-
-                <div class="lg:col-span-2 card-bg p-6 rounded-2xl flex flex-col justify-between">
+            <!-- ==================== DETALLE Y ESTADÍSTICAS DE GASTOS HORMIGA ==================== -->
+            <section id="viewHormiga" class="space-y-6 hidden">
+            <div class="card-bg p-6 rounded-2xl flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
                             <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -719,6 +700,7 @@ select option {
                 <div class="flex flex-wrap items-center gap-1.5 pt-1" id="containerFiltrosHormigaEvolCat"></div>
                 <div class="relative h-72 w-full"><canvas id="chartHormigaEvolucionCategorias"></canvas></div>
             </div>
+            </section>
         </section>
     </div>
 
