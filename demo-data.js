@@ -252,7 +252,6 @@
 
         const banner = document.getElementById('bannerModoDemo');
         if (banner) banner.classList.remove('hidden');
-        const boton = document.getElementById('btnModoDemo');
         window.actualizarVisibilidadDemoLocal();
         const grupoStatus = document.getElementById('grupoStatus');
         if (grupoStatus) grupoStatus.textContent = 'Modo demo local · dos perfiles simulados';

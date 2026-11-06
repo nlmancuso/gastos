@@ -743,6 +743,7 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
 };
 
 onAuthStateChanged(auth, async (user) => {
+    window.actualizarVisibilidadDemoLocal?.();
     if (user) {
         window.showLoading();
 
@@ -849,8 +850,10 @@ onAuthStateChanged(auth, async (user) => {
         const userName = user.email ? user.email.split('@')[0] : 'Usuario';
         const grupoDisplay = document.getElementById('grupoStatus');
         if (grupoDisplay) grupoDisplay.innerHTML = `👤 ${userName}`;
+        window.actualizarVisibilidadDemoLocal?.();
     } else {
         window.showLogin();
+        window.actualizarVisibilidadDemoLocal?.();
         if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
         if (unsubscribeHormiga) { unsubscribeHormiga(); unsubscribeHormiga = null; }
         if (unsubscribeInvitaciones) { unsubscribeInvitaciones(); unsubscribeInvitaciones = null; }

@@ -120,9 +120,6 @@ select option {
                     <button data-demo-allow onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
 <div class="flex items-center gap-3">
-    <button id="btnModoDemo" data-demo-allow onclick="toggleModoDemoLocal()" class="hidden px-3 py-2 rounded-xl border border-violet-800/70 bg-violet-950/50 text-violet-300 hover:bg-violet-900/60 text-xs font-semibold transition">
-        <i class="fa-solid fa-flask mr-1"></i> <span class="hidden sm:inline">Cargar demo local</span>
-    </button>
     <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
         <i class="fa-solid fa-plus"></i> Nuevo Gasto
     </button>
@@ -174,6 +171,15 @@ select option {
             <div class="mb-5">
                 <h2 class="text-xl font-bold text-white">Ajustes</h2>
                 <p class="mt-1 text-sm text-slate-400">Administrá categorías, subcategorías y el acceso al grupo.</p>
+            </div>
+            <div class="mb-5 rounded-2xl border border-violet-900/60 bg-violet-950/20 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-bold text-violet-200"><i class="fa-solid fa-flask mr-2"></i>Datos de demostración</h3>
+                    <p class="mt-1 text-xs text-slate-400">Cargá datos ficticios localmente para recorrer los gráficos y las distintas secciones. No se guarda nada en Firebase.</p>
+                </div>
+                <button id="btnModoDemo" data-demo-allow onclick="toggleModoDemoLocal()" class="hidden shrink-0 px-4 py-2 rounded-xl border border-violet-800/70 bg-violet-950/50 text-violet-300 hover:bg-violet-900/60 text-xs font-semibold transition">
+                    <i class="fa-solid fa-flask mr-1"></i> Cargar demo local
+                </button>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-5">
                 <aside class="card-bg rounded-2xl p-3 h-fit space-y-1">
