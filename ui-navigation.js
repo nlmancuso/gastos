@@ -46,6 +46,10 @@
             const resumenHormiga = document.getElementById('resumenGastoHormiga');
             const titulo = document.getElementById('tituloFormGastoMensual');
             const ayuda = document.getElementById('ayudaTipoGastoUnificado');
+            document.getElementById('medioPagoGrupoContainer').classList.toggle('hidden', esHormiga);
+            document.getElementById('medioPagoHormigaContainer').classList.toggle('hidden', !esHormiga);
+            document.getElementById('gastoMensualMedioPago').disabled = esHormiga || !window.esUsuarioEditor();
+            document.getElementById('hormigaMedioPago').disabled = !esHormiga;
             const botonGuardar = document.getElementById('btnGuardarGastoUnificado');
             const botonCategorias = document.getElementById('btnCategoriasTipoGasto');
 

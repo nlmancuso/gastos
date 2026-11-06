@@ -422,9 +422,11 @@ select option {
                         <p id="ayudaTipoGastoUnificado" class="mt-1 text-xs text-slate-400">Este gasto será visible para los integrantes del grupo.</p>
                     </div>
                     <div class="flex w-full sm:w-auto items-end gap-2">
-                        <div class="min-w-0 flex-1 sm:w-64 sm:flex-none">
-                        <label for="tipoGastoUnificado" class="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de gasto</label>
-                        <select id="tipoGastoUnificado" onchange="cambiarTipoGastoUnificado(this.value)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                        <div class="min-w-0 flex-1 sm:w-64 sm:flex-none rounded-xl border-2 border-amber-400/70 bg-amber-950/30 p-2 shadow-lg shadow-amber-950/30">
+                        <label for="tipoGastoUnificado" class="mb-1 flex items-center justify-between gap-2 text-xs font-extrabold uppercase text-amber-300">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-right-arrow-left"></i> Tipo de gasto</span>
+                        </label>
+                        <select id="tipoGastoUnificado" onchange="cambiarTipoGastoUnificado(this.value)" class="w-full rounded-lg border border-amber-300/70 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400/60">
                             <option value="grupo">Grupo (compartido)</option>
                             <option value="hormiga">Hormiga (privado)</option>
                         </select>
@@ -453,16 +455,6 @@ select option {
                             <label for="gastoMensualCategoria" class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría</label>
                             <select id="gastoMensualCategoria" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white"></select>
                         </div>
-                        <div>
-                            <label for="gastoMensualMedioPago" class="block text-xs font-bold text-slate-400 uppercase mb-1">Medio de pago</label>
-                            <select id="gastoMensualMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
-                                <option value="Mercado Pago">Mercado Pago</option>
-                                <option value="Efectivo">Efectivo</option>
-                                <option value="Débito">Débito</option>
-                                <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
-                                <option value="Otros">Otros</option>
-                            </select>
-                        </div>
                     </fieldset>
 
                     <fieldset id="gastoHormigaFields" disabled class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 border-0 p-0 m-0 min-w-0">
@@ -482,7 +474,20 @@ select option {
                             <label for="hormigaCategoriaSelect" class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría</label>
                             <select id="hormigaCategoriaSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white"></select>
                         </div>
-                        <div>
+                    </fieldset>
+                    <p id="gastoMensualSoloLectura" class="hidden text-xs text-slate-400">Tenés permiso de solo lectura en este grupo. Podés seguir cargando tus gastos hormiga privados.</p>
+                    <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+                        <div id="medioPagoGrupoContainer" class="w-full sm:w-64">
+                            <label for="gastoMensualMedioPago" class="block text-xs font-bold text-slate-400 uppercase mb-1">Medio de pago</label>
+                            <select id="gastoMensualMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                                <option value="Mercado Pago">Mercado Pago</option>
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Débito">Débito</option>
+                                <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                        <div id="medioPagoHormigaContainer" class="hidden w-full sm:w-64">
                             <label for="hormigaMedioPago" class="block text-xs font-bold text-slate-400 uppercase mb-1">Medio de pago</label>
                             <select id="hormigaMedioPago" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white">
                                 <option value="Mercado Pago" selected>Mercado Pago</option>
@@ -492,11 +497,10 @@ select option {
                                 <option value="Otros">Otros</option>
                             </select>
                         </div>
-                    </fieldset>
-                    <p id="gastoMensualSoloLectura" class="hidden text-xs text-slate-400">Tenés permiso de solo lectura en este grupo. Podés seguir cargando tus gastos hormiga privados.</p>
-                    <button id="btnGuardarGastoUnificado" type="submit" class="w-full sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-floppy-disk"></i> Guardar gasto de Grupo
-                    </button>
+                        <button id="btnGuardarGastoUnificado" type="submit" class="w-full sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> Guardar gasto de Grupo
+                        </button>
+                    </div>
                 </form>
             </div>
 
