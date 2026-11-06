@@ -481,7 +481,7 @@
             const mesActual = window.appState.currentMonth || '2026-10';
             const [añoActual, numeroMesActual] = mesActual.split('-').map(Number);
             const meses = [];
-            for (let desplazamiento = 5; desplazamiento >= 0; desplazamiento--) {
+            for (let desplazamiento = 11; desplazamiento >= 0; desplazamiento--) {
                 const fecha = new Date(añoActual, numeroMesActual - 1 - desplazamiento, 1);
                 const clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
                 meses.push({ clave, etiqueta: window.formatMonthDisplay(clave) });

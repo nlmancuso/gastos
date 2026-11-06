@@ -115,11 +115,14 @@ select option {
 </select>
 </div>
                 <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
-                    <button onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button data-demo-allow onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-left"></i></button>
                     <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center">Cargando...</span>
-                    <button onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button data-demo-allow onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
 <div class="flex items-center gap-3">
+    <button id="btnModoDemo" data-demo-allow onclick="toggleModoDemoLocal()" class="hidden px-3 py-2 rounded-xl border border-violet-800/70 bg-violet-950/50 text-violet-300 hover:bg-violet-900/60 text-xs font-semibold transition">
+        <i class="fa-solid fa-flask mr-1"></i> <span class="hidden sm:inline">Cargar demo local</span>
+    </button>
     <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
         <i class="fa-solid fa-plus"></i> Nuevo Gasto
     </button>
@@ -148,17 +151,22 @@ select option {
         <i class="fa-solid fa-right-from-bracket text-sm"></i>
     </button>
     
-    <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronizado
+    <div id="estadoSincronizacion" class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
+        <span id="indicadorSincronizacion" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="textoSincronizacion">Sincronizado</span>
     </div>
 </div>
             </div>
             <!-- NAVEGACIÓN INSTANTÁNEA (SPA) -->
             <div class="flex border-b border-slate-800 overflow-x-auto">
-                <button onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</button>
-                <button onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</button>
-                <button onclick="switchTab('saldos')" id="btnTabSaldos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</button>
-                <button onclick="switchTab('gastos')" id="btnTabGastos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-receipt text-sky-400"></i> Gastos del Mes y Hormiga</button>
+                <button data-demo-allow onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</button>
+                <button data-demo-allow onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</button>
+                <button data-demo-allow onclick="switchTab('saldos')" id="btnTabSaldos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</button>
+                <button data-demo-allow onclick="switchTab('gastos')" id="btnTabGastos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-receipt text-sky-400"></i> Gastos del Mes y Hormiga</button>
+            </div>
+            <div id="bannerModoDemo" class="hidden mt-3 rounded-xl border border-violet-800/70 bg-violet-950/50 px-4 py-3 text-xs text-violet-200 flex items-center justify-between gap-3">
+                <span><i class="fa-solid fa-flask mr-2"></i><strong>Modo demo local:</strong> datos ficticios de dos perfiles, 12 meses de historial y gastos recurrentes proyectados 3 meses con aumentos de ejemplo. No se guarda nada en Firebase.</span>
+                <button data-demo-allow onclick="toggleModoDemoLocal()" class="shrink-0 rounded-lg bg-violet-800/70 px-3 py-1.5 font-bold hover:bg-violet-700">Salir de demo</button>
             </div>
         </header>
 
@@ -565,7 +573,7 @@ select option {
                 <div class="card-bg p-6 rounded-2xl space-y-4">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-column text-sky-400"></i> Evolución Gasto Mensual (Últimos 6 Meses)
+                            <i class="fa-solid fa-chart-column text-sky-400"></i> Evolución Gasto Mensual (Últimos 12 Meses)
                         </h3>
                         <button onclick="expandirGraficoModal('chartGastoMensualEvolucion', 'Evolución Gasto Mensual')" class="text-slate-400 hover:text-sky-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
                             <i class="fa-solid fa-expand text-xs"></i>
@@ -578,7 +586,7 @@ select option {
             <div class="card-bg p-6 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-sky-400"></i> Evolución por Categoría (Últimos 6 Meses)
+                        <i class="fa-solid fa-chart-line text-sky-400"></i> Evolución por Categoría (Últimos 12 Meses)
                     </h3>
                     <div class="flex items-center gap-3">
                         <div class="flex items-center gap-2 text-xs font-semibold">
@@ -599,7 +607,7 @@ select option {
             <div class="card-bg p-6 rounded-2xl space-y-4">
                 <div class="flex items-center justify-between">
                     <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-column text-sky-400"></i> Gasto mensual por usuario (Últimos 6 meses)
+                        <i class="fa-solid fa-chart-column text-sky-400"></i> Gasto mensual por usuario (Últimos 12 meses)
                     </h3>
                     <button onclick="expandirGraficoModal('chartGastoMensualUsuarios', 'Gasto mensual por usuario')" class="text-slate-400 hover:text-sky-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
                         <i class="fa-solid fa-expand text-xs"></i>
@@ -672,7 +680,7 @@ select option {
                 <div class="card-bg p-6 rounded-2xl space-y-4">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 6 Meses)
+                            <i class="fa-solid fa-chart-column text-amber-400"></i> Evolución Gasto Hormiga (Últimos 12 Meses)
                         </h3>
                         <button onclick="expandirGraficoModal('chartHormigaEvolucion', 'Evolución Gasto Hormiga')" class="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-900 rounded-lg border border-slate-800 transition" title="Ver en grande">
                             <i class="fa-solid fa-expand text-xs"></i>
@@ -685,7 +693,7 @@ select option {
             <div class="card-bg p-6 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 6 Meses)
+                        <i class="fa-solid fa-chart-line text-amber-400"></i> Evolución por Categoría (Últimos 12 Meses)
                     </h3>
                     <div class="flex items-center gap-3">
                         <div class="flex items-center gap-2 text-xs font-semibold">
@@ -1124,5 +1132,6 @@ select option {
     <script src="ui-mensual.js"></script>
     <script src="ui-hormiga.js"></script>
     <script src="ui-navigation.js"></script>
+    <script src="demo-data.js"></script>
 </body>
 </html>

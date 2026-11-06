@@ -454,6 +454,7 @@ window.showLogin = function() {
     if (login) login.classList.remove('hidden');
     if (loading) loading.classList.add('hidden');
     if (appContent) appContent.classList.add('hidden');
+    window.actualizarVisibilidadDemoLocal?.();
 };
 
 window.showApp = function() {
@@ -463,6 +464,7 @@ window.showApp = function() {
     if (login) login.classList.add('hidden');
     if (loading) loading.classList.add('hidden');
     if (appContent) appContent.classList.remove('hidden');
+    window.actualizarVisibilidadDemoLocal?.();
 };
 
 window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
@@ -698,7 +700,7 @@ async function verificarDesdeURL() {
 verificarDesdeURL();
 
 window.cambiarVistaSeleccionada = async function(vistaId) {
-    if (!vistaId) return;
+    if (!vistaId || window.demoModeActive) return;
     
     localStorage.setItem("ultima_vista_id", vistaId);
     window.showLoading();
@@ -712,6 +714,7 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
     if (unsubscribeSnapshot) unsubscribeSnapshot();
 
     unsubscribeSnapshot = onSnapshot(window.docRef, async (docSnap) => {
+        if (window.demoModeActive) return;
         if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.appState) {
@@ -786,6 +789,7 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeHormiga) unsubscribeHormiga();
 
         unsubscribeSnapshot = onSnapshot(docRef, async (docSnap) => {
+            if (window.demoModeActive) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.appState) {
@@ -819,6 +823,7 @@ onAuthStateChanged(auth, async (user) => {
         });
 
         unsubscribeHormiga = onSnapshot(window.docHormigaRef, async (docSnap) => {
+            if (window.demoModeActive) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.hormigaState) {
@@ -1208,6 +1213,7 @@ window.salirDelGrupoActual = async function() {
 };
 
 window.saveDataToCloud = async function() {
+    if (window.demoModeActive) return;
     try {
         if (!window.docRef) return;
         const appStateToSave = JSON.parse(JSON.stringify(window.appState));
@@ -1222,6 +1228,7 @@ window.saveDataToCloud = async function() {
 };
 
 window.guardarMontoPagadoPlanilla = async function(key, monto, esBloque) {
+    if (window.demoModeActive) return;
     if (!window.docRef) throw new Error("No hay un grupo activo para guardar el monto pagado.");
     if (!window.esUsuarioEditor()) throw new Error("No tenés permiso para modificar los gastos.");
     const campo = esBloque ? "excepcionesMontoPagadoBloque" : "excepcionesMontoPagado";
@@ -1237,6 +1244,7 @@ window.guardarMontoPagadoPlanilla = async function(key, monto, esBloque) {
 };
 
 window.agregarGastoMensualCompartido = async function(gasto) {
+    if (window.demoModeActive) return;
     if (!window.docRef) throw new Error("No hay un grupo activo para guardar el gasto mensual.");
     await updateDoc(window.docRef, {
         "appState.gastosMensuales": arrayUnion(gasto)
@@ -1249,6 +1257,7 @@ window.agregarGastoMensualCompartido = async function(gasto) {
 };
 
 window.eliminarGastoMensualCompartido = async function(gastoId) {
+    if (window.demoModeActive) return;
     if (!window.docRef) throw new Error("No hay un grupo activo para eliminar el gasto mensual.");
     if (!window.esUsuarioEditor()) throw new Error("No tenés permiso para eliminar gastos mensuales.");
     const gasto = (window.appState.gastosMensuales || []).find(item => item.id === gastoId);
@@ -1260,6 +1269,7 @@ window.eliminarGastoMensualCompartido = async function(gastoId) {
 };
 
 window.guardarCategoriasGastoMensual = async function(categorias, gastos) {
+    if (window.demoModeActive) return;
     if (!window.docRef) throw new Error("No hay un grupo activo para guardar las categorías.");
     if (!window.esUsuarioEditor()) throw new Error("No tenés permiso para modificar las categorías.");
     const gastosAnteriores = window.appState.gastosMensuales || [];
@@ -1291,6 +1301,7 @@ window.guardarCategoriasGastoMensual = async function(categorias, gastos) {
 };
 
 window.saveHormigaDataToCloud = async function() {
+    if (window.demoModeActive) return;
     const user = auth.currentUser;
     if (!user) throw new Error("No hay una cuenta activa para guardar los gastos hormiga.");
 
@@ -1335,7 +1346,7 @@ window.navigateMonth = function(direction) {
     month += direction;
     if (month > 12) { month = 1; year++; } if (month < 1) { month = 12; year--; }
     window.appState.currentMonth = `${year}-${String(month).padStart(2, '0')}`;
-    if (window.currentGrupo) {
+    if (window.currentGrupo && !window.demoModeActive) {
         localStorage.setItem(`currentMonth_${window.currentGrupo}`, window.appState.currentMonth);
     }
     triggerPageRenders();
@@ -1344,7 +1355,7 @@ window.navigateMonth = function(direction) {
 window.persistCurrentMonthSelection = function(month) {
     if (!month) return;
     window.appState.currentMonth = month;
-    if (window.currentGrupo) {
+    if (window.currentGrupo && !window.demoModeActive) {
         localStorage.setItem(`currentMonth_${window.currentGrupo}`, month);
     }
 };

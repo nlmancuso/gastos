@@ -133,7 +133,7 @@
 
             let [cYear, cMonth] = currentMonth.split('-').map(Number); let monthsLabels = [], totalsByMonth = [];
             const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-            for (let i = 5; i >= 0; i--) {
+            for (let i = 11; i >= 0; i--) {
                 let m = cMonth - i, y = cYear; while (m < 1) { m += 12; y--; }
                 monthsLabels.push(`${monthNames[m - 1]} ${y}`); let totalM = 0;
                 allHormigaGastos.forEach(g => { if (g.fecha && g.fecha.slice(0, 7) === `${y}-${String(m).padStart(2, '0')}`) totalM += parseFloat(g.monto) || 0; });
@@ -147,7 +147,7 @@
                 .filter(cat => filtrosHormigaActivos.length === 0 || filtrosHormigaActivos.includes(cat.nombre))
                 .map(cat => {
                     let dataPorMes = []; let [currY2, currM2] = currentMonth.split('-').map(Number);
-                    for (let i = 5; i >= 0; i--) {
+                    for (let i = 11; i >= 0; i--) {
                         let m = currM2 - i, y = currY2; while (m < 1) { m += 12; y--; }
                         let ymStr = `${y}-${String(m).padStart(2, '0')}`; let sumaCatMes = 0;
                         allHormigaGastos.forEach(g => { if (g.fecha && g.fecha.slice(0, 7) === ymStr && g.categoria === cat.nombre) sumaCatMes += parseFloat(g.monto) || 0; });
