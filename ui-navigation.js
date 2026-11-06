@@ -93,4 +93,3 @@
                 hormiga: renderHormigaApp
             });
         }
-
