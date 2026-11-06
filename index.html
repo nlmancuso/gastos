@@ -369,10 +369,10 @@ select option {
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-building-columns text-emerald-400"></i> Gestión de Cuentas y Saldos
                     </h3>
-                    <p class="text-xs text-slate-400 mt-1">Cargá tus saldos en Banco y Mercado Pago. Asigná qué tarjetas/categorías e ítems fijos específicos se debitan de cada cuenta.</p>
+                    <p class="text-xs text-slate-400 mt-1">Registrá tus cuentas y las entidades asociadas, con saldo independiente para cada una. Asigná qué tarjetas y gastos fijos se descuentan de cada cuenta.</p>
                 </div>
                 <button onclick="openModalCuenta()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 shrink-0">
-                    <i class="fa-solid fa-plus"></i> Nueva Cuenta / Banco
+                    <i class="fa-solid fa-plus"></i> Nueva Cuenta
                 </button>
             </div>
             <div id="containerResumenDisponibles" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
@@ -862,24 +862,26 @@ select option {
     <div id="modalCuenta" class="fixed inset-0 bg-slate-950/80 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="card-bg rounded-2xl shadow-2xl max-w-lg w-full p-6 text-white border border-slate-700 relative flex flex-col max-h-[90vh]">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-                <h3 id="modalCuentaTitulo" class="text-lg font-bold">Configurar Banco / Cuenta</h3>
+                <h3 id="modalCuentaTitulo" class="text-lg font-bold">Nueva Cuenta</h3>
                 <button type="button" onclick="closeModal('modalCuenta')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form onsubmit="handleSaveCuenta(event)" class="space-y-4 overflow-y-auto pr-1">
                 <input type="hidden" id="cuentaId">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">NOMBRE DEL BANCO / CUENTA</label>
-                    <input type="text" id="cuentaNombre" required placeholder="Ej: Banco Ciudad, Santander..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">NOMBRE DE LA CUENTA</label>
+                    <input type="text" id="cuentaNombre" required placeholder="Ej: Cuenta principal, uso diario..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none">
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO BANCO ($)</label>
-                        <input type="number" step="0.01" id="cuentaBcoSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase">Entidades y saldos</label>
+                            <p class="text-[11px] text-slate-500 mt-1">Agregá Banco, Mercado Pago u otra entidad; cada una tiene su propio saldo mensual.</p>
+                        </div>
+                        <button type="button" onclick="agregarEntidadCuenta()" class="shrink-0 rounded-lg border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-900/60">
+                            <i class="fa-solid fa-plus mr-1"></i> Agregar entidad
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">SALDO MP ($)</label>
-                        <input type="number" step="0.01" id="cuentaMpSaldo" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                    </div>
+                    <div id="containerEntidadesCuenta" class="space-y-2"></div>
                 </div>
                 <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
                     <div>
