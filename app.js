@@ -1,6 +1,55 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, onSnapshot, collection, addDoc, query, where, updateDoc, arrayRemove, arrayUnion, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc as firestoreSetDoc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, onSnapshot, collection, addDoc as firestoreAddDoc, query, where, updateDoc as firestoreUpdateDoc, arrayRemove, arrayUnion, runTransaction as firestoreRunTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { renderActiveView } from "./view-renderer.mjs";
+
+let pendingDatabaseOperations = 0;
+let databaseActivityTimer = null;
+let databaseActivityIndicator = null;
+
+function updateDatabaseActivityIndicator() {
+    if (pendingDatabaseOperations === 0) {
+        if (databaseActivityTimer) {
+            clearTimeout(databaseActivityTimer);
+            databaseActivityTimer = null;
+        }
+        databaseActivityIndicator?.remove();
+        databaseActivityIndicator = null;
+        return;
+    }
+
+    if (!databaseActivityIndicator && !databaseActivityTimer) {
+        databaseActivityTimer = setTimeout(() => {
+            databaseActivityTimer = null;
+            if (pendingDatabaseOperations === 0) return;
+            databaseActivityIndicator = document.createElement('div');
+            databaseActivityIndicator.id = 'databaseActivityIndicator';
+            databaseActivityIndicator.className = 'fixed top-3 right-3 z-[100] flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/95 px-3 py-2 text-xs font-semibold text-slate-200 shadow-xl';
+            databaseActivityIndicator.setAttribute('role', 'status');
+            databaseActivityIndicator.setAttribute('aria-live', 'polite');
+            databaseActivityIndicator.innerHTML = '<span class="h-4 w-4 animate-spin rounded-full border-2 border-sky-400/30 border-t-sky-400"></span><span>Consultando o guardando...</span>';
+            document.body.appendChild(databaseActivityIndicator);
+        }, 150);
+    }
+}
+
+async function trackDatabaseOperation(operation) {
+    pendingDatabaseOperations += 1;
+    updateDatabaseActivityIndicator();
+    try {
+        return await operation();
+    } finally {
+        pendingDatabaseOperations -= 1;
+        updateDatabaseActivityIndicator();
+    }
+}
+
+const setDoc = (...args) => trackDatabaseOperation(() => firestoreSetDoc(...args));
+const getDoc = (...args) => trackDatabaseOperation(() => firestoreGetDoc(...args));
+const getDocs = (...args) => trackDatabaseOperation(() => firestoreGetDocs(...args));
+const addDoc = (...args) => trackDatabaseOperation(() => firestoreAddDoc(...args));
+const updateDoc = (...args) => trackDatabaseOperation(() => firestoreUpdateDoc(...args));
+const runTransaction = (...args) => trackDatabaseOperation(() => firestoreRunTransaction(...args));
 
 const firebaseConfig = {
     apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
@@ -17,6 +66,7 @@ const auth = getAuth(app);
 
 window.db = db;
 window.auth = auth;
+window.renderActiveView = renderActiveView;
 
 let unsubscribeSnapshot = null;
 let unsubscribeHormiga = null;
@@ -634,6 +684,7 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
 
     window.currentGrupo = targetDocId;
     window.docRef = doc(db, "app_data", targetDocId);
+    const claveMesLocal = `currentMonth_${targetDocId}`;
 
     if (unsubscribeSnapshot) unsubscribeSnapshot();
 
@@ -641,7 +692,13 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
         if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.appState) {
-                window.appState = { ...window.appState, ...data.appState };
+                const mesGuardadoLocal = localStorage.getItem(claveMesLocal);
+                window.appState = {
+                    ...window.appState,
+                    ...data.appState,
+                    currentMonth: mesGuardadoLocal || data.appState.currentMonth || defaultLocalMonth
+                };
+                localStorage.setItem(claveMesLocal, window.appState.currentMonth);
             }
         } else {
             if (targetDocId.startsWith("personal_")) {
@@ -708,7 +765,14 @@ onAuthStateChanged(auth, async (user) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.appState) {
-                    window.appState = { ...window.appState, ...data.appState };
+                    const claveMesLocal = `currentMonth_${targetDocId}`;
+                    const mesGuardadoLocal = localStorage.getItem(claveMesLocal);
+                    window.appState = {
+                        ...window.appState,
+                        ...data.appState,
+                        currentMonth: mesGuardadoLocal || data.appState.currentMonth || currentLocalMonthStr
+                    };
+                    localStorage.setItem(claveMesLocal, window.appState.currentMonth);
                     if (!window.appState.subcategorias) window.appState.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
                     if (!window.appState.aumentosIndividuales) window.appState.aumentosIndividuales = {};
                     if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
@@ -730,7 +794,7 @@ onAuthStateChanged(auth, async (user) => {
             window.showApp();
         });
 
-        unsubscribeHormiga = onSnapshot(window.docHormigaRef, (docSnap) => {
+        unsubscribeHormiga = onSnapshot(window.docHormigaRef, async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.hormigaState) {
@@ -754,7 +818,12 @@ onAuthStateChanged(auth, async (user) => {
                     filtrosCategorias: [],
                     filtrosHormigaCatGrafico: []
                 };
-                window.saveHormigaDataToCloud();
+                try {
+                    await window.saveHormigaDataToCloud();
+                } catch (error) {
+                    console.error("Error inicializando los gastos hormiga:", error);
+                    window.mostrarNotificacion("No se pudieron inicializar los gastos hormiga", "Revisá tu conexión e intentá nuevamente.", "error");
+                }
             }
             triggerPageRenders();
         });
@@ -944,7 +1013,10 @@ window.saveDataToCloud = async function() {
         delete appStateToSave.excepcionesMontoPagado;
         delete appStateToSave.excepcionesMontoPagadoBloque;
         await setDoc(window.docRef, { appState: appStateToSave }, { merge: true });
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error("Error guardando los datos:", e);
+        window.mostrarNotificacion("No se pudieron guardar los cambios", "Revisá tu conexión e intentá nuevamente.", "error");
+    }
 };
 
 window.guardarMontoPagadoPlanilla = async function(key, monto, esBloque) {
@@ -1017,10 +1089,8 @@ window.guardarCategoriasGastoMensual = async function(categorias, gastos) {
 };
 
 window.saveHormigaDataToCloud = async function() {
-    try {
-        if (!window.docHormigaRef) return;
-        await setDoc(window.docHormigaRef, { hormigaState: JSON.parse(JSON.stringify(window.hormigaState)) });
-    } catch (e) { console.error("Error guardando hormiga:", e); }
+    if (!window.docHormigaRef) throw new Error("No hay una cuenta activa para guardar los gastos hormiga.");
+    await setDoc(window.docHormigaRef, { hormigaState: JSON.parse(JSON.stringify(window.hormigaState)) });
 };
 
 function actualizarVisibilidadBotonesAdmin() {
@@ -1056,10 +1126,6 @@ function actualizarVisibilidadBotonesAdmin() {
 function triggerPageRenders() {
     actualizarVisibilidadBotonesAdmin();
     if (typeof renderApp === 'function') renderApp();
-    if (typeof renderCharts === 'function') renderCharts();
-    if (typeof renderSaldosApp === 'function') renderSaldosApp();
-    if (typeof renderGastoMensualApp === 'function') renderGastoMensualApp();
-    if (typeof renderHormigaApp === 'function') renderHormigaApp();
 }
 
 window.navigateMonth = function(direction) {
@@ -1067,7 +1133,18 @@ window.navigateMonth = function(direction) {
     month += direction;
     if (month > 12) { month = 1; year++; } if (month < 1) { month = 12; year--; }
     window.appState.currentMonth = `${year}-${String(month).padStart(2, '0')}`;
+    if (window.currentGrupo) {
+        localStorage.setItem(`currentMonth_${window.currentGrupo}`, window.appState.currentMonth);
+    }
     triggerPageRenders();
+};
+
+window.persistCurrentMonthSelection = function(month) {
+    if (!month) return;
+    window.appState.currentMonth = month;
+    if (window.currentGrupo) {
+        localStorage.setItem(`currentMonth_${window.currentGrupo}`, month);
+    }
 };
 
 window.formatMonthDisplay = function(ymStr) {
@@ -1360,9 +1437,7 @@ window.ejecutarEliminacionGasto = function() {
 };
 
 window.openModalGestionGrupo = function() {
-    renderMiembrosGrupo();
-    const modal = document.getElementById('modalGestionGrupo');
-    if (modal) modal.classList.remove('hidden');
+    window.openSettingsSection('grupo');
 };
 
 function renderMiembrosGrupo() {
@@ -1386,7 +1461,6 @@ function renderMiembrosGrupo() {
             invitacionesPendientes: []
         };
     }
-
     const grupoInfo = window.appState.grupoInfo;
     const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || grupoInfo.adminUid === userUid;
 
@@ -1443,6 +1517,7 @@ function renderMiembrosGrupo() {
         containerPendientes.classList.add('hidden');
     }
 }
+window.renderMiembrosGrupoSettings = renderMiembrosGrupo;
 
 window.handleInvitarMiembro = async function(e) {
     if (e) e.preventDefault();
