@@ -218,9 +218,11 @@
 
     window.actualizarVisibilidadDemoLocal = function() {
         const boton = document.getElementById('btnModoDemo');
-        if (!boton) return;
         const email = window.auth?.currentUser?.email?.trim().toLowerCase();
-        boton.classList.toggle('hidden', email !== 'nicolaslmancuso@gmail.com' || window.demoModeActive);
+        const esAdmin = email === 'nicolaslmancuso@gmail.com' && !window.demoModeActive;
+        const seccion = document.getElementById('seccionDatosDemo');
+        seccion?.classList.toggle('hidden', !esAdmin);
+        boton?.classList.toggle('hidden', !esAdmin);
     };
 
     window.toggleModoDemoLocal = function() {
