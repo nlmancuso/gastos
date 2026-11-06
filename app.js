@@ -71,7 +71,10 @@ window.renderActiveView = renderActiveView;
 let unsubscribeSnapshot = null;
 let unsubscribeHormiga = null;
 let unsubscribeInvitaciones = null;
+let unsubscribeNotificacionesOcultas = null;
 let invitacionesUsuario = [];
+let invitacionesOcultas = new Set();
+let invitacionesSeleccionadas = new Set();
 let emailUsuarioInvitaciones = '';
 
 function escapeHtml(value) {
@@ -836,6 +839,7 @@ onAuthStateChanged(auth, async (user) => {
         });
 
         escucharInvitacionesUsuario(user.email);
+        escucharNotificacionesOcultas(user.uid);
 
         const userName = user.email ? user.email.split('@')[0] : 'Usuario';
         const grupoDisplay = document.getElementById('grupoStatus');
@@ -845,14 +849,38 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
         if (unsubscribeHormiga) { unsubscribeHormiga(); unsubscribeHormiga = null; }
         if (unsubscribeInvitaciones) { unsubscribeInvitaciones(); unsubscribeInvitaciones = null; }
+        if (unsubscribeNotificacionesOcultas) { unsubscribeNotificacionesOcultas(); unsubscribeNotificacionesOcultas = null; }
         window.docHormigaRef = null;
         window.hormigaState = crearEstadoHormigaInicial();
         invitacionesUsuario = [];
+        invitacionesOcultas = new Set();
+        invitacionesSeleccionadas = new Set();
         emailUsuarioInvitaciones = '';
         window.renderBandejaNotificaciones([]);
         window.renderHistorialNotificaciones();
     }
 });
+
+function escucharNotificacionesOcultas(uid) {
+    if (unsubscribeNotificacionesOcultas) unsubscribeNotificacionesOcultas();
+    invitacionesOcultas = new Set();
+    invitacionesSeleccionadas = new Set();
+
+    const preferenciasRef = doc(db, "notificaciones_usuario", uid);
+    unsubscribeNotificacionesOcultas = onSnapshot(preferenciasRef, (snapshot) => {
+        const idsOcultos = snapshot.exists() ? snapshot.data().invitacionesOcultas : [];
+        invitacionesOcultas = new Set(Array.isArray(idsOcultos) ? idsOcultos : []);
+        invitacionesSeleccionadas = new Set(
+            [...invitacionesSeleccionadas].filter(id =>
+                !invitacionesOcultas.has(id) && invitacionesUsuario.some(inv => inv.id === id)
+            )
+        );
+        window.renderHistorialNotificaciones();
+    }, (error) => {
+        console.error("Error al cargar las notificaciones ocultas:", error);
+        window.mostrarNotificacion("No se pudieron cargar tus preferencias", "Revisá tu conexión e intentá nuevamente.", "error");
+    });
+}
 
 function escucharInvitacionesUsuario(userEmail) {
     if (unsubscribeInvitaciones) unsubscribeInvitaciones();
@@ -974,7 +1002,10 @@ window.renderHistorialNotificaciones = function() {
     if (!lista) return;
 
     const historial = invitacionesUsuario
-        .filter(inv => ['PENDIENTE', 'ACEPTADO', 'RECHAZADO'].includes(inv.estado))
+        .filter(inv =>
+            ['PENDIENTE', 'ACEPTADO', 'RECHAZADO'].includes(inv.estado) &&
+            !invitacionesOcultas.has(inv.id)
+        )
         .sort((a, b) => (parseInvitationDate(b.fecha)?.getTime() || 0) - (parseInvitationDate(a.fecha)?.getTime() || 0));
 
     if (historial.length === 0) {
@@ -982,17 +1013,32 @@ window.renderHistorialNotificaciones = function() {
         return;
     }
 
+    const todasSeleccionadas = historial.every(inv => invitacionesSeleccionadas.has(inv.id));
+    const algunaSeleccionada = historial.some(inv => invitacionesSeleccionadas.has(inv.id));
     const estados = {
         PENDIENTE: { texto: 'Pendiente', estilo: 'text-amber-400 bg-amber-500/10' },
         ACEPTADO: { texto: 'Aceptada', estilo: 'text-emerald-400 bg-emerald-500/10' },
         RECHAZADO: { texto: 'Rechazada', estilo: 'text-slate-400 bg-slate-800' }
     };
 
-    lista.innerHTML = historial.map(inv => {
+    lista.innerHTML = `
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input type="checkbox" data-seleccionar-todas class="accent-emerald-500 h-4 w-4" ${todasSeleccionadas ? 'checked' : ''}>
+                Seleccionar todas
+            </label>
+            <button type="button" data-accion="borrar-seleccionadas" ${algunaSeleccionada ? '' : 'disabled'}
+                class="px-3 py-2 rounded-lg text-xs font-semibold ${algunaSeleccionada ? 'bg-rose-950/70 text-rose-300 hover:bg-rose-900' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+                <i class="fa-solid fa-trash-can mr-1"></i>Borrar seleccionadas
+            </button>
+        </div>
+        <p class="text-xs text-slate-500">Las invitaciones pendientes que borres del historial pueden seguir apareciendo en la campana hasta que las respondas.</p>
+        ${historial.map(inv => {
         const recibida = inv.esRecibida;
         const otraParte = escapeHtml(recibida ? inv.remitenteEmail : inv.destinatarioEmail);
         const grupoNombre = escapeHtml(inv.grupoNombre || 'Grupo');
         const rol = escapeHtml(inv.rol || 'sin rol');
+        const id = escapeHtml(inv.id);
         const estado = estados[inv.estado];
         const fecha = parseInvitationDate(inv.fecha);
         const fechaTexto = fecha
@@ -1011,19 +1057,76 @@ window.renderHistorialNotificaciones = function() {
         }
 
         return `
-            <article class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-slate-950/70 border border-slate-800 rounded-xl">
-                <div class="min-w-0">
+            <article class="flex items-start gap-3 p-4 bg-slate-950/70 border border-slate-800 rounded-xl">
+                <input type="checkbox" data-seleccionar-id="${id}" class="accent-emerald-500 h-4 w-4 mt-0.5 shrink-0" aria-label="Seleccionar notificación" ${invitacionesSeleccionadas.has(inv.id) ? 'checked' : ''}>
+                <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-slate-200">${descripcion}</p>
-                    <p class="mt-1 text-xs text-slate-400">
-                        ${recibida ? `De ${otraParte}` : 'Enviada por vos'} · Rol: ${rol}
-                    </p>
+                    <p class="mt-1 text-xs text-slate-400">${recibida ? `De ${otraParte}` : 'Enviada por vos'} · Rol: ${rol}</p>
                     <time class="mt-1 block text-[11px] text-slate-500">${fechaTexto}</time>
                 </div>
-                <span class="shrink-0 self-start sm:self-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${estado.estilo}">${estado.texto}</span>
+                <div class="flex shrink-0 flex-col items-end gap-3">
+                    <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${estado.estilo}">${estado.texto}</span>
+                    <button type="button" data-accion="borrar-una" data-id="${id}" class="text-slate-500 hover:text-rose-400" title="Borrar del historial" aria-label="Borrar del historial">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
             </article>
         `;
-    }).join('');
+    }).join('')}
+    `;
+
+    lista.onchange = (event) => {
+        const checkbox = event.target;
+        if (checkbox.matches('[data-seleccionar-todas]')) {
+            if (checkbox.checked) historial.forEach(inv => invitacionesSeleccionadas.add(inv.id));
+            else historial.forEach(inv => invitacionesSeleccionadas.delete(inv.id));
+        } else if (checkbox.matches('[data-seleccionar-id]')) {
+            if (checkbox.checked) invitacionesSeleccionadas.add(checkbox.dataset.seleccionarId);
+            else invitacionesSeleccionadas.delete(checkbox.dataset.seleccionarId);
+        } else {
+            return;
+        }
+        window.renderHistorialNotificaciones();
+    };
+
+    lista.onclick = (event) => {
+        const button = event.target.closest('button[data-accion]');
+        if (!button || button.disabled) return;
+
+        if (button.dataset.accion === 'borrar-una') {
+            ocultarInvitacionesDelHistorial([button.dataset.id]);
+        } else if (button.dataset.accion === 'borrar-seleccionadas') {
+            ocultarInvitacionesDelHistorial([...invitacionesSeleccionadas]);
+        }
+    };
 };
+
+async function ocultarInvitacionesDelHistorial(ids) {
+    const user = auth.currentUser;
+    const idsValidos = [...new Set(ids)].filter(id =>
+        invitacionesUsuario.some(inv => inv.id === id) && !invitacionesOcultas.has(id)
+    );
+    if (!user || idsValidos.length === 0) return;
+
+    const ocultasAntes = new Set(invitacionesOcultas);
+    idsValidos.forEach(id => {
+        invitacionesOcultas.add(id);
+        invitacionesSeleccionadas.delete(id);
+    });
+    window.renderHistorialNotificaciones();
+
+    try {
+        await setDoc(doc(db, "notificaciones_usuario", user.uid), {
+            invitacionesOcultas: arrayUnion(...idsValidos)
+        }, { merge: true });
+    } catch (error) {
+        console.error("Error al borrar notificaciones del historial:", error);
+        invitacionesOcultas = ocultasAntes;
+        idsValidos.forEach(id => invitacionesSeleccionadas.add(id));
+        window.renderHistorialNotificaciones();
+        window.mostrarNotificacion("No se pudieron borrar las notificaciones", "Revisá tu conexión e intentá nuevamente.", "error");
+    }
+}
 
 window.responderInvitacion = async function(invitacionId, grupoId, rol, nuevoEstado) {
     try {
@@ -1214,14 +1317,11 @@ function actualizarVisibilidadBotonesAdmin() {
     const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || !grupoInfo || (grupoInfo && grupoInfo.adminUid === userUid);
 
     const btnConfigCat = document.getElementById('btnConfigCat');
-    const btnGestionGrupo = document.getElementById('btnGestionGrupo');
 
     if (esAdmin) {
         if (btnConfigCat) { btnConfigCat.classList.remove('hidden'); btnConfigCat.style.display = 'inline-flex'; }
-        if (btnGestionGrupo) { btnGestionGrupo.classList.remove('hidden'); btnGestionGrupo.style.display = 'inline-flex'; }
     } else {
         if (btnConfigCat) { btnConfigCat.classList.add('hidden'); btnConfigCat.style.display = 'none'; }
-        if (btnGestionGrupo) { btnGestionGrupo.classList.add('hidden'); btnGestionGrupo.style.display = 'none'; }
     }
 }
 

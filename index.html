@@ -129,11 +129,6 @@ select option {
         <i class="fa-solid fa-gear text-sm"></i>
     </button>
     
-    <!-- BOTÓN GESTIÓN DE GRUPO -->
-    <button id="btnGestionGrupo" onclick="openSettingsSection('grupo')" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-emerald-400 transition" title="Gestión del Grupo Familiar">
-        <i class="fa-solid fa-users text-sm"></i>
-    </button>
-
     <!-- Botón de Notificaciones / Invitaciones -->
     <div class="relative">
         <button onclick="toggleBandejaNotificaciones()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl relative transition-colors" title="Invitaciones a grupos">
@@ -195,7 +190,7 @@ select option {
                     <div id="settingsSectionnotificaciones" class="hidden card-bg rounded-2xl p-6">
                         <div class="mb-5">
                             <h3 class="text-base font-bold text-white">Historial de invitaciones</h3>
-                            <p class="mt-2 text-sm text-slate-400">Consultá las invitaciones recibidas y enviadas. La campanita sigue indicando las invitaciones recibidas pendientes de respuesta.</p>
+                            <p class="mt-2 text-sm text-slate-400">Consultá y administrá las invitaciones recibidas y enviadas. Borrar una invitación la oculta solo de tu historial, sin afectar a la otra persona.</p>
                         </div>
                         <div id="listaHistorialNotificaciones" class="space-y-3" aria-live="polite">
                             <p class="text-sm text-slate-500 text-center py-8">Cargando historial...</p>
