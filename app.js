@@ -215,7 +215,7 @@ function aplicarRestriccionesInterfaz() {
                 display: none !important;
             }
             /* Deshabilitar selects (excepto selector de vistas), inputs, textareas y BLOQUEAR ORDENAMIENTO Y ARRASTRE DE FILAS */
-            #appContent select:not(#selectorVista), 
+            #appContent select:not(#selectorVista):not(#tipoGastoUnificado),
             #appContent input, 
             #appContent textarea, 
             #appContent [onclick*="sort"], 

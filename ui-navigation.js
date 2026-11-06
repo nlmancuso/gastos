@@ -46,8 +46,12 @@
             const resumenHormiga = document.getElementById('resumenGastoHormiga');
             const titulo = document.getElementById('tituloFormGastoMensual');
             const ayuda = document.getElementById('ayudaTipoGastoUnificado');
+            document.getElementById('categoriaGrupoContainer').classList.toggle('hidden', esHormiga);
+            document.getElementById('categoriaHormigaContainer').classList.toggle('hidden', !esHormiga);
             document.getElementById('medioPagoGrupoContainer').classList.toggle('hidden', esHormiga);
             document.getElementById('medioPagoHormigaContainer').classList.toggle('hidden', !esHormiga);
+            document.getElementById('gastoMensualCategoria').disabled = esHormiga || !window.esUsuarioEditor();
+            document.getElementById('hormigaCategoriaSelect').disabled = !esHormiga;
             document.getElementById('gastoMensualMedioPago').disabled = esHormiga || !window.esUsuarioEditor();
             document.getElementById('hormigaMedioPago').disabled = !esHormiga;
             const botonGuardar = document.getElementById('btnGuardarGastoUnificado');
@@ -69,8 +73,8 @@
                 ? 'Este gasto es privado y solo vos podés verlo, sin importar el espacio seleccionado.'
                 : 'Este gasto será visible para los integrantes del grupo.';
             botonGuardar.className = esHormiga
-                ? 'w-full sm:w-auto bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2'
-                : 'w-full sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2';
+                ? 'w-full sm:col-span-2 lg:col-span-1 sm:w-auto bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2'
+                : 'w-full sm:col-span-2 lg:col-span-1 sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2';
             botonGuardar.innerHTML = esHormiga
                 ? '<i class="fa-solid fa-cookie"></i> Guardar Gasto Hormiga'
                 : '<i class="fa-solid fa-floppy-disk"></i> Guardar gasto de Grupo';

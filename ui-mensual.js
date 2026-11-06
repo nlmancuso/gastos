@@ -321,12 +321,16 @@
             const mensajeLectura = document.getElementById('gastoMensualSoloLectura');
             const botonGuardar = document.getElementById('btnGuardarGastoUnificado');
             const tipoGasto = document.getElementById('tipoGastoUnificado')?.value || 'grupo';
+            const camposDisponibles = editor && tipoGasto === 'grupo';
             if (formulario) formulario.classList.remove('hidden');
             if (formularioCampos) {
-                const camposDisponibles = editor && tipoGasto === 'grupo';
                 formularioCampos.classList.toggle('hidden', !camposDisponibles);
                 formularioCampos.disabled = !camposDisponibles;
             }
+            document.getElementById('categoriaGrupoContainer').classList.toggle('hidden', !camposDisponibles);
+            document.getElementById('gastoMensualCategoria').disabled = !camposDisponibles;
+            document.getElementById('medioPagoGrupoContainer').classList.toggle('hidden', !camposDisponibles);
+            document.getElementById('gastoMensualMedioPago').disabled = !camposDisponibles;
             if (mensajeLectura) mensajeLectura.classList.toggle('hidden', editor || tipoGasto !== 'grupo');
             if (botonGuardar) botonGuardar.classList.toggle('hidden', !editor && tipoGasto === 'grupo');
             const botonCategorias = document.getElementById('btnCategoriasTipoGasto');
