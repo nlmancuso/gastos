@@ -71,6 +71,23 @@ window.renderActiveView = renderActiveView;
 let unsubscribeSnapshot = null;
 let unsubscribeHormiga = null;
 let unsubscribeInvitaciones = null;
+let invitacionesUsuario = [];
+let emailUsuarioInvitaciones = '';
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[character]);
+}
+
+function parseInvitationDate(value) {
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+}
 
 // Helpers globales para Modales Estéticos
 window.mostrarNotificacion = function(titulo, mensaje, tipo = 'info', callback = null) {
@@ -365,6 +382,17 @@ const categoriasHormigaDefault = [
     { nombre: "Varios", color: "#64748b" }
 ];
 
+function crearEstadoHormigaInicial() {
+    return {
+        gastos: [],
+        categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
+        sortColumn: 'fecha',
+        sortAscending: false,
+        filtrosCategorias: [],
+        filtrosHormigaCatGrafico: []
+    };
+}
+
 const dInit = new Date();
 const defaultLocalMonth = `${dInit.getFullYear()}-${String(dInit.getMonth() + 1).padStart(2, '0')}`;
 
@@ -396,15 +424,7 @@ if (auth.currentUser) {
 }
 
 window.appState = window.appState || JSON.parse(JSON.stringify(appStateLimpioBase));
-
-window.hormigaState = window.hormigaState || {
-    gastos: [],
-    categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
-    sortColumn: 'fecha',
-    sortAscending: false,
-    filtrosCategorias: [],
-    filtrosHormigaCatGrafico: []
-};
+window.hormigaState = window.hormigaState || crearEstadoHormigaInicial();
 
 window.filtrosTemporales = [];
 window.categoriasAbiertasMap = {};
@@ -757,6 +777,7 @@ onAuthStateChanged(auth, async (user) => {
         window.docRef = docRef;
         window.currentGrupo = targetDocId;
         window.docHormigaRef = doc(db, "app_data_hormiga", user.uid);
+        window.hormigaState = crearEstadoHormigaInicial();
 
         if (unsubscribeSnapshot) unsubscribeSnapshot();
         if (unsubscribeHormiga) unsubscribeHormiga();
@@ -798,26 +819,12 @@ onAuthStateChanged(auth, async (user) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.hormigaState) {
-                    window.hormigaState = { ...window.hormigaState, ...data.hormigaState };
+                    window.hormigaState = { ...crearEstadoHormigaInicial(), ...data.hormigaState };
                 } else {
-                    window.hormigaState = {
-                        gastos: [],
-                        categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
-                        sortColumn: 'fecha',
-                        sortAscending: false,
-                        filtrosCategorias: [],
-                        filtrosHormigaCatGrafico: []
-                    };
+                    window.hormigaState = crearEstadoHormigaInicial();
                 }
             } else {
-                window.hormigaState = {
-                    gastos: [],
-                    categorias: JSON.parse(JSON.stringify(categoriasHormigaDefault)),
-                    sortColumn: 'fecha',
-                    sortAscending: false,
-                    filtrosCategorias: [],
-                    filtrosHormigaCatGrafico: []
-                };
+                window.hormigaState = crearEstadoHormigaInicial();
                 try {
                     await window.saveHormigaDataToCloud();
                 } catch (error) {
@@ -838,6 +845,12 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
         if (unsubscribeHormiga) { unsubscribeHormiga(); unsubscribeHormiga = null; }
         if (unsubscribeInvitaciones) { unsubscribeInvitaciones(); unsubscribeInvitaciones = null; }
+        window.docHormigaRef = null;
+        window.hormigaState = crearEstadoHormigaInicial();
+        invitacionesUsuario = [];
+        emailUsuarioInvitaciones = '';
+        window.renderBandejaNotificaciones([]);
+        window.renderHistorialNotificaciones();
     }
 });
 
@@ -845,22 +858,31 @@ function escucharInvitacionesUsuario(userEmail) {
     if (unsubscribeInvitaciones) unsubscribeInvitaciones();
 
     const q = query(collection(db, "invitaciones"));
+    emailUsuarioInvitaciones = (userEmail || '').trim().toLowerCase();
 
     unsubscribeInvitaciones = onSnapshot(q, (snapshot) => {
         const invitaciones = [];
-        const emailActual = userEmail.trim().toLowerCase();
 
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
             const destino = (data.destinatarioEmail || "").trim().toLowerCase();
+            const remitente = (data.remitenteEmail || "").trim().toLowerCase();
 
-            if (destino === emailActual) {
-                if (data.estado === "PENDIENTE" || data.estado === "ACEPTADO") {
-                    invitaciones.push({ id: docSnap.id, ...data });
-                }
+            if (destino === emailUsuarioInvitaciones || remitente === emailUsuarioInvitaciones) {
+                invitaciones.push({
+                    id: docSnap.id,
+                    ...data,
+                    esRecibida: destino === emailUsuarioInvitaciones
+                });
             }
         });
-        window.renderBandejaNotificaciones(invitaciones);
+
+        invitacionesUsuario = invitaciones;
+        window.renderBandejaNotificaciones(invitaciones.filter(inv => inv.esRecibida));
+        window.renderHistorialNotificaciones();
+    }, (error) => {
+        console.error("Error al escuchar las invitaciones:", error);
+        window.mostrarNotificacion("No se pudieron cargar las invitaciones", "Revisá tu conexión e intentá nuevamente.", "error");
     });
 }
 
@@ -874,7 +896,8 @@ window.renderBandejaNotificaciones = function(invitaciones) {
     const lista = document.getElementById('listaNotificaciones');
     if (!badge || !lista) return;
 
-    const pendientes = invitaciones.filter(i => i.estado === "PENDIENTE");
+    const invitacionesRecibidas = invitaciones.filter(i => i.esRecibida !== false);
+    const pendientes = invitacionesRecibidas.filter(i => i.estado === "PENDIENTE");
 
     if (pendientes.length > 0) {
         badge.innerText = pendientes.length;
@@ -883,47 +906,123 @@ window.renderBandejaNotificaciones = function(invitaciones) {
         badge.classList.add('hidden');
     }
 
-    if (invitaciones.length > 0) {
-        lista.innerHTML = '';
-        invitaciones.forEach(inv => {
-            if (inv.estado === "PENDIENTE") {
-                lista.innerHTML += `
-                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
-                        <p class="text-slate-300">
-                            <strong class="text-amber-400">${inv.remitenteEmail}</strong> te invitó a unirte a <strong>${inv.grupoNombre}</strong> (${inv.rol}).
-                        </p>
-                        <div class="flex gap-2 justify-end">
-                            <button onclick="responderInvitacion('${inv.id}', '${inv.grupoId}', '${inv.rol}', 'RECHAZADO')" class="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg font-semibold text-[11px]">
-                                Rechazar
-                            </button>
-                            <button onclick="responderInvitacion('${inv.id}', '${inv.grupoId}', '${inv.rol}', 'ACEPTADO')" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg font-bold text-[11px]">
-                                Aceptar
-                            </button>
-                        </div>
-                    </div>
-                `;
-            } else if (inv.estado === "ACEPTADO") {
-                lista.innerHTML += `
-                    <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">✓ Pertenece al grupo</span>
-                            <span class="text-slate-500 text-[10px]">${inv.rol}</span>
-                        </div>
-                        <p class="text-slate-300 text-[11px]">
-                            <strong>${inv.grupoNombre}</strong> (Invitado por ${inv.remitenteEmail})
-                        </p>
-                        <div class="flex justify-end">
-                            <button onclick="salirDelGrupoConId('${inv.id}', '${inv.grupoId}')" class="px-2 py-0.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 rounded-lg font-medium text-[10px] transition-colors">
-                                Salir del grupo
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-        });
-    } else {
-        lista.innerHTML = `<p class="text-xs text-slate-500 text-center py-2">No tenés notificaciones pendientes.</p>`;
+    const invitacionesActivas = invitacionesRecibidas.filter(inv =>
+        inv.estado === "PENDIENTE" || inv.estado === "ACEPTADO"
+    );
+    if (invitacionesActivas.length === 0) {
+        lista.innerHTML = `<p class="text-xs text-slate-500 text-center py-2">No tenés invitaciones nuevas.</p>`;
+        return;
     }
+
+    lista.innerHTML = invitacionesActivas.map(inv => {
+        const remitente = escapeHtml(inv.remitenteEmail);
+        const grupoNombre = escapeHtml(inv.grupoNombre);
+        const rol = escapeHtml(inv.rol);
+        const id = escapeHtml(inv.id);
+        const grupoId = escapeHtml(inv.grupoId);
+
+        if (inv.estado === "PENDIENTE") {
+            return `
+                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
+                    <p class="text-slate-300">
+                        <strong class="text-amber-400">${remitente}</strong> te invitó a unirte a <strong>${grupoNombre}</strong> (${rol}).
+                    </p>
+                    <div class="flex gap-2 justify-end">
+                        <button data-accion="responder" data-id="${id}" data-grupo-id="${grupoId}" data-rol="${rol}" data-estado="RECHAZADO" class="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg font-semibold text-[11px]">
+                            Rechazar
+                        </button>
+                        <button data-accion="responder" data-id="${id}" data-grupo-id="${grupoId}" data-rol="${rol}" data-estado="ACEPTADO" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg font-bold text-[11px]">
+                            Aceptar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">✓ Pertenece al grupo</span>
+                    <span class="text-slate-500 text-[10px]">${rol}</span>
+                </div>
+                <p class="text-slate-300 text-[11px]">
+                    <strong>${grupoNombre}</strong> (Invitado por ${remitente})
+                </p>
+                <div class="flex justify-end">
+                    <button data-accion="salir" data-id="${id}" data-grupo-id="${grupoId}" class="px-2 py-0.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 rounded-lg font-medium text-[10px] transition-colors">
+                        Salir del grupo
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    lista.onclick = (event) => {
+        const button = event.target.closest('button[data-accion]');
+        if (!button) return;
+
+        if (button.dataset.accion === 'responder') {
+            window.responderInvitacion(button.dataset.id, button.dataset.grupoId, button.dataset.rol, button.dataset.estado);
+        } else if (button.dataset.accion === 'salir') {
+            window.salirDelGrupoConId(button.dataset.id, button.dataset.grupoId);
+        }
+    };
+};
+
+window.renderHistorialNotificaciones = function() {
+    const lista = document.getElementById('listaHistorialNotificaciones');
+    if (!lista) return;
+
+    const historial = invitacionesUsuario
+        .filter(inv => ['PENDIENTE', 'ACEPTADO', 'RECHAZADO'].includes(inv.estado))
+        .sort((a, b) => (parseInvitationDate(b.fecha)?.getTime() || 0) - (parseInvitationDate(a.fecha)?.getTime() || 0));
+
+    if (historial.length === 0) {
+        lista.innerHTML = '<p class="text-sm text-slate-500 text-center py-8">Todavía no hay invitaciones para mostrar.</p>';
+        return;
+    }
+
+    const estados = {
+        PENDIENTE: { texto: 'Pendiente', estilo: 'text-amber-400 bg-amber-500/10' },
+        ACEPTADO: { texto: 'Aceptada', estilo: 'text-emerald-400 bg-emerald-500/10' },
+        RECHAZADO: { texto: 'Rechazada', estilo: 'text-slate-400 bg-slate-800' }
+    };
+
+    lista.innerHTML = historial.map(inv => {
+        const recibida = inv.esRecibida;
+        const otraParte = escapeHtml(recibida ? inv.remitenteEmail : inv.destinatarioEmail);
+        const grupoNombre = escapeHtml(inv.grupoNombre || 'Grupo');
+        const rol = escapeHtml(inv.rol || 'sin rol');
+        const estado = estados[inv.estado];
+        const fecha = parseInvitationDate(inv.fecha);
+        const fechaTexto = fecha
+            ? fecha.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+            : 'Fecha no disponible';
+        let descripcion;
+
+        if (recibida) {
+            descripcion = inv.estado === 'PENDIENTE'
+                ? `Te invitaron a unirte a ${grupoNombre}`
+                : `Invitación a ${grupoNombre}`;
+        } else {
+            descripcion = inv.estado === 'PENDIENTE'
+                ? `Invitación enviada a ${otraParte} para ${grupoNombre}`
+                : `${otraParte} respondió a la invitación para ${grupoNombre}`;
+        }
+
+        return `
+            <article class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-slate-950/70 border border-slate-800 rounded-xl">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-slate-200">${descripcion}</p>
+                    <p class="mt-1 text-xs text-slate-400">
+                        ${recibida ? `De ${otraParte}` : 'Enviada por vos'} · Rol: ${rol}
+                    </p>
+                    <time class="mt-1 block text-[11px] text-slate-500">${fechaTexto}</time>
+                </div>
+                <span class="shrink-0 self-start sm:self-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${estado.estilo}">${estado.texto}</span>
+            </article>
+        `;
+    }).join('');
 };
 
 window.responderInvitacion = async function(invitacionId, grupoId, rol, nuevoEstado) {
@@ -1089,7 +1188,10 @@ window.guardarCategoriasGastoMensual = async function(categorias, gastos) {
 };
 
 window.saveHormigaDataToCloud = async function() {
-    if (!window.docHormigaRef) throw new Error("No hay una cuenta activa para guardar los gastos hormiga.");
+    const user = auth.currentUser;
+    if (!user) throw new Error("No hay una cuenta activa para guardar los gastos hormiga.");
+
+    window.docHormigaRef = doc(db, "app_data_hormiga", user.uid);
     await setDoc(window.docHormigaRef, { hormigaState: JSON.parse(JSON.stringify(window.hormigaState)) });
 };
 

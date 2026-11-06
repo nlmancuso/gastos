@@ -73,6 +73,8 @@
                 if (typeof window.renderSettingsCategories === 'function') window.renderSettingsCategories();
             } else if (sectionName === 'grupo') {
                 window.renderMiembrosGrupoSettings();
+            } else if (sectionName === 'notificaciones') {
+                window.renderHistorialNotificaciones();
             }
         };
 

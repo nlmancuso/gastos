@@ -193,11 +193,13 @@ select option {
                     <div id="settingsSectionsubcategorias" class="hidden"></div>
                     <div id="settingsSectiongrupo" class="hidden"></div>
                     <div id="settingsSectionnotificaciones" class="hidden card-bg rounded-2xl p-6">
-                        <h3 class="text-base font-bold text-white">Notificaciones</h3>
-                        <p class="mt-2 text-sm text-slate-400">El historial de notificaciones estará disponible en una próxima etapa. Por ahora, podés consultar las invitaciones nuevas desde la campanita.</p>
-                        <button onclick="toggleBandejaNotificaciones()" class="mt-4 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200">
-                            <i class="fa-solid fa-bell mr-2"></i>Ver invitaciones nuevas
-                        </button>
+                        <div class="mb-5">
+                            <h3 class="text-base font-bold text-white">Historial de invitaciones</h3>
+                            <p class="mt-2 text-sm text-slate-400">Consultá las invitaciones recibidas y enviadas. La campanita sigue indicando las invitaciones recibidas pendientes de respuesta.</p>
+                        </div>
+                        <div id="listaHistorialNotificaciones" class="space-y-3" aria-live="polite">
+                            <p class="text-sm text-slate-500 text-center py-8">Cargando historial...</p>
+                        </div>
                     </div>
                 </main>
             </div>
