@@ -1,0 +1,304 @@
+// Draft only: validate in the Firebase Emulator and migrate or disable the Node.js notifier before deployment.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null
+        && 'email_verified' in request.auth.token
+        && request.auth.token.email_verified == true;
+    }
+
+    function ownsPersonalDocument(documentId) {
+      return signedIn() && documentId == 'personal_' + request.auth.uid;
+    }
+
+    function hasGroupMember(data, uid) {
+      return 'appState' in data
+        && data.appState is map
+        && 'grupoInfo' in data.appState
+        && data.appState.grupoInfo is map
+        && 'miembros' in data.appState.grupoInfo
+        && data.appState.grupoInfo.miembros is map
+        && uid in data.appState.grupoInfo.miembros;
+    }
+
+    function isGroupMember(data) {
+      return signedIn() && hasGroupMember(data, request.auth.uid);
+    }
+
+    function isGroupAdmin(data) {
+      return signedIn()
+        && 'appState' in data
+        && data.appState is map
+        && 'grupoInfo' in data.appState
+        && data.appState.grupoInfo is map
+        && 'adminUid' in data.appState.grupoInfo
+        && data.appState.grupoInfo.adminUid == request.auth.uid;
+    }
+
+    function isGroupEditor(data) {
+      return isGroupAdmin(data)
+        || (
+          isGroupMember(data)
+          && data.appState.grupoInfo.miembros[request.auth.uid] is map
+          && data.appState.grupoInfo.miembros[request.auth.uid].rol in ['admin', 'editor']
+        );
+    }
+
+    function isPersonalGroupSetup(documentId) {
+      let oldAppState = resource.data.appState;
+      let newAppState = request.resource.data.appState;
+      let newInfo = newAppState.grupoInfo;
+      let newMembers = newInfo.miembros;
+      return ownsPersonalDocument(documentId)
+        && oldAppState is map
+        && newAppState is map
+        && newInfo is map
+        && newMembers is map
+        && (!('grupoInfo' in oldAppState) || oldAppState.grupoInfo == null)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appState'])
+        && newAppState.diff(oldAppState).affectedKeys().hasOnly(['grupoInfo'])
+        && newInfo.keys().hasOnly(['adminUid', 'miembros', 'invitacionesPendientes'])
+        && newInfo.adminUid == request.auth.uid
+        && newMembers.keys().hasOnly([request.auth.uid])
+        && newMembers[request.auth.uid].email == request.auth.token.email
+        && newMembers[request.auth.uid].rol == 'admin';
+    }
+
+    function isAdminMembershipUpdate() {
+      let oldAppState = resource.data.appState;
+      let newAppState = request.resource.data.appState;
+      let oldInfo = oldAppState.grupoInfo;
+      let newInfo = newAppState.grupoInfo;
+      let oldMembers = oldInfo.miembros;
+      let newMembers = newInfo.miembros;
+      return isGroupAdmin(resource.data)
+        && oldAppState is map
+        && newAppState is map
+        && oldInfo is map
+        && newInfo is map
+        && oldMembers is map
+        && newMembers is map
+        && request.auth.uid in newMembers
+        && newInfo.adminUid == request.auth.uid
+        && newMembers[request.auth.uid] is map
+        && newMembers[request.auth.uid].email == request.auth.token.email
+        && newMembers[request.auth.uid].rol == 'admin'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appState'])
+        && newAppState.diff(oldAppState).affectedKeys().hasOnly(['grupoInfo'])
+        && newInfo.diff(oldInfo).affectedKeys().hasOnly(['miembros'])
+        && newMembers.keys().hasOnly(oldMembers.keys());
+    }
+
+    function validGroupId(groupId) {
+      return groupId is string
+        && groupId.matches('^personal_[A-Za-z0-9_-]+$');
+    }
+
+    function isGroupAdminById(groupId) {
+      let groupPath = /databases/$(database)/documents/app_data/$(groupId);
+      return signedIn()
+        && validGroupId(groupId)
+        && exists(groupPath)
+        && isGroupAdmin(get(groupPath).data);
+    }
+
+    function isInvitationParty(data) {
+      return signedIn()
+        && (
+          data.destinatarioEmail == request.auth.token.email
+          || data.remitenteEmail == request.auth.token.email
+        );
+    }
+
+    function hasAcceptedInvitationAfter(groupId, invitationId, member) {
+      let invitationPath = /databases/$(database)/documents/invitaciones/$(invitationId);
+      return invitationId is string
+        && existsAfter(invitationPath)
+        && getAfter(invitationPath).data.grupoId == groupId
+        && getAfter(invitationPath).data.estado == 'ACEPTADO'
+        && getAfter(invitationPath).data.destinatarioEmail == request.auth.token.email
+        && getAfter(invitationPath).data.destinatarioUid == request.auth.uid
+        && getAfter(invitationPath).data.rol == member.rol;
+    }
+
+    function isGroupJoin(groupId) {
+      let oldAppState = resource.data.appState;
+      let newAppState = request.resource.data.appState;
+      let oldInfo = oldAppState.grupoInfo;
+      let newInfo = newAppState.grupoInfo;
+      let oldMembers = oldInfo.miembros;
+      let newMembers = newInfo.miembros;
+      let newMember = newMembers[request.auth.uid];
+      return signedIn()
+        && oldInfo is map
+        && newInfo is map
+        && oldMembers is map
+        && newMembers is map
+        && !(request.auth.uid in oldMembers)
+        && request.auth.uid in newMembers
+        && newMember is map
+        && newMember.rol in ['editor', 'lector']
+        && newMember.email == request.auth.token.email
+        && newMember.invitacionId is string
+        && oldMembers.diff(newMembers).affectedKeys().hasOnly([request.auth.uid])
+        && newInfo.diff(oldInfo).affectedKeys().hasOnly(['miembros'])
+        && newAppState.diff(oldAppState).affectedKeys().hasOnly(['grupoInfo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appState'])
+        && hasAcceptedInvitationAfter(groupId, newMember.invitacionId, newMember);
+    }
+
+    function isGroupExit() {
+      let oldAppState = resource.data.appState;
+      let newAppState = request.resource.data.appState;
+      let oldInfo = oldAppState.grupoInfo;
+      let newInfo = newAppState.grupoInfo;
+      let oldMembers = oldInfo.miembros;
+      let newMembers = newInfo.miembros;
+      let oldMember = oldMembers[request.auth.uid];
+      return signedIn()
+        && oldInfo is map
+        && newInfo is map
+        && oldMembers is map
+        && newMembers is map
+        && request.auth.uid in oldMembers
+        && oldMember is map
+        && oldMember.email == request.auth.token.email
+        && !(request.auth.uid in newMembers)
+        && oldMembers.diff(newMembers).affectedKeys().hasOnly([request.auth.uid])
+        && newInfo.diff(oldInfo).affectedKeys().hasOnly(['miembros'])
+        && newAppState.diff(oldAppState).affectedKeys().hasOnly(['grupoInfo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appState']);
+    }
+
+    function invitationMembershipAfter(data, invitationId) {
+      let groupPath = /databases/$(database)/documents/app_data/$(data.grupoId);
+      return data.destinatarioUid is string
+        && existsAfter(groupPath)
+        && hasGroupMember(getAfter(groupPath).data, data.destinatarioUid)
+        && getAfter(groupPath).data.appState.grupoInfo.miembros[data.destinatarioUid].invitacionId == invitationId;
+    }
+
+    function invitationMemberRemovedAfter(data) {
+      let groupPath = /databases/$(database)/documents/app_data/$(data.grupoId);
+      return data.destinatarioUid is string
+        && existsAfter(groupPath)
+        && !hasGroupMember(getAfter(groupPath).data, data.destinatarioUid);
+    }
+
+    match /app_data/{documentId} {
+      allow get: if ownsPersonalDocument(documentId) || isGroupMember(resource.data);
+      allow list: if false;
+
+      allow create: if ownsPersonalDocument(documentId)
+        && request.resource.data.keys().hasOnly(['appState', 'creadoEl'])
+        && request.resource.data.appState is map
+        && request.resource.data.appState.grupoInfo is map
+        && request.resource.data.appState.grupoInfo.adminUid == request.auth.uid
+        && request.resource.data.appState.grupoInfo.miembros is map
+        && request.resource.data.appState.grupoInfo.miembros.keys().hasOnly([request.auth.uid])
+        && request.resource.data.appState.grupoInfo.miembros[request.auth.uid].email == request.auth.token.email
+        && request.resource.data.appState.grupoInfo.miembros[request.auth.uid].rol == 'admin';
+
+      allow update: if ownsPersonalDocument(documentId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appState'])
+        && request.resource.data.appState.grupoInfo == resource.data.appState.grupoInfo
+        || (
+          isGroupEditor(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appState'])
+          && request.resource.data.appState.grupoInfo == resource.data.appState.grupoInfo
+        )
+        || isPersonalGroupSetup(documentId)
+        || isAdminMembershipUpdate()
+        || isGroupJoin(documentId)
+        || isGroupExit();
+
+      allow delete: if false;
+    }
+
+    match /app_data_hormiga/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /invitaciones/{invitationId} {
+      allow get: if isInvitationParty(resource.data)
+        || isGroupAdminById(resource.data.grupoId);
+      allow list: if isInvitationParty(resource.data);
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'grupoId',
+          'grupoNombre',
+          'remitenteEmail',
+          'destinatarioEmail',
+          'rol',
+          'estado',
+          'fecha'
+        ])
+        && request.resource.data.keys().hasAll([
+          'grupoId',
+          'grupoNombre',
+          'remitenteEmail',
+          'destinatarioEmail',
+          'rol',
+          'estado',
+          'fecha'
+        ])
+        && validGroupId(request.resource.data.grupoId)
+        && request.resource.data.grupoNombre is string
+        && request.resource.data.grupoNombre.size() <= 120
+        && request.resource.data.remitenteEmail == request.auth.token.email
+        && request.resource.data.destinatarioEmail is string
+        && request.resource.data.destinatarioEmail.size() <= 254
+        && request.resource.data.destinatarioEmail != request.auth.token.email
+        && request.resource.data.rol in ['editor', 'lector']
+        && request.resource.data.estado == 'PENDIENTE'
+        && request.resource.data.fecha is string
+        && isGroupAdminById(request.resource.data.grupoId);
+
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'estado',
+          'destinatarioUid'
+        ])
+        && (
+          (
+            resource.data.estado == 'PENDIENTE'
+            && request.resource.data.estado == 'ACEPTADO'
+            && request.resource.data.destinatarioUid == request.auth.uid
+            && request.resource.data.rol in ['editor', 'lector']
+            && resource.data.destinatarioEmail == request.auth.token.email
+            && invitationMembershipAfter(request.resource.data, invitationId)
+          )
+          || (
+            resource.data.estado == 'PENDIENTE'
+            && request.resource.data.estado == 'RECHAZADO'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado'])
+            && (
+              resource.data.destinatarioEmail == request.auth.token.email
+              || isGroupAdminById(resource.data.grupoId)
+            )
+          )
+          || (
+            resource.data.estado == 'ACEPTADO'
+            && request.resource.data.estado == 'RECHAZADO'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado'])
+            && invitationMemberRemovedAfter(resource.data)
+            && (
+              resource.data.destinatarioEmail == request.auth.token.email
+              || isGroupAdminById(resource.data.grupoId)
+            )
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /notificaciones_usuario/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

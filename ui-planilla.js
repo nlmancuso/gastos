@@ -140,27 +140,29 @@
             const currentMonth = window.appState.currentMonth || '2026-10';
             const calculo = window.getCalculatedDataForMonth(currentMonth);
             const items = obtenerItemsPlanillaConSaldo(currentMonth);
-            const totalFijos = items.reduce((total, item) => {
-                const categoria = (window.appState.categorias || []).find(cat => cat.nombre === item.categoria);
-                const montoConSaldo = item.montoDebidoBloque !== undefined
-                    ? item.montoDebidoBloque - item.monto + (Number(item.monto) || 0)
-                    : item.monto;
-                return total + (categoria && !categoria.esTarjeta ? montoConSaldo : 0);
+            const categorias = window.appState.categorias || [];
+            const sumarTotalesPorTipo = esTarjeta => items.reduce((total, item) => {
+                const categoria = categorias.find(cat => cat.nombre === item.categoria);
+                const esCategoriaTarjeta = categoria ? categoria.esTarjeta : true;
+                if (esCategoriaTarjeta !== esTarjeta) return total;
+
+                if (categoria?.vencimientoUnicoEnBloque) {
+                    return total + (Number(item.montoDebidoBloque) || 0);
+                }
+                return total + (Number(item.monto) || 0);
             }, 0);
-            const totalTarjetas = items.reduce((total, item) => {
-                const categoria = (window.appState.categorias || []).find(cat => cat.nombre === item.categoria);
-                const montoConSaldo = item.montoDebidoBloque !== undefined
-                    ? item.montoDebidoBloque - item.monto + (Number(item.monto) || 0)
-                    : item.monto;
-                return total + (categoria ? (categoria.esTarjeta ? montoConSaldo : 0) : montoConSaldo);
-            }, 0);
+            const totalFijos = sumarTotalesPorTipo(false);
+            const totalTarjetas = sumarTotalesPorTipo(true);
             const { sueldoActual } = calculo;
-            const totalGastosMes = totalFijos + totalTarjetas;
+            const redondearCentavos = monto => Math.round(monto * 100) / 100;
+            const totalFijosRedondeado = redondearCentavos(totalFijos);
+            const totalTarjetasRedondeado = redondearCentavos(totalTarjetas);
+            const totalGastosMes = redondearCentavos(totalFijosRedondeado + totalTarjetasRedondeado);
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 
             if(document.getElementById('cardSueldo')) document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
-            if(document.getElementById('cardGastosFijos')) document.getElementById('cardGastosFijos').innerText = fmt(totalFijos);
-            if(document.getElementById('cardTarjetas')) document.getElementById('cardTarjetas').innerText = fmt(totalTarjetas);
+            if(document.getElementById('cardGastosFijos')) document.getElementById('cardGastosFijos').innerText = fmt(totalFijosRedondeado);
+            if(document.getElementById('cardTarjetas')) document.getElementById('cardTarjetas').innerText = fmt(totalTarjetasRedondeado);
             if(document.getElementById('cardGastosTotales')) document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
             if(document.getElementById('cardResto')) document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
 
@@ -650,7 +652,7 @@ window.solicitarConfirmacionEliminacion = function(tipoEliminacion) {
 
     const txtDetalle = document.getElementById('eliminarConfirmacionDetalleText');
     if (txtDetalle) {
-        txtDetalle.innerHTML = `¿Realmente deseás eliminar el gasto <strong class="text-white">"${gasto ? gasto.concepto : ''}"</strong> de forma <strong class="text-amber-400">${textoModalidad}</strong>?`;
+        txtDetalle.innerHTML = `¿Realmente deseás eliminar el gasto <strong class="text-white">"${window.escapeHtml(gasto?.concepto)}"</strong> de forma <strong class="text-amber-400">${window.escapeHtml(textoModalidad)}</strong>?`;
     }
 
     // Alternar vista del modal hacia el paso de confirmación

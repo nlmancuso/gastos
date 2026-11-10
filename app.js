@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc as firestoreSetDoc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, onSnapshot, collection, addDoc as firestoreAddDoc, query, where, updateDoc as firestoreUpdateDoc, arrayRemove, arrayUnion, runTransaction as firestoreRunTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { renderActiveView } from "./view-renderer.mjs";
 
 let pendingDatabaseOperations = 0;
@@ -70,12 +70,14 @@ window.renderActiveView = renderActiveView;
 
 let unsubscribeSnapshot = null;
 let unsubscribeHormiga = null;
-let unsubscribeInvitaciones = null;
+let unsubscribeInvitacionesRecibidas = null;
+let unsubscribeInvitacionesEnviadas = null;
 let unsubscribeNotificacionesOcultas = null;
 let invitacionesUsuario = [];
 let invitacionesOcultas = new Set();
 let invitacionesSeleccionadas = new Set();
 let emailUsuarioInvitaciones = '';
+let flujoVerificacionEnCurso = false;
 
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -86,6 +88,7 @@ function escapeHtml(value) {
         "'": '&#39;'
     })[character]);
 }
+window.escapeHtml = escapeHtml;
 
 function parseInvitationDate(value) {
     const date = value ? new Date(value) : null;
@@ -153,39 +156,18 @@ window.mostrarMensajeApp = function(titulo, mensaje, tipo = 'info') {
 window.esUsuarioEditor = function() {
     const user = auth.currentUser;
     if (!user) return false;
-    
-    if (user.email === "nicolaslmancuso@gmail.com") {
-        return true;
-    }
 
-    const grupoInfo = window.appState?.grupoInfo;
-    
     if (!window.currentGrupo || window.currentGrupo === `personal_${user.uid}`) {
         return true;
     }
 
+    const grupoInfo = window.appState?.grupoInfo;
     if (!grupoInfo) return false;
-
     if (grupoInfo.adminUid === user.uid) return true;
 
     const miembros = grupoInfo.miembros || {};
-    const emailActual = user.email.toLowerCase();
-    
-    let rolMiembro = null;
-    if (miembros[user.uid]) {
-        rolMiembro = miembros[user.uid].rol;
-    } else {
-        const miembroEncontrado = Object.values(miembros).find(m => (m.email || "").toLowerCase() === emailActual);
-        if (miembroEncontrado) {
-            rolMiembro = miembroEncontrado.rol;
-        }
-    }
-
-    if (rolMiembro === 'lector') {
-        return false;
-    }
-
-    return rolMiembro !== 'lector';
+    const rolMiembro = miembros[user.uid]?.rol;
+    return rolMiembro === 'admin' || rolMiembro === 'editor';
 };
 
 // ==========================================
@@ -323,31 +305,22 @@ window.cambiarRolMiembro = async function(uidMiembro, nuevoRol) {
             return;
         }
 
-        const docIdPersonal = `personal_${user.uid}`;
-
-        if (typeof db !== 'undefined') {
-            if (window.appState?.grupoInfo?.miembros?.[uidMiembro]) {
-                window.appState.grupoInfo.miembros[uidMiembro].rol = nuevoRol;
-            }
-            
-            await updateDoc(doc(db, "app_data", docIdPersonal), {
-                [`appState.grupoInfo.miembros.${uidMiembro}.rol`]: nuevoRol
-            });
-
-            console.log(`Rol actualizado en Firebase para ${uidMiembro} -> ${nuevoRol}`);
-            
-            if (typeof window.showToast === 'function') {
-                window.showToast(`Rol actualizado a ${nuevoRol.toUpperCase()} correctamente`, 'success');
-            } else {
-                window.mostrarNotificacion("¡Éxito!", `Rol actualizado a ${nuevoRol.toUpperCase()} correctamente.`, "exito");
-            }
-
-            if (typeof window.renderModalGrupo === 'function') {
-                window.renderModalGrupo();
-            } else if (typeof window.renderApp === 'function') {
-                window.renderApp();
-            }
+        if (!['editor', 'lector'].includes(nuevoRol) || !window.currentGrupo) {
+            throw new Error("El rol o el grupo seleccionado no es válido.");
         }
+
+        if (window.appState?.grupoInfo?.adminUid !== user.uid) {
+            throw new Error("Solo el administrador del grupo puede cambiar roles.");
+        }
+
+        await updateDoc(doc(db, "app_data", window.currentGrupo), {
+            [`appState.grupoInfo.miembros.${uidMiembro}.rol`]: nuevoRol
+        });
+        if (window.appState?.grupoInfo?.miembros?.[uidMiembro]) {
+            window.appState.grupoInfo.miembros[uidMiembro].rol = nuevoRol;
+        }
+        window.mostrarNotificacion("¡Éxito!", `Rol actualizado a ${nuevoRol.toUpperCase()} correctamente.`, "exito");
+        window.renderMiembrosGrupoSettings?.();
     } catch (error) {
         console.error("Error al actualizar el rol en Firebase:", error);
         window.mostrarNotificacion("Error", "Hubo un problema al guardar el cambio de rol en la base de datos.", "error");
@@ -421,6 +394,18 @@ const appStateLimpioBase = {
     grupoInfo: null
 };
 
+function crearEstadoPersonal(user) {
+    const estado = JSON.parse(JSON.stringify(appStateLimpioBase));
+    estado.grupoInfo = {
+        adminUid: user.uid,
+        miembros: {
+            [user.uid]: { email: user.email || '', rol: 'admin' }
+        },
+        invitacionesPendientes: []
+    };
+    return estado;
+}
+
 if (auth.currentUser) {
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) loginOverlay.classList.add('hidden');
@@ -485,45 +470,16 @@ window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
     }
 
     try {
-        const emailActual = user.email.toLowerCase();
-
-        const qAceptados = query(
+        const qInvitacionesRecibidas = query(
             collection(db, "invitaciones"),
-            where("destinatarioEmail", "==", emailActual),
-            where("estado", "==", "ACEPTADO")
+            where("destinatarioEmail", "==", user.email)
         );
-        const snapAceptados = await getDocs(qAceptados);
-        
-        const mapaInvitantes = {};
-        snapAceptados.forEach(d => {
-            const data = d.data();
-            if (data.grupoId) {
-                mapaInvitantes[data.grupoId] = data.remitenteEmail;
-            }
-        });
-
-        const gruposPermitidosIds = new Set(Object.keys(mapaInvitantes));
-
-        const querySnapshot = await getDocs(collection(db, "app_data"));
-        const mapaCreadores = {};
-
-        querySnapshot.forEach((docSnap) => {
-            if (docSnap.id.startsWith("personal_")) return;
-
-            const docData = docSnap.data();
-            const grupoInfo = docData.appState?.grupoInfo;
-
-            if (grupoInfo) {
-                const miembros = grupoInfo.miembros || {};
-                const esMiembroUID = miembros[user.uid] !== undefined;
-                const esMiembroEmail = Object.values(miembros).some(m => (m.email || "").toLowerCase() === emailActual);
-
-                if (esMiembroUID || esMiembroEmail || gruposPermitidosIds.has(docSnap.id)) {
-                    gruposPermitidosIds.add(docSnap.id);
-                    if (grupoInfo.adminUid && miembros[grupoInfo.adminUid]) {
-                        mapaCreadores[docSnap.id] = miembros[grupoInfo.adminUid].email;
-                    }
-                }
+        const snapInvitaciones = await getDocs(qInvitacionesRecibidas);
+        const gruposPermitidos = new Map();
+        snapInvitaciones.forEach(invitation => {
+            const data = invitation.data();
+            if (data.estado === "ACEPTADO" && typeof data.grupoId === "string") {
+                gruposPermitidos.set(data.grupoId, data.remitenteEmail || '');
             }
         });
 
@@ -534,22 +490,27 @@ window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
         optPersonal.textContent = "🏠 Mi Espacio Personal";
         selector.appendChild(optPersonal);
 
-        for (const grupoId of gruposPermitidosIds) {
+        for (const [grupoId, remitenteEmail] of gruposPermitidos) {
             const grupoRef = doc(db, "app_data", grupoId);
-            const grupoSnap = await getDoc(grupoRef);
-
-            if (grupoSnap.exists()) {
-                const docData = grupoSnap.data();
-                const grupoInfo = docData.appState?.grupoInfo;
-
-                let hostEmail = mapaInvitantes[grupoId] || mapaCreadores[grupoId] || '';
-                let usuarioTag = hostEmail ? ` (${hostEmail.split('@')[0]})` : '';
-
-                const optGrupo = document.createElement('option');
-                optGrupo.value = grupoId;
-                optGrupo.textContent = `👥 ${grupoInfo?.nombreGrupo || 'Grupo Control de Gastos'}${usuarioTag}`;
-                selector.appendChild(optGrupo);
+            let grupoSnap;
+            try {
+                grupoSnap = await getDoc(grupoRef);
+            } catch (error) {
+                if (error.code === 'permission-denied' || error.code === 'not-found') continue;
+                throw error;
             }
+
+            if (!grupoSnap.exists()) continue;
+            const docData = grupoSnap.data();
+            const grupoInfo = docData.appState?.grupoInfo;
+            if (!grupoInfo?.miembros?.[user.uid]) continue;
+
+            const hostEmail = grupoInfo.miembros[grupoInfo.adminUid]?.email || remitenteEmail;
+            const usuarioTag = hostEmail ? ` (${hostEmail.split('@')[0]})` : '';
+            const optGrupo = document.createElement('option');
+            optGrupo.value = grupoId;
+            optGrupo.textContent = `👥 ${grupoInfo.nombreGrupo || 'Grupo Control de Gastos'}${usuarioTag}`;
+            selector.appendChild(optGrupo);
         }
 
         const existeOpcion = Array.from(selector.options).some(opt => opt.value === valorGuardadoPrevio);
@@ -557,6 +518,7 @@ window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
 
     } catch (e) {
         console.error("Error al poblar los grupos en el selector:", e);
+        window.mostrarNotificacion("No se pudieron cargar tus grupos", "Revisá tu conexión e intentá nuevamente.", "error");
         selector.value = "personal";
     }
 };
@@ -622,42 +584,22 @@ window.handleRegister = async function(e) {
     window.showLoading();
 
     try {
+        flujoVerificacionEnCurso = true;
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
-
-        const linkVerificacion = `https://nlmancuso.github.io/gastos/?verified=true&uid=${user.uid}`;
-
-        try {
-            if (typeof emailjs !== 'undefined') {
-                await emailjs.send('service_hib3aln', 'template_j01kfcn', {
-                    to_email: email,
-                    to_name: email.split('@')[0],
-                    link_verificacion: linkVerificacion
-                });
-            }
-        } catch (emailErr) {
-            console.error("Error al enviar email mediante EmailJS:", emailErr);
-        }
-
-        const personalDocId = `personal_${user.uid}`;
-        const personalDocRef = doc(db, "app_data", personalDocId);
-
-        localStorage.setItem("ultima_vista_id", "personal");
-
-        await setDoc(personalDocRef, {
-            appState: JSON.parse(JSON.stringify(appStateLimpioBase)),
-            creadoEl: new Date().toISOString(),
-            emailVerificado: true
+        await sendEmailVerification(user, {
+            url: 'https://nlmancuso.github.io/gastos/'
         });
-
-        window.showApp();
+        await signOut(auth);
+        window.showLogin();
         window.mostrarNotificacion(
-            "¡Cuenta creada con éxito!",
-            "Tu cuenta ha sido registrada y verificada automáticamente para el entorno de pruebas.",
-            "exito"
+            "Revisá tu correo",
+            "Te enviamos un enlace de verificación de Firebase. Confirmá tu correo y después iniciá sesión para crear tu espacio personal.",
+            "info"
         );
     } catch (error) {
         console.error("Error al registrar usuario:", error);
+        if (auth.currentUser) await signOut(auth);
         window.showLogin();
         window.mostrarTabAuth('register');
         if (loginError) {
@@ -667,6 +609,48 @@ window.handleRegister = async function(e) {
             loginError.innerText = msg;
             loginError.classList.remove('hidden');
         }
+    } finally {
+        flujoVerificacionEnCurso = false;
+    }
+};
+
+window.reenviarVerificacion = async function() {
+    const email = document.getElementById('loginEmail')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
+    const loginError = document.getElementById('loginError');
+
+    if (!email || !password) {
+        if (loginError) {
+            loginError.innerText = "Ingresá tu correo y contraseña para reenviar la verificación.";
+            loginError.classList.remove('hidden');
+        }
+        return;
+    }
+
+    try {
+        flujoVerificacionEnCurso = true;
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        if (credential.user.emailVerified) {
+            await signOut(auth);
+            window.mostrarNotificacion("Correo ya verificado", "Ya podés iniciar sesión normalmente.", "info");
+            return;
+        }
+        await sendEmailVerification(credential.user, {
+            url: 'https://nlmancuso.github.io/gastos/'
+        });
+        await signOut(auth);
+        window.mostrarNotificacion("Correo enviado", "Te enviamos un nuevo enlace de verificación. Revisá también la carpeta de correo no deseado.", "exito");
+    } catch (error) {
+        console.error("Error al reenviar la verificación:", error);
+        if (auth.currentUser) await signOut(auth);
+        if (loginError) {
+            loginError.innerText = error.code === 'auth/invalid-credential'
+                ? "No se pudo validar el correo y la contraseña."
+                : "No se pudo reenviar el correo de verificación. Intentá nuevamente más tarde.";
+            loginError.classList.remove('hidden');
+        }
+    } finally {
+        flujoVerificacionEnCurso = false;
     }
 };
 
@@ -674,30 +658,6 @@ window.cerrarSesion = function() {
     window.showLogin();
     signOut(auth);
 };
-
-async function verificarDesdeURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const isVerified = urlParams.get('verified') === 'true';
-    const uid = urlParams.get('uid');
-
-    if (isVerified && uid) {
-        try {
-            const personalDocRef = doc(db, "app_data", `personal_${uid}`);
-            await setDoc(personalDocRef, { emailVerificado: true }, { merge: true });
-
-            window.mostrarNotificacion(
-                "¡Cuenta verificada con éxito!",
-                "Tu correo ha sido confirmado con éxito. Ya podés iniciar sesión.",
-                "exito",
-                () => { window.location.replace(window.location.pathname); }
-            );
-        } catch (e) {
-            console.error("Error al actualizar verificación en base de datos:", e);
-        }
-    }
-}
-
-verificarDesdeURL();
 
 window.cambiarVistaSeleccionada = async function(vistaId) {
     if (!vistaId || window.demoModeActive) return;
@@ -728,46 +688,60 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
             }
         } else {
             if (targetDocId.startsWith("personal_")) {
-                window.appState = JSON.parse(JSON.stringify(appStateLimpioBase));
-                await setDoc(window.docRef, { 
-                    appState: window.appState, 
-                    creadoEl: new Date().toISOString() 
-                });
+                window.appState = crearEstadoPersonal(auth.currentUser);
+                try {
+                    await setDoc(window.docRef, {
+                        appState: window.appState,
+                        creadoEl: new Date().toISOString()
+                    });
+                } catch (error) {
+                    console.error("Error al crear el espacio personal:", error);
+                    window.mostrarNotificacion("No se pudo crear tu espacio", "Revisá que tu correo esté verificado e intentá nuevamente.", "error");
+                }
             } else {
-                window.saveDataToCloud();
+                window.mostrarNotificacion("Grupo no disponible", "Ya no tenés acceso a este grupo. Volvé a tu espacio personal.", "error", () => {
+                    window.cambiarVistaSeleccionada("personal");
+                });
+                return;
             }
         }
         triggerPageRenders();
         window.showApp();
+    }, (error) => {
+        console.error("Error al escuchar los datos del grupo:", error);
+        if (error.code === 'permission-denied' && targetDocId !== `personal_${auth.currentUser?.uid}`) {
+            window.mostrarNotificacion("Acceso al grupo finalizado", "Volverás a tu espacio personal.", "info", () => {
+                window.cambiarVistaSeleccionada("personal");
+            });
+        } else {
+            window.mostrarNotificacion("No se pudieron cargar los datos", "Revisá tu conexión e intentá nuevamente.", "error");
+        }
     });
 };
 
 onAuthStateChanged(auth, async (user) => {
     window.actualizarVisibilidadDemoLocal?.();
     if (user) {
+        if (flujoVerificacionEnCurso) return;
         window.showLoading();
 
-        const esAdminPrincipal = user.email === "nicolaslmancuso@gmail.com";
-        let estaVerificado = esAdminPrincipal;
-
-        if (!esAdminPrincipal) {
-            try {
-                const docRef = doc(db, "app_data", `personal_${user.uid}`);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    estaVerificado = docSnap.data().emailVerificado === true;
-                }
-            } catch (e) {
-                console.error("Error al verificar estado en Firestore:", e);
-            }
+        try {
+            await user.reload();
+            await user.getIdToken(true);
+        } catch (error) {
+            console.error("No se pudo actualizar el estado de autenticación:", error);
+            await signOut(auth);
+            window.showLogin();
+            window.mostrarNotificacion("No se pudo validar la sesión", "Revisá tu conexión e intentá iniciar sesión nuevamente.", "error");
+            return;
         }
 
-        if (!estaVerificado) {
+        if (!user.emailVerified) {
             await signOut(auth);
             window.showLogin();
             window.mostrarNotificacion(
-                "Cuenta pendiente de activación",
-                "Tu cuenta aún no ha sido verificada. Por favor hacé clic en el botón del correo que te enviamos para poder ingresar.",
+                "Correo pendiente de verificación",
+                "Verificá tu correo con el enlace de Firebase. Si no lo encontrás, ingresá tu correo y contraseña y usá la opción para reenviar el mensaje.",
                 "info"
             );
             return;
@@ -778,6 +752,7 @@ onAuthStateChanged(auth, async (user) => {
         
         let vistaGuardada = localStorage.getItem("ultima_vista_id") || "personal";
         await window.poblarSelectorVistas(vistaGuardada);
+        vistaGuardada = document.getElementById('selectorVista')?.value || "personal";
 
         let targetDocId = (vistaGuardada === "personal") ? `personal_${user.uid}` : vistaGuardada;
         const docRef = doc(db, "app_data", targetDocId);
@@ -810,17 +785,34 @@ onAuthStateChanged(auth, async (user) => {
                 }
             } else {
                 if (targetDocId.startsWith("personal_")) {
-                    window.appState = JSON.parse(JSON.stringify(appStateLimpioBase));
-                    await setDoc(docRef, { 
-                        appState: window.appState, 
-                        creadoEl: new Date().toISOString() 
-                    });
+                    window.appState = crearEstadoPersonal(user);
+                    try {
+                        await setDoc(docRef, {
+                            appState: window.appState,
+                            creadoEl: new Date().toISOString()
+                        });
+                    } catch (error) {
+                        console.error("Error al crear el espacio personal:", error);
+                        window.mostrarNotificacion("No se pudo crear tu espacio", "Revisá que tu correo esté verificado e intentá nuevamente.", "error");
+                    }
                 } else {
-                    window.saveDataToCloud();
+                    window.mostrarNotificacion("Grupo no disponible", "Ya no tenés acceso a este grupo. Volvé a tu espacio personal.", "error", () => {
+                        window.cambiarVistaSeleccionada("personal");
+                    });
+                    return;
                 }
             }
             triggerPageRenders();
             window.showApp();
+        }, (error) => {
+            console.error("Error al escuchar los datos del grupo:", error);
+            if (error.code === 'permission-denied' && targetDocId !== `personal_${user.uid}`) {
+                window.mostrarNotificacion("Acceso al grupo finalizado", "Volverás a tu espacio personal.", "info", () => {
+                    window.cambiarVistaSeleccionada("personal");
+                });
+            } else {
+                window.mostrarNotificacion("No se pudieron cargar los datos", "Revisá tu conexión e intentá nuevamente.", "error");
+            }
         });
 
         unsubscribeHormiga = onSnapshot(window.docHormigaRef, async (docSnap) => {
@@ -842,6 +834,9 @@ onAuthStateChanged(auth, async (user) => {
                 }
             }
             triggerPageRenders();
+        }, (error) => {
+            console.error("Error al escuchar los gastos hormiga:", error);
+            window.mostrarNotificacion("No se pudieron cargar tus gastos Hormiga", "Verificá que hayas iniciado sesión con el correo correcto y volvé a intentar.", "error");
         });
 
         escucharInvitacionesUsuario(user.email);
@@ -856,7 +851,8 @@ onAuthStateChanged(auth, async (user) => {
         window.actualizarVisibilidadDemoLocal?.();
         if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
         if (unsubscribeHormiga) { unsubscribeHormiga(); unsubscribeHormiga = null; }
-        if (unsubscribeInvitaciones) { unsubscribeInvitaciones(); unsubscribeInvitaciones = null; }
+        if (unsubscribeInvitacionesRecibidas) { unsubscribeInvitacionesRecibidas(); unsubscribeInvitacionesRecibidas = null; }
+        if (unsubscribeInvitacionesEnviadas) { unsubscribeInvitacionesEnviadas(); unsubscribeInvitacionesEnviadas = null; }
         if (unsubscribeNotificacionesOcultas) { unsubscribeNotificacionesOcultas(); unsubscribeNotificacionesOcultas = null; }
         window.docHormigaRef = null;
         window.hormigaState = crearEstadoHormigaInicial();
@@ -891,35 +887,54 @@ function escucharNotificacionesOcultas(uid) {
 }
 
 function escucharInvitacionesUsuario(userEmail) {
-    if (unsubscribeInvitaciones) unsubscribeInvitaciones();
+    if (unsubscribeInvitacionesRecibidas) unsubscribeInvitacionesRecibidas();
+    if (unsubscribeInvitacionesEnviadas) unsubscribeInvitacionesEnviadas();
 
-    const q = query(collection(db, "invitaciones"));
-    emailUsuarioInvitaciones = (userEmail || '').trim().toLowerCase();
-
-    unsubscribeInvitaciones = onSnapshot(q, (snapshot) => {
-        const invitaciones = [];
-
-        snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            const destino = (data.destinatarioEmail || "").trim().toLowerCase();
-            const remitente = (data.remitenteEmail || "").trim().toLowerCase();
-
-            if (destino === emailUsuarioInvitaciones || remitente === emailUsuarioInvitaciones) {
-                invitaciones.push({
-                    id: docSnap.id,
-                    ...data,
-                    esRecibida: destino === emailUsuarioInvitaciones
-                });
-            }
-        });
-
-        invitacionesUsuario = invitaciones;
-        window.renderBandejaNotificaciones(invitaciones.filter(inv => inv.esRecibida));
+    emailUsuarioInvitaciones = (userEmail || '').trim();
+    const recibidas = new Map();
+    const enviadas = new Map();
+    const actualizarInvitaciones = () => {
+        const unificadas = new Map();
+        enviadas.forEach((invitation, id) => unificadas.set(id, invitation));
+        recibidas.forEach((invitation, id) => unificadas.set(id, invitation));
+        invitacionesUsuario = [...unificadas.values()];
+        window.renderBandejaNotificaciones(invitacionesUsuario.filter(inv => inv.esRecibida));
         window.renderHistorialNotificaciones();
-    }, (error) => {
+        window.renderMiembrosGrupoSettings?.();
+    };
+    const manejarError = (error) => {
         console.error("Error al escuchar las invitaciones:", error);
         window.mostrarNotificacion("No se pudieron cargar las invitaciones", "Revisá tu conexión e intentá nuevamente.", "error");
-    });
+    };
+
+    const qRecibidas = query(
+        collection(db, "invitaciones"),
+        where("destinatarioEmail", "==", emailUsuarioInvitaciones)
+    );
+    const qEnviadas = query(
+        collection(db, "invitaciones"),
+        where("remitenteEmail", "==", emailUsuarioInvitaciones)
+    );
+
+    unsubscribeInvitacionesRecibidas = onSnapshot(qRecibidas, snapshot => {
+        recibidas.clear();
+        snapshot.forEach(docSnap => recibidas.set(docSnap.id, {
+            id: docSnap.id,
+            ...docSnap.data(),
+            esRecibida: true
+        }));
+        actualizarInvitaciones();
+    }, manejarError);
+
+    unsubscribeInvitacionesEnviadas = onSnapshot(qEnviadas, snapshot => {
+        enviadas.clear();
+        snapshot.forEach(docSnap => enviadas.set(docSnap.id, {
+            id: docSnap.id,
+            ...docSnap.data(),
+            esRecibida: false
+        }));
+        actualizarInvitaciones();
+    }, manejarError);
 }
 
 window.toggleBandejaNotificaciones = function() {
@@ -998,9 +1013,9 @@ window.renderBandejaNotificaciones = function(invitaciones) {
         if (!button) return;
 
         if (button.dataset.accion === 'responder') {
-            window.responderInvitacion(button.dataset.id, button.dataset.grupoId, button.dataset.rol, button.dataset.estado);
+            window.responderInvitacion(button.dataset.id, button.dataset.grupoId, button.dataset.estado);
         } else if (button.dataset.accion === 'salir') {
-            window.salirDelGrupoConId(button.dataset.id, button.dataset.grupoId);
+            window.salirDelGrupoConId(button.dataset.grupoId);
         }
     };
 };
@@ -1136,34 +1151,42 @@ async function ocultarInvitacionesDelHistorial(ids) {
     }
 }
 
-window.responderInvitacion = async function(invitacionId, grupoId, rol, nuevoEstado) {
+window.responderInvitacion = async function(invitacionId, grupoId, nuevoEstado) {
     try {
         const user = auth.currentUser;
+        if (!user || !['ACEPTADO', 'RECHAZADO'].includes(nuevoEstado)) {
+            throw new Error("La invitación o el usuario no son válidos.");
+        }
         const invRef = doc(db, "invitaciones", invitacionId);
-        await updateDoc(invRef, { estado: nuevoEstado });
-
         const grupoRef = doc(db, "app_data", grupoId);
-        const grupoSnap = await getDoc(grupoRef);
-
-        if (grupoSnap.exists()) {
-            const data = grupoSnap.data();
-            const appState = data.appState || {};
-            const grupoInfo = appState.grupoInfo || { miembros: {}, invitacionesPendientes: [] };
-            
-            if (!grupoInfo.miembros) grupoInfo.miembros = {};
-            
-            if (grupoInfo.invitacionesPendientes) {
-                grupoInfo.invitacionesPendientes = grupoInfo.invitacionesPendientes.filter(
-                    inv => inv.email.toLowerCase() !== user.email.toLowerCase()
-                );
+        await runTransaction(db, async transaction => {
+            const invitationSnap = await transaction.get(invRef);
+            if (!invitationSnap.exists()) throw new Error("La invitación ya no existe.");
+            const invitation = invitationSnap.data();
+            if (
+                invitation.estado !== 'PENDIENTE' ||
+                invitation.grupoId !== grupoId ||
+                invitation.destinatarioEmail !== user.email
+            ) {
+                throw new Error("La invitación ya fue respondida o no te pertenece.");
             }
 
             if (nuevoEstado === 'ACEPTADO') {
-                grupoInfo.miembros[user.uid] = { email: user.email, rol: rol };
+                transaction.update(invRef, {
+                    estado: "ACEPTADO",
+                    destinatarioUid: user.uid
+                });
+                transaction.update(grupoRef, {
+                    [`appState.grupoInfo.miembros.${user.uid}`]: {
+                        email: user.email,
+                        rol: invitation.rol,
+                        invitacionId
+                    }
+                });
+            } else {
+                transaction.update(invRef, { estado: "RECHAZADO" });
             }
-
-            await updateDoc(grupoRef, { "appState.grupoInfo": grupoInfo });
-        }
+        });
 
         if (nuevoEstado === 'ACEPTADO') {
             window.mostrarNotificacion("¡Unión exitosa!", "Te uniste al grupo con éxito.", "exito", async () => {
@@ -1175,44 +1198,50 @@ window.responderInvitacion = async function(invitacionId, grupoId, rol, nuevoEst
         }
     } catch (e) {
         console.error("Error al responder invitación:", e);
+        window.mostrarNotificacion("No se pudo responder la invitación", "Es posible que haya cambiado de estado. Actualizá e intentá nuevamente.", "error");
     }
 };
 
-window.salirDelGrupoConId = async function(invitacionId, grupoId) {
+window.salirDelGrupoConId = async function(grupoId) {
     window.mostrarNotificacion(
         "Confirmar salida",
         "¿Deseás salir de este grupo? Ya no tendrás acceso a sus datos.",
         "error",
         async () => {
-            try {
-                const user = auth.currentUser;
-
-                if (invitacionId) {
-                    const invRef = doc(db, "invitaciones", invitacionId);
-                    await updateDoc(invRef, { estado: "RECHAZADO" });
+        try {
+            const user = auth.currentUser;
+            if (!user) throw new Error("No hay una cuenta activa para salir del grupo.");
+            const grupoRef = doc(db, "app_data", grupoId);
+            await runTransaction(db, async transaction => {
+                const groupSnap = await transaction.get(grupoRef);
+                if (!groupSnap.exists()) throw new Error("No se encontró el grupo.");
+                const groupInfo = groupSnap.data().appState?.grupoInfo;
+                if (
+                    !groupInfo?.miembros?.[user.uid] ||
+                    groupInfo.miembros[user.uid].email !== user.email
+                ) {
+                    throw new Error("No tenés permiso para salir de este grupo.");
                 }
 
-                const grupoRef = doc(db, "app_data", grupoId);
-                const grupoSnap = await getDoc(grupoRef);
-
-                if (grupoSnap.exists()) {
-                    const data = grupoSnap.data();
-                    const miembros = data.appState.grupoInfo?.miembros || {};
-                    delete miembros[user.uid];
-                    await updateDoc(grupoRef, { "appState.grupoInfo.miembros": miembros });
-                }
+                const miembros = { ...groupInfo.miembros };
+                delete miembros[user.uid];
+                transaction.update(grupoRef, {
+                    "appState.grupoInfo": { ...groupInfo, miembros }
+                });
+                });
 
                 await window.poblarSelectorVistas("personal");
                 window.cambiarVistaSeleccionada("personal");
             } catch (e) {
                 console.error("Error al salir del grupo:", e);
+                window.mostrarNotificacion("No se pudo salir del grupo", "Revisá la conexión e intentá nuevamente.", "error");
             }
         }
     );
 };
 
 window.salirDelGrupoActual = async function() {
-    window.salirDelGrupoConId("", window.currentGrupo);
+    window.salirDelGrupoConId(window.currentGrupo);
 };
 
 window.saveDataToCloud = async function() {
@@ -1314,21 +1343,21 @@ window.saveHormigaDataToCloud = async function() {
 
 function actualizarVisibilidadBotonesAdmin() {
     const user = auth.currentUser;
-    const userEmail = user ? user.email : '';
-    const userUid = user ? user.uid : null;
+    const userUid = user?.uid || null;
+    const esEspacioPersonal = Boolean(userUid && window.currentGrupo === `personal_${userUid}`);
 
-    if (window.appState && !window.appState.grupoInfo && userUid) {
+    if (window.appState && !window.appState.grupoInfo && esEspacioPersonal) {
         window.appState.grupoInfo = {
             adminUid: userUid,
             miembros: {
-                [userUid]: { email: userEmail, rol: 'admin' }
+                [userUid]: { email: user.email || '', rol: 'admin' }
             },
             invitacionesPendientes: []
         };
     }
 
     const grupoInfo = window.appState ? window.appState.grupoInfo : null;
-    const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || !grupoInfo || (grupoInfo && grupoInfo.adminUid === userUid);
+    const esAdmin = Boolean(userUid && (esEspacioPersonal || grupoInfo?.adminUid === userUid));
 
     const btnConfigCat = document.getElementById('btnConfigCat');
 
@@ -1600,7 +1629,7 @@ window.solicitarConfirmacionEliminacion = function(tipoEliminacion) {
 
     const txtDetalle = document.getElementById('eliminarConfirmacionDetalleText');
     if (txtDetalle) {
-        txtDetalle.innerHTML = `¿Realmente deseás eliminar el gasto <strong class="text-white">"${gasto ? gasto.concepto : ''}"</strong> de forma <strong class="text-amber-400">${textoModalidad}</strong>?`;
+        txtDetalle.innerHTML = `¿Realmente deseás eliminar el gasto <strong class="text-white">"${escapeHtml(gasto?.concepto)}"</strong> de forma <strong class="text-amber-400">${escapeHtml(textoModalidad)}</strong>?`;
     }
 
     const pasoSeleccion = document.getElementById('eliminarPasoSeleccion');
@@ -1665,20 +1694,16 @@ function renderMiembrosGrupo() {
 
     container.innerHTML = '';
     
-    const userEmail = auth.currentUser ? auth.currentUser.email : 'usuario@ejemplo.com';
-    const userUid = auth.currentUser ? auth.currentUser.uid : 'uid_actual';
-
-    if (!window.appState.grupoInfo) {
-        window.appState.grupoInfo = {
-            adminUid: userUid,
-            miembros: {
-                [userUid]: { email: userEmail, rol: 'admin' }
-            },
-            invitacionesPendientes: []
-        };
-    }
-    const grupoInfo = window.appState.grupoInfo;
-    const esAdmin = userEmail === "nicolaslmancuso@gmail.com" || grupoInfo.adminUid === userUid;
+    const user = auth.currentUser;
+    const userEmail = user?.email || '';
+    const userUid = user?.uid || '';
+    const esEspacioPersonal = window.currentGrupo === `personal_${userUid}`;
+    const grupoInfo = window.appState.grupoInfo || {
+        adminUid: esEspacioPersonal ? userUid : '',
+        miembros: esEspacioPersonal ? { [userUid]: { email: userEmail, rol: 'admin' } } : {},
+        invitacionesPendientes: []
+    };
+    const esAdmin = esEspacioPersonal || grupoInfo.adminUid === userUid;
 
     const formInvitar = document.getElementById('containerFormInvitar');
     if (formInvitar) {
@@ -1690,7 +1715,7 @@ function renderMiembrosGrupo() {
     if (badgeCant) badgeCant.innerText = `${miembrosArr.length} activo(s)`;
 
     miembrosArr.forEach(([uid, info]) => {
-        const esElAdmin = uid === grupoInfo.adminUid || info.email === "nicolaslmancuso@gmail.com";
+        const esElAdmin = uid === grupoInfo.adminUid;
         const esYoMismo = uid === userUid;
 
         container.innerHTML += `
@@ -1700,8 +1725,8 @@ function renderMiembrosGrupo() {
                         <i class="fa-solid ${esElAdmin ? 'fa-crown' : 'fa-user'}"></i>
                     </div>
                     <div>
-                        <span class="font-bold text-white block">${info.email} ${esYoMismo ? '<span class="text-[10px] text-emerald-400 font-normal">(Tú)</span>' : ''}</span>
-                        <span class="text-[10px] text-slate-500 uppercase font-semibold">${esElAdmin ? 'admin' : (info.rol || 'miembro')}</span>
+                        <span class="font-bold text-white block">${escapeHtml(info.email)} ${esYoMismo ? '<span class="text-[10px] text-emerald-400 font-normal">(Tú)</span>' : ''}</span>
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold">${esElAdmin ? 'admin' : escapeHtml(info.rol || 'miembro')}</span>
                     </div>
                 </div>
                 ${(esAdmin && !esYoMismo) ? `
@@ -1717,14 +1742,18 @@ function renderMiembrosGrupo() {
         `;
     });
 
-    const pendientes = grupoInfo.invitacionesPendientes || [];
+    const pendientes = invitacionesUsuario.filter(inv =>
+        !inv.esRecibida &&
+        inv.grupoId === window.currentGrupo &&
+        inv.estado === 'PENDIENTE'
+    );
     if (pendientes.length > 0 && listaPendientes && containerPendientes) {
         containerPendientes.classList.remove('hidden');
         listaPendientes.innerHTML = '';
         pendientes.forEach((inv, idx) => {
             listaPendientes.innerHTML += `
                 <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-xs">
-                    <span class="text-slate-400">${inv.email} <span class="text-[10px] text-amber-400">(${inv.rol})</span></span>
+                    <span class="text-slate-400">${escapeHtml(inv.destinatarioEmail)} <span class="text-[10px] text-amber-400">(${escapeHtml(inv.rol)})</span></span>
                     ${esAdmin ? `<button onclick="cancelarInvitacion(${idx})" class="text-rose-400 hover:text-rose-300 p-1"><i class="fa-solid fa-xmark"></i></button>` : ''}
                 </div>
             `;
@@ -1737,8 +1766,9 @@ window.renderMiembrosGrupoSettings = renderMiembrosGrupo;
 
 window.handleInvitarMiembro = async function(e) {
     if (e) e.preventDefault();
-    if (!window.esUsuarioEditor()) {
-        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+    const user = auth.currentUser;
+    if (!user || (window.currentGrupo !== `personal_${user.uid}` && window.appState.grupoInfo?.adminUid !== user.uid)) {
+        window.mostrarNotificacion("Acceso denegado", "Solo el administrador del grupo puede enviar invitaciones.", "error");
         return;
     }
     const emailInput = document.getElementById('inputInvitarEmail');
@@ -1749,24 +1779,44 @@ window.handleInvitarMiembro = async function(e) {
     const rol = rolSelect ? rolSelect.value : 'editor';
     if (!email) return;
 
-    if (!window.appState.grupoInfo) {
-        window.appState.grupoInfo = { adminUid: auth.currentUser.uid, miembros: {}, invitacionesPendientes: [] };
-    }
-    if (!window.appState.grupoInfo.invitacionesPendientes) {
-        window.appState.grupoInfo.invitacionesPendientes = [];
-    }
-
-    const yaEsMiembro = Object.values(window.appState.grupoInfo.miembros || {}).some(m => m.email === email);
-    if (yaEsMiembro) {
-        window.mostrarNotificacion("Aviso", "Ese usuario ya pertenece al grupo.", "info");
+    if (!['editor', 'lector'].includes(rol)) {
+        window.mostrarNotificacion("Rol inválido", "Elegí un rol válido para la invitación.", "error");
         return;
     }
 
     try {
+        const grupoRef = doc(db, "app_data", window.currentGrupo);
+        const grupoSnap = await getDoc(grupoRef);
+        if (!grupoSnap.exists()) {
+            throw new Error("No se encontró el grupo.");
+        }
+        let grupoInfo = grupoSnap.data().appState?.grupoInfo;
+        if (!grupoInfo && window.currentGrupo === `personal_${user.uid}`) {
+            grupoInfo = {
+                adminUid: user.uid,
+                miembros: { [user.uid]: { email: user.email || '', rol: 'admin' } },
+                invitacionesPendientes: []
+            };
+            await updateDoc(grupoRef, { "appState.grupoInfo": grupoInfo });
+        }
+        if (!grupoInfo || grupoInfo.adminUid !== user.uid) {
+            throw new Error("Solo el administrador del grupo puede enviar invitaciones.");
+        }
+
+        const yaEsMiembro = Object.values(grupoInfo.miembros || {}).some(m => (m.email || '').toLowerCase() === email);
+        if (yaEsMiembro) {
+            window.mostrarNotificacion("Aviso", "Ese usuario ya pertenece al grupo.", "info");
+            return;
+        }
+        if (email === (user.email || '').toLowerCase()) {
+            window.mostrarNotificacion("Aviso", "No podés invitar tu propio correo.", "info");
+            return;
+        }
+
         await addDoc(collection(db, "invitaciones"), {
             grupoId: window.currentGrupo,
-            grupoNombre: "Grupo Control de Gastos",
-            remitenteEmail: auth.currentUser.email,
+            grupoNombre: grupoInfo.nombreGrupo || "Grupo Control de Gastos",
+            remitenteEmail: user.email,
             destinatarioEmail: email,
             rol: rol,
             estado: "PENDIENTE",
@@ -1778,24 +1828,24 @@ window.handleInvitarMiembro = async function(e) {
                 to_email: email,
                 para_correo_electrónico: email,
                 rol_invitado: rol.toUpperCase(),
-                remitente: auth.currentUser.email
+                remitente: user.email
             });
         }
 
-        window.appState.grupoInfo.invitacionesPendientes.push({ email, rol, fecha: new Date().toISOString() });
         emailInput.value = '';
-
-        window.saveDataToCloud();
+        window.renderMiembrosGrupoSettings?.();
         renderMiembrosGrupo();
         window.mostrarNotificacion("¡Invitación enviada!", `Se envió con éxito la invitación a ${email}.`, "exito");
     } catch (err) {
         console.error("Error al enviar invitación:", err);
+        window.mostrarNotificacion("No se pudo enviar la invitación", err.message || "Revisá los permisos del grupo y volvé a intentar.", "error");
     }
 };
 
 window.removerMiembroGrupo = function(uid) {
-    if (!window.esUsuarioEditor()) {
-        window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
+    const user = auth.currentUser;
+    if (!user || window.appState.grupoInfo?.adminUid !== user.uid) {
+        window.mostrarNotificacion("Acceso denegado", "Solo el administrador del grupo puede quitar integrantes.", "error");
         return;
     }
     window.mostrarNotificacion(
@@ -1804,41 +1854,61 @@ window.removerMiembroGrupo = function(uid) {
         "error",
         async () => {
             try {
-                if (window.appState.grupoInfo && window.appState.grupoInfo.miembros) {
-                    const miembroRemovido = window.appState.grupoInfo.miembros[uid];
-                    const emailRemovido = miembroRemovido ? miembroRemovido.email : null;
-
-                    delete window.appState.grupoInfo.miembros[uid];
-                    await window.saveDataToCloud();
-
-                    if (emailRemovido) {
-                        const qInv = query(
-                            collection(db, "invitaciones"),
-                            where("grupoId", "==", window.currentGrupo),
-                            where("destinatarioEmail", "==", emailRemovido.toLowerCase())
-                        );
-                        const snapInv = await getDocs(qInv);
-                        snapInv.forEach(async (invDoc) => {
-                            await updateDoc(doc(db, "invitaciones", invDoc.id), { estado: "RECHAZADO" });
-                        });
+                const groupRef = doc(db, "app_data", window.currentGrupo);
+                await runTransaction(db, async transaction => {
+                    const groupSnap = await transaction.get(groupRef);
+                    if (!groupSnap.exists()) throw new Error("No se encontró el grupo.");
+                    const groupInfo = groupSnap.data().appState?.grupoInfo;
+                    if (!groupInfo || groupInfo.adminUid !== user.uid || !groupInfo.miembros?.[uid]) {
+                        throw new Error("No tenés permiso para quitar a este integrante.");
                     }
 
-                    renderMiembrosGrupo();
-                    window.mostrarNotificacion("Integrante removido", "El usuario ya no forma parte del grupo.", "exito");
-                }
+                    const miembroRemovido = groupInfo.miembros[uid];
+                    const invitationRef = miembroRemovido.invitacionId
+                        ? doc(db, "invitaciones", miembroRemovido.invitacionId)
+                        : null;
+                    const invitationSnap = invitationRef ? await transaction.get(invitationRef) : null;
+                    const miembros = { ...groupInfo.miembros };
+                    delete miembros[uid];
+
+                    if (
+                        invitationSnap?.exists() &&
+                        invitationSnap.data().estado === 'ACEPTADO' &&
+                        invitationSnap.data().destinatarioUid === uid
+                    ) {
+                        transaction.update(invitationRef, { estado: "RECHAZADO" });
+                    }
+                    transaction.update(groupRef, {
+                        "appState.grupoInfo": { ...groupInfo, miembros }
+                    });
+                });
+                renderMiembrosGrupo();
+                window.mostrarNotificacion("Integrante removido", "El usuario ya no forma parte del grupo.", "exito");
             } catch (e) {
                 console.error("Error al remover miembro:", e);
+                window.mostrarNotificacion("No se pudo quitar al integrante", "Revisá los permisos del grupo e intentá nuevamente.", "error");
             }
         }
     );
 };
 
-window.cancelarInvitacion = function(index) {
-    if (!window.esUsuarioEditor()) return;
-    if (window.appState.grupoInfo?.invitacionesPendientes) {
-        window.appState.grupoInfo.invitacionesPendientes.splice(index, 1);
-        window.saveDataToCloud();
+window.cancelarInvitacion = async function(index) {
+    const user = auth.currentUser;
+    if (!user || window.appState.grupoInfo?.adminUid !== user.uid) return;
+    const pendientes = invitacionesUsuario.filter(inv =>
+        !inv.esRecibida &&
+        inv.grupoId === window.currentGrupo &&
+        inv.estado === 'PENDIENTE'
+    );
+    const invitacion = pendientes[index];
+    if (!invitacion) return;
+
+    try {
+        await updateDoc(doc(db, "invitaciones", invitacion.id), { estado: "RECHAZADO" });
         renderMiembrosGrupo();
+    } catch (error) {
+        console.error("Error al cancelar la invitación:", error);
+        window.mostrarNotificacion("No se pudo cancelar la invitación", "Revisá la conexión e intentá nuevamente.", "error");
     }
 };
 
@@ -2007,7 +2077,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                     `;
                     montoPagadoCellHtml = `
                         <td class="px-4 py-3 text-right">
-                            <input type="number" min="0" max="${g.monto}" step="0.01" value="${g.montoPagado ?? g.monto}" data-id="${g.idPago || g.id}" onchange="actualizarMontoPagadoPlanilla(this, false)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 disabled:opacity-60" aria-label="Monto pagado de ${g.concepto}">
+                            <input type="number" min="0" max="${g.monto}" step="0.01" value="${g.montoPagado ?? g.monto}" data-id="${g.idPago || g.id}" onchange="actualizarMontoPagadoPlanilla(this, false)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 disabled:opacity-60" aria-label="Monto pagado de ${escapeHtml(g.concepto)}">
                         </td>
                     `;
                 }
@@ -2016,7 +2086,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                     <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event, '${categoria}')" data-id="${g.id}" class="hover:bg-slate-900/40 transition-colors border-b border-slate-800/40 text-xs cursor-default">
                         <td class="px-4 py-3 text-white font-bold flex items-center gap-2">
                             <span class="text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing p-1"><i class="fa-solid fa-grip-vertical"></i></span>
-                            ${g.concepto}
+                            ${escapeHtml(g.concepto)}
                         </td>
                         <td class="px-4 py-3 text-slate-400">${g.tipo}</td>
                         <td class="px-4 py-3 text-slate-300 font-medium">${subcatNombre}</td>
@@ -2098,100 +2168,4 @@ window.renderPlanillaAgrupadaTabla = function(items) {
             </div>
         `;
     });
-};
-
-window.verificarLeonelaDirecto = async function() {
-    await setDoc(doc(db, "app_data", "personal_Ax3bwHzylYbXjCOGy5Y85e0Iu8R2"), { emailVerificado: true }, { merge: true });
-    console.log("¡Cuenta de Leonela verificada con éxito!");
-    alert("¡Cuenta verificada con éxito! Ya puede iniciar sesión.");
-};
-
-window.limpiarEspacioLeonela = async function() {
-    try {
-        const uidLeonela = "Ax3bwHzylYbXjCOGy5Y85e0Iu8R2";
-        
-        const dInit = new Date();
-        const mesActualStr = `${dInit.getFullYear()}-${String(dInit.getMonth() + 1).padStart(2, '0')}`;
-
-        const appStateLimpioTotal = {
-            currentMonth: mesActualStr,
-            gastos: [],
-            excepcionesMonto: {},
-            excepcionesCategoria: {},
-            excepcionesVencimiento: {},
-            excepcionesVencimientoGrid: {},
-            excepcionesEstado: {},
-            excepcionesEliminacion: {},
-            excepcionesEliminacionSoloMes: {},
-            aumentosIndividuales: {},
-            subcategorias: [
-                { id: "sub_alquiler", nombre: "Alquiler / Expensas", porcentajeAumento: 0 },
-                { id: "sub_servicios_basicos", nombre: "Servicios Básicos (Luz/Gas/Agua)", porcentajeAumento: 0 },
-                { id: "sub_conectividad", nombre: "Internet / Cable / Telefonía", porcentajeAumento: 0 },
-                { id: "sub_suscripciones", nombre: "Streaming y Suscripciones", porcentajeAumento: 0 }
-            ],
-            sueldos: {},
-            cuentasBancarias: [],
-            categorias: [
-                { nombre: "Gastos Fijo", color: "#10b981", esTarjeta: false, vencimientoUnicoEnBloque: false },
-                { nombre: "Servicios", color: "#f97316", esTarjeta: false, vencimientoUnicoEnBloque: false },
-                { nombre: "Santander Visa", color: "#ef4444", esTarjeta: true, vencimientoUnicoEnBloque: true },
-                { nombre: "Ciudad Visa", color: "#3b82f6", esTarjeta: true, vencimientoUnicoEnBloque: true },
-                { nombre: "Mercado Pago", color: "#f59e0b", esTarjeta: true, vencimientoUnicoEnBloque: true },
-                { nombre: "Santander Amex", color: "#f97316", esTarjeta: true, vencimientoUnicoEnBloque: true }
-            ],
-            recurrentesPreferidos: [],
-            sortColumn: 'concepto',
-            sortAscending: true,
-            grupoInfo: {
-                adminUid: uidLeonela,
-                miembros: {
-                    [uidLeonela]: { email: "sosaleonela2024@gmail.com", rol: "admin" }
-                },
-                invitacionesPendientes: []
-            }
-        };
-
-        await setDoc(doc(db, "app_data", `personal_${uidLeonela}`), {
-            appState: appStateLimpioTotal,
-            emailVerificado: true
-        }, { merge: false });
-
-        console.log("¡Espacio personal de Leonela limpiado por completo!");
-        alert("Espacio personal de Leonela blanqueado en todos los meses con éxito.");
-    } catch (e) {
-        console.error("Error al limpiar espacio personal:", e);
-    }
-};
-
-window.forzarVerificacionEmail = async function(emailObjetivo = "sosaleonela2024@gmail.com") {
-    try {
-        const querySnapshot = await getDocs(collection(db, "app_data"));
-        let encontrado = false;
-
-        querySnapshot.forEach(async (docSnap) => {
-            const data = docSnap.data();
-            const grupoInfo = data.appState?.grupoInfo;
-            
-            // Buscar si el UID pertenece al email en los miembros de su espacio personal
-            if (docSnap.id.startsWith("personal_")) {
-                const uidDoc = docSnap.id.replace("personal_", "");
-                // Verificamos si este documento coincide o si lo buscamos por email en auth/firestore
-                // O de forma directa si conoces el UID (ej: Ax3bwHzylYbXjCOGy5Y85e0Iu8R2)
-                await setDoc(doc(db, "app_data", docSnap.id), { emailVerificado: true }, { merge: true });
-                console.log(`Verificado documento: ${docSnap.id}`);
-                encontrado = true;
-            }
-        });
-
-        // Alternativa directa por el UID conocido de Leonela si ya lo tenés identificado:
-        const uidLeonela = "Ax3bwHzylYbXjCOGy5Y85e0Iu8R2";
-        await setDoc(doc(db, "app_data", `personal_${uidLeonela}`), { emailVerificado: true }, { merge: true });
-        
-        console.log(`¡Cuenta de ${emailObjetivo} forzada a VERIFICADA con éxito!`);
-        alert(`¡Cuenta de ${emailObjetivo} verificada correctamente! Ya puede iniciar sesión.`);
-    } catch (e) {
-        console.error("Error al forzar la verificación:", e);
-        alert("Hubo un error al intentar verificar la cuenta.");
-    }
 };

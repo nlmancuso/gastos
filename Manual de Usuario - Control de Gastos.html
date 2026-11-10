@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual de Usuario - Control de Gastos</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #172033;
+      background: #e9eef5;
+      font-size: 10.5pt;
+      line-height: 1.42;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      margin: 0;
+    }
+
+    .page {
+      width: 297mm;
+      height: 210mm;
+      padding: 12mm 14mm 11mm;
+      margin: 0 auto 8mm;
+      position: relative;
+      overflow: hidden;
+      background: #fff;
+      page-break-after: always;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      color: #0c8b69;
+      font-size: 30pt;
+      line-height: 1.1;
+      margin-bottom: 5mm;
+    }
+
+    h2 {
+      color: #0f766e;
+      font-size: 21pt;
+      line-height: 1.15;
+      margin-bottom: 3mm;
+    }
+
+    h3 {
+      color: #1d3557;
+      font-size: 12pt;
+      margin-bottom: 1.5mm;
+    }
+
+    p {
+      margin-bottom: 3mm;
+    }
+
+    ul, ol {
+      margin: 2mm 0 4mm;
+      padding-left: 5mm;
+    }
+
+    li {
+      margin-bottom: 1.5mm;
+    }
+
+    .kicker {
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: 8pt;
+      font-weight: 700;
+      margin-bottom: 3mm;
+    }
+
+    .subtitle {
+      color: #475569;
+      font-size: 15pt;
+      line-height: 1.35;
+      margin-bottom: 7mm;
+    }
+
+    .cover {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 12mm;
+      align-items: center;
+    }
+
+    .cover img {
+      width: 100%;
+      height: 180mm;
+      object-fit: contain;
+      object-position: center;
+      border: 1px solid #d5deea;
+      border-radius: 3mm;
+      background: #0b1220;
+    }
+
+    .cover-list {
+      border-left: 2px solid #13a77c;
+      padding-left: 5mm;
+      color: #334155;
+    }
+
+    .callout {
+      border-left: 1.2mm solid #13a77c;
+      border-radius: 2mm;
+      background: #effaf6;
+      color: #21463d;
+      padding: 3mm 4mm;
+      margin: 3mm 0;
+    }
+
+    .callout.warning {
+      border-color: #e5a11a;
+      background: #fff8e8;
+      color: #6a4c12;
+    }
+
+    .columns {
+      display: grid;
+      grid-template-columns: 0.78fr 1.22fr;
+      gap: 8mm;
+      align-items: start;
+    }
+
+    .text-column {
+      padding-top: 2mm;
+    }
+
+    figure {
+      margin: 0;
+      min-width: 0;
+    }
+
+    figure img {
+      display: block;
+      width: 100%;
+      max-height: 150mm;
+      object-fit: contain;
+      object-position: top center;
+      border: 1px solid #d5deea;
+      border-radius: 2mm;
+      background: #0b1220;
+    }
+
+    figcaption {
+      color: #64748b;
+      font-size: 8pt;
+      margin-top: 1.5mm;
+    }
+
+    .analysis-layout {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: 7mm;
+      align-items: center;
+    }
+
+    .two-captures {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7mm;
+      margin-top: 5mm;
+    }
+
+    .two-captures img {
+      height: 132mm;
+      max-height: 132mm;
+    }
+
+    .paired-page {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .paired-page .two-captures {
+      flex: 1;
+      min-height: 0;
+      margin-top: 2mm;
+    }
+
+    .paired-page .two-captures figure {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .paired-page .two-captures img {
+      flex: 1;
+      min-height: 0;
+      height: auto;
+      max-height: 145mm;
+    }
+
+    .paired-page .two-captures figcaption {
+      flex: 0 0 auto;
+    }
+
+    .wide-page figure {
+      margin-top: 4mm;
+    }
+
+    .wide-page figure img {
+      height: 132mm;
+      max-height: 132mm;
+    }
+
+    .compact {
+      font-size: 9.5pt;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6mm;
+      margin-top: 4mm;
+    }
+
+    .settings-card {
+      border: 1px solid #d8e1eb;
+      border-radius: 2mm;
+      padding: 4mm;
+      background: #f8fafc;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 5mm;
+      left: 14mm;
+      right: 14mm;
+      display: flex;
+      justify-content: space-between;
+      color: #94a3b8;
+      font-size: 8pt;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 2mm;
+    }
+
+    .page-num {
+      font-weight: 700;
+      color: #0f766e;
+    }
+
+    @media screen {
+      .page {
+        box-shadow: 0 2mm 8mm #0f172a22;
+      }
+    }
+
+    @media print {
+      :root {
+        background: #fff;
+      }
+
+      .page {
+        margin: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <article class="page cover">
+    <div>
+      <div class="kicker">Guía de uso</div>
+      <h1>Control de Gastos</h1>
+      <p class="subtitle">Manual actualizado para organizar gastos personales y compartidos, revisar saldos y consultar estadísticas.</p>
+      <div class="cover-list">
+        <p><strong>En esta guía</strong></p>
+        <ul>
+          <li>Planilla mensual y análisis con gráficos.</li>
+          <li>Cuentas con varias entidades y saldos independientes.</li>
+          <li>Gastos compartidos del grupo y Gasto Hormiga privado.</li>
+          <li>Ajustes, invitaciones y modo demo local.</li>
+        </ul>
+      </div>
+      <div class="callout warning">
+        Las capturas de este manual se tomaron con datos ficticios de la demo. No muestran información real.
+      </div>
+      <p class="compact">La disponibilidad de algunas opciones depende de que hayas iniciado sesión y de los permisos de tu cuenta.</p>
+    </div>
+    <figure>
+      <img src="manual-capturas/planilla-resumen.png" alt="Vista de la planilla con datos ficticios de la demo">
+      <figcaption>Planilla mensual con información de ejemplo.</figcaption>
+    </figure>
+    <div class="footer"><span>Control de Gastos · Manual de usuario</span><span class="page-num">1 / 10</span></div>
+  </article>
+
+  <article class="page">
+    <div class="kicker">01 · Registro</div>
+    <h2>Planilla de gastos</h2>
+    <div class="columns">
+      <div class="text-column">
+        <p>La barra superior permite cambiar el espacio de trabajo y el mes consultado. Las tarjetas resumen muestran ingresos, gastos fijos, tarjetas, gastos totales y dinero disponible.</p>
+        <h3>Cargar un gasto</h3>
+        <ol>
+          <li>Elegí <strong>Nuevo Gasto</strong>.</li>
+          <li>Completá la descripción, el importe, la fecha, la categoría y el medio de pago.</li>
+          <li>Guardá el registro. Va a aparecer agrupado en la planilla del mes.</li>
+        </ol>
+        <h3>Revisar y organizar</h3>
+        <p>La lista agrupada permite desplegar cada categoría o medio de pago para ver sus movimientos. En los grupos de tarjetas también se muestran vencimiento, estado y monto pagado cuando corresponda.</p>
+        <div class="callout">Usá los filtros de la planilla para mostrar todos los grupos o concentrarte en algunos.</div>
+      </div>
+      <figure>
+        <img src="manual-capturas/planilla-resumen.png" alt="Planilla y resumen mensual de gastos">
+        <figcaption>Resumen y movimientos agrupados del mes seleccionado.</figcaption>
+      </figure>
+    </div>
+    <div class="footer"><span>Registro y consulta</span><span class="page-num">2 / 10</span></div>
+  </article>
+
+  <article class="page">
+    <div class="kicker">02 · Estadísticas</div>
+    <h2>Análisis y gráficos</h2>
+    <div class="analysis-layout">
+      <div>
+        <p>En <strong>Análisis y Gráficos</strong> elegí las fechas de inicio y fin para acotar el período. El botón <strong>Restablecer (±3 Meses)</strong> vuelve al rango sugerido alrededor del mes actual.</p>
+        <p>Los gráficos comparan gastos e ingresos y permiten filtrar categorías. También muestran la evolución por categoría, subcategoría y gastos recurrentes.</p>
+        <div class="callout">Seleccioná o quitá las etiquetas de cada gráfico para enfocarte en los datos que te interesan.</div>
+      </div>
+      <figure>
+        <img src="manual-capturas/analisis-principal.png" alt="Gráficos de gastos e ingresos y evolución por categoría">
+        <figcaption>Período y gráficos principales de análisis.</figcaption>
+      </figure>
+    </div>
+    <div class="footer"><span>Estadísticas del período</span><span class="page-num">3 / 10</span></div>
+  </article>
+
+  <article class="page paired-page">
+    <div class="kicker">02 · Estadísticas</div>
+    <h2>Proyecciones y balance</h2>
+    <p class="compact">La vista incluye la evolución de subcategorías, gastos recurrentes y un balance entre ingresos, gastos y resto disponible. Las pestañas de Gastos del Mes y Gasto Hormiga incluyen gráficos de los últimos 12 meses.</p>
+    <div class="two-captures">
+      <figure>
+        <img src="manual-capturas/analisis-proyeccion.png" alt="Evolución por subcategoría y gastos recurrentes">
+        <figcaption>Seguimiento de subcategorías y gastos recurrentes.</figcaption>
+      </figure>
+      <figure>
+        <img src="manual-capturas/analisis-balance.png" alt="Balance de ingresos, gastos y resto disponible">
+        <figcaption>Comparación mensual de ingresos, gastos y resto.</figcaption>
+      </figure>
+    </div>
+    <div class="footer"><span>Estadísticas del período</span><span class="page-num">4 / 10</span></div>
+  </article>
+
+  <article class="page">
+    <div class="kicker">03 · Saldos</div>
+    <h2>Cuentas y entidades</h2>
+    <div class="columns">
+      <div class="text-column">
+        <p>En <strong>Saldos y Bancos</strong> se administran cuentas. Cada cuenta puede tener varias entidades, por ejemplo Banco, Ahorros o Mercado Pago; cada entidad conserva su propio saldo.</p>
+        <ol>
+          <li>Creá una cuenta con <strong>Nueva Cuenta</strong>.</li>
+          <li>Agregá y nombrá las entidades que uses dentro de esa cuenta.</li>
+          <li>Registrá el saldo de cada una y actualizalo cuando sea necesario.</li>
+        </ol>
+        <p>La pantalla muestra el disponible real de cada cuenta y el total. También permite revisar los descuentos aplicados en el mes por gastos fijos y tarjetas vinculados.</p>
+        <div class="callout">Ya no hace falta elegir entre “cuenta” o “banco” al crearla: la cuenta puede reunir tantas entidades como necesites.</div>
+      </div>
+      <figure>
+        <img src="manual-capturas/saldos-cuentas.png" alt="Cuentas con varias entidades y saldos de ejemplo">
+        <figcaption>Ejemplo de una cuenta con entidades y otra billetera digital.</figcaption>
+      </figure>
+    </div>
+    <div class="footer"><span>Cuentas y saldos disponibles</span><span class="page-num">5 / 10</span></div>
+  </article>
+
+  <article class="page wide-page">
+    <div class="kicker">04 · Gastos compartidos</div>
+    <h2>Gastos del grupo</h2>
+    <p class="compact">En <strong>Gastos del Mes y Hormiga</strong>, seleccioná <strong>Grupo (compartido)</strong> para registrar un gasto que verán los integrantes del grupo. Completá descripción, importe, fecha, categoría y medio de pago.</p>
+    <figure>
+      <img src="manual-capturas/gastos-grupo-resumen.png" alt="Formulario y resumen de gastos compartidos">
+      <figcaption>Formulario y resumen del mes. Los datos visibles son ficticios.</figcaption>
+    </figure>
+    <div class="footer"><span>Gastos compartidos visibles para el grupo</span><span class="page-num">6 / 10</span></div>
+  </article>
+
+  <article class="page wide-page">
+    <div class="kicker">04 · Gastos compartidos</div>
+    <h2>Detalle y evolución del grupo</h2>
+    <p class="compact">La pantalla permite revisar el detalle de los movimientos, los totales por categoría y la evolución mensual. Los integrantes del grupo comparten la información de esta vista.</p>
+    <figure>
+      <img src="manual-capturas/gastos-grupo-graficos.png" alt="Gráficos de gastos compartidos por categoría y mes">
+      <figcaption>Gráficos de categorías y evolución mensual con información de ejemplo.</figcaption>
+    </figure>
+    <div class="footer"><span>Gastos compartidos visibles para el grupo</span><span class="page-num">7 / 10</span></div>
+  </article>
+
+  <article class="page wide-page">
+    <div class="kicker">05 · Privacidad</div>
+    <h2>Gasto Hormiga: privado</h2>
+    <p class="compact">Elegí <strong>Hormiga (privado)</strong> para registrar compras personales pequeñas. Estos datos pertenecen al usuario que inició sesión y solo ese usuario puede verlos; el espacio seleccionado (personal o grupo) no cambia esta privacidad.</p>
+    <figure>
+      <img src="manual-capturas/gasto-hormiga-resumen.png" alt="Formulario y resumen de Gasto Hormiga privado">
+      <figcaption>Resumen y formulario privado. El espacio de trabajo no modifica la privacidad.</figcaption>
+    </figure>
+    <div class="footer"><span>Gasto Hormiga: información privada del usuario</span><span class="page-num">8 / 10</span></div>
+  </article>
+
+  <article class="page wide-page">
+    <div class="kicker">05 · Privacidad</div>
+    <h2>Detalle y evolución de Gasto Hormiga</h2>
+    <p class="compact">El historial muestra las compras del usuario, sus categorías, medios de pago y gráficos de evolución de los últimos 12 meses.</p>
+    <figure>
+      <img src="manual-capturas/gasto-hormiga-graficos.png" alt="Gráficos privados de Gasto Hormiga por categoría y mes">
+      <figcaption>Gráficos privados con información ficticia de la demo.</figcaption>
+    </figure>
+    <div class="footer"><span>Gasto Hormiga: información privada del usuario</span><span class="page-num">9 / 10</span></div>
+  </article>
+
+  <article class="page">
+    <div class="kicker">06 · Ajustes y acceso</div>
+    <h2>Configuración, grupo y demo</h2>
+    <div class="settings-grid">
+      <section class="settings-card">
+        <h3>Categorías y subcategorías</h3>
+        <p>Desde el engranaje se abre Ajustes. Allí podés administrar las categorías y subcategorías disponibles para clasificar tus gastos.</p>
+      </section>
+      <section class="settings-card">
+        <h3>Gestión de grupo e invitaciones</h3>
+        <p>La sección Gestión de grupo permite consultar integrantes e invitaciones pendientes. Usá la campana para revisar invitaciones recibidas y responderlas.</p>
+      </section>
+      <section class="settings-card">
+        <h3>Notificaciones</h3>
+        <p>La sección Notificaciones es informativa. Las invitaciones a grupos se consultan desde la campana; no es un historial de movimientos de gastos.</p>
+      </section>
+      <section class="settings-card">
+        <h3>Modo demo local</h3>
+        <p>El acceso a la demo está disponible para el administrador autorizado. Carga perfiles y movimientos ficticios para recorrer las pantallas y gráficos.</p>
+        <div class="callout warning">La demo es local y de solo lectura: no guarda esos datos en Firebase. Al salir, la aplicación vuelve a cargar los datos reales.</div>
+      </section>
+    </div>
+    <div class="callout">
+      <strong>Recordatorio:</strong> los gastos compartidos son visibles para el grupo. El Gasto Hormiga es privado para el usuario que lo registra, independientemente del espacio seleccionado.
+    </div>
+    <div class="footer"><span>Ayuda rápida</span><span class="page-num">10 / 10</span></div>
+  </article>
+</body>
+</html>

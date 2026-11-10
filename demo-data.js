@@ -70,7 +70,8 @@
             const mes = meses[monthIndex];
             const cantidad = 5 + monthIndex % 3;
             for (let index = 0; index < cantidad; index++) {
-                const dia = String(2 + index * 3).padStart(2, '0');
+                const diaBase = 2 + index * 3;
+                const dia = String(Math.min(diaBase, mes === mesActual ? new Date().getDate() : 28)).padStart(2, '0');
                 const usuario = usuariosDemo[(monthIndex + index) % usuariosDemo.length];
                 gastosMensuales.push({
                     id: `demo-gm-${mes}-${index}`,
@@ -119,7 +120,8 @@
         for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
             const mes = meses[monthIndex];
             for (let index = 0; index < 7; index++) {
-                const dia = String(3 + index * 4).padStart(2, '0');
+                const diaBase = 3 + index * 4;
+                const dia = String(Math.min(diaBase, mes === mesActual ? new Date().getDate() : 28)).padStart(2, '0');
                 gastosHormiga.push({
                     id: `demo-gh-${mes}-${index}`,
                     concepto: ['Café', 'Algo para merendar', 'Kiosco', 'Viaje', 'Compra rápida', 'Propina', 'Pan'][index],
