@@ -177,7 +177,7 @@ test('alerts a card category due today when it has not been paid', () => {
     assert.equal(alerts[0].vencimiento, '2026-11-11');
 });
 
-test('carries an overdue unpaid individual expense into the current month alert', () => {
+test('includes an overdue unpaid service and its current monthly expense', () => {
     const state = crearEstado([{
         id: 'internet',
         concepto: 'Internet',
@@ -194,8 +194,8 @@ test('carries an overdue unpaid individual expense into the current month alert'
 
     const alerts = calcularAlertasVencimiento(state, '2026-11-11');
     assert.equal(alerts.length, 1);
-    assert.equal(alerts[0].monto, 1000);
-    assert.equal(alerts[0].vencimiento, '2026-10-10');
+    assert.equal(alerts[0].monto, 2000);
+    assert.equal(alerts[0].vencimiento, '2026-11-10');
 });
 
 test('carries an overdue unpaid card balance into the current month alert', () => {
