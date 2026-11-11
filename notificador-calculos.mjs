@@ -232,6 +232,8 @@ function obtenerItemsConSaldo(state, targetMonth, hoy) {
     const ultimosItemsBloque = {};
     const pagosIndividuales = state.excepcionesMontoPagado || {};
     const pagosBloque = state.excepcionesMontoPagadoBloque || {};
+    const estadosGuardados = state.excepcionesEstado || {};
+    const currentMonth = hoy.slice(0, 7);
     let itemsObjetivo = [];
 
     while (month <= targetMonth) {
@@ -281,11 +283,14 @@ function obtenerItemsConSaldo(state, targetMonth, hoy) {
             const idPago = item.idPago || item.id;
             const key = `${idPago}_${month}`;
             const amountDue = roundMoney(toNumber(item.monto) + (balancesIndividuales[idPago] || 0));
-            const isMarkedPaid = String(item.estado).toUpperCase() === 'PAGADO';
-            const amountPaid = isMarkedPaid
-                ? amountDue
-                : own(pagosIndividuales, key)
-                    ? clampPayment(pagosIndividuales[key], amountDue)
+            const stateKey = `${item.id}_${month}`;
+            const hasSavedState = own(estadosGuardados, stateKey);
+            const isMarkedPaid = String(hasSavedState ? estadosGuardados[stateKey] : item.estado).toUpperCase() === 'PAGADO';
+            const assumeHistoricalPaid = month < currentMonth && !hasSavedState && !item.esSaldoArrastrado;
+            const amountPaid = own(pagosIndividuales, key)
+                ? clampPayment(pagosIndividuales[key], amountDue)
+                : isMarkedPaid || assumeHistoricalPaid
+                    ? amountDue
                     : 0;
             balancesIndividuales[idPago] = roundMoney(Math.max(0, amountDue - amountPaid));
             if (!item.esSaldoArrastrado) ultimosItemsIndividuales[idPago] = item;
@@ -308,14 +313,29 @@ function obtenerItemsConSaldo(state, targetMonth, hoy) {
             );
             const key = `${name}_${month}`;
             const actualItems = gastosCategoria.filter(item => !item.esSaldoArrastrado);
-            const allMarkedPaid = actualItems.length > 0
-                && actualItems.every(item => String(item.estado).toUpperCase() === 'PAGADO');
-            const markedPaidAmount = allMarkedPaid
-                ? amountDue
-                : actualItems
-                    .filter(item => String(item.estado).toUpperCase() === 'PAGADO')
-                    .reduce((total, item) => total + toNumber(item.monto), 0);
-            const remainingBeforeBlockPayment = roundMoney(Math.max(0, amountDue - markedPaidAmount));
+            const stateKeyFor = item => `${item.id}_${month}`;
+            const hasSavedState = item => own(estadosGuardados, stateKeyFor(item));
+            const isMarkedPaid = item => String(
+                hasSavedState(item) ? estadosGuardados[stateKeyFor(item)] : item.estado
+            ).toUpperCase() === 'PAGADO';
+            const allMarkedPaid = actualItems.length > 0 && actualItems.every(isMarkedPaid);
+            const explicitlyPaidAmount = actualItems
+                .filter(item => hasSavedState(item) && isMarkedPaid(item))
+                .reduce((total, item) => total + toNumber(item.monto), 0);
+            const unpaidActualAmount = actualItems
+                .filter(item => {
+                    if (hasSavedState(item)) return !isMarkedPaid(item);
+                    return month === currentMonth && !isMarkedPaid(item);
+                })
+                .reduce((total, item) => total + toNumber(item.monto), 0);
+            const unpaidCarryover = saldoAnterior > 0 && (
+                actualItems.length === 0
+                || month === currentMonth && !allMarkedPaid
+                || actualItems.some(item => hasSavedState(item) && !isMarkedPaid(item))
+            ) ? saldoAnterior : 0;
+            const remainingBeforeBlockPayment = own(pagosBloque, key)
+                ? roundMoney(Math.max(0, amountDue - explicitlyPaidAmount))
+                : roundMoney(unpaidCarryover + unpaidActualAmount);
             const amountPaid = own(pagosBloque, key)
                 ? clampPayment(pagosBloque[key], remainingBeforeBlockPayment)
                 : 0;

@@ -121,6 +121,34 @@ test('groups a card once, subtracts its recorded partial payment, and ignores ol
     assert.equal(alerts[0].vencimiento, '2026-11-10');
 });
 
+test('does not add automatically overdue card purchases from older months', () => {
+    const state = crearEstado([
+        {
+            id: 'old-purchase',
+            concepto: 'Compra vieja',
+            monto: 9000000,
+            cuotas: 1,
+            categoria: 'Mercado Pago',
+            startMonth: '2026-10',
+            vencimiento: '2026-10-10'
+        },
+        {
+            id: 'current-purchase',
+            concepto: 'Compra actual',
+            monto: 500,
+            cuotas: 1,
+            categoria: 'Mercado Pago',
+            startMonth: '2026-11',
+            vencimiento: '2026-11-12'
+        }
+    ]);
+
+    const alerts = calcularAlertasVencimiento(state, '2026-11-11');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].monto, 500);
+    assert.equal(alerts[0].vencimiento, '2026-11-12');
+});
+
 test('alerts an overdue card carryover in the current month without duplicating it next month', () => {
     const state = crearEstado([{
         id: 'card-purchase',
@@ -159,22 +187,42 @@ test('alerts an expense due today when it has not been paid', () => {
     assert.equal(alerts[0].vencimiento, '2026-11-11');
 });
 
-test('alerts a card category due today when it has not been paid', () => {
-    const state = crearEstado([{
-        id: 'card-purchase',
-        concepto: 'Compra con tarjeta',
-        monto: 1000,
-        cuotas: 1,
-        categoria: 'Mercado Pago',
-        startMonth: '2026-11',
-        vencimiento: '2026-11-11'
-    }]);
+test('alerts both card categories due today when they have not been paid', () => {
+    const state = crearEstado([
+        {
+            id: 'santander-purchase',
+            concepto: 'Compra Santander',
+            monto: 1000,
+            cuotas: 1,
+            categoria: 'Santander Visa',
+            startMonth: '2026-11',
+            vencimiento: '2026-11-11'
+        },
+        {
+            id: 'ciudad-purchase',
+            concepto: 'Compra Ciudad',
+            monto: 2000,
+            cuotas: 1,
+            categoria: 'Ciudad Visa',
+            startMonth: '2026-11',
+            vencimiento: '2026-11-11'
+        }
+    ], {
+        categorias: [
+            { nombre: 'Santander Visa', esTarjeta: true, vencimientoUnicoEnBloque: true },
+            { nombre: 'Ciudad Visa', esTarjeta: true, vencimientoUnicoEnBloque: true }
+        ]
+    });
 
     const alerts = calcularAlertasVencimiento(state, '2026-11-11');
-    assert.equal(alerts.length, 1);
-    assert.equal(alerts[0].concepto, 'Tarjeta: Mercado Pago');
-    assert.equal(alerts[0].monto, 1000);
-    assert.equal(alerts[0].vencimiento, '2026-11-11');
+    assert.equal(alerts.length, 2);
+    assert.deepEqual(
+        alerts.map(alert => [alert.categoria, alert.monto, alert.vencimiento]).sort(),
+        [
+            ['Ciudad Visa', 2000, '2026-11-11'],
+            ['Santander Visa', 1000, '2026-11-11']
+        ]
+    );
 });
 
 test('includes an overdue unpaid service and its current monthly expense', () => {
@@ -207,7 +255,11 @@ test('carries an overdue unpaid card balance into the current month alert', () =
         categoria: 'Mercado Pago',
         startMonth: '2026-10',
         vencimiento: '2026-10-10'
-    }]);
+    }], {
+        excepcionesEstado: {
+            'card-purchase_2026-10': 'VENCIDO'
+        }
+    });
 
     const alerts = calcularAlertasVencimiento(state, '2026-11-11');
     assert.equal(alerts.length, 1);
