@@ -373,6 +373,7 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
                 processedBlocks.add(item.categoria);
                 const group = items.filter(entry => entry.categoria === item.categoria);
                 const actualItems = group.filter(entry => !entry.esSaldoArrastrado);
+                if (!actualItems.length && month !== currentMonth) return;
                 const allMarkedPaid = actualItems.length > 0
                     && actualItems.every(entry => String(entry.estado).toUpperCase() === 'PAGADO');
                 if (allMarkedPaid) return;
@@ -388,7 +389,7 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
                     ? clampPayment(paidBlockMap[key], remainingBeforeBlockPayment)
                     : 0;
                 const remaining = roundMoney(Math.max(0, remainingBeforeBlockPayment - amountPaid));
-                const dueDateValue = group.find(entry =>
+                const dueDateValue = actualItems.find(entry =>
                     String(entry.estado).toUpperCase() !== 'PAGADO' && normalizarFecha(entry.vencimiento)
                 )?.vencimiento
                     || state?.vencimientosTarjetas?.[key]

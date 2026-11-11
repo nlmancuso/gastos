@@ -117,6 +117,27 @@ test('groups a card once, subtracts its recorded partial payment, and ignores ol
     assert.equal(alerts[0].vencimiento, '2026-11-10');
 });
 
+test('alerts an overdue card carryover in the current month without duplicating it next month', () => {
+    const state = crearEstado([{
+        id: 'card-purchase',
+        concepto: 'Compra con tarjeta',
+        monto: 1000,
+        cuotas: 1,
+        categoria: 'Mercado Pago',
+        startMonth: '2026-11',
+        vencimiento: '2026-11-10'
+    }], {
+        excepcionesMontoPagadoBloque: {
+            'Mercado Pago_2026-11': 200
+        }
+    });
+
+    const alerts = calcularAlertasVencimiento(state, '2026-12-11');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].monto, 800);
+    assert.equal(alerts[0].vencimiento, '2026-11-10');
+});
+
 test('shows only the unpaid remainder for an individual expense', () => {
     const state = crearEstado([{
         id: 'internet',

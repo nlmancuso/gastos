@@ -2,6 +2,12 @@ name: Enviar Alertas de Vencimiento
 
 on:
   workflow_dispatch:
+    inputs:
+      enviar_correo:
+        description: "Enviar el correo después de las pruebas"
+        required: true
+        default: true
+        type: boolean
 
 jobs:
   enviar-alerta:
@@ -22,6 +28,7 @@ jobs:
         run: node --test tests/notificador-calculos.test.mjs
 
       - name: Ejecutar script de notificaciones
+        if: ${{ inputs.enviar_correo }}
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_TO: ${{ secrets.MY_EMAIL }}
