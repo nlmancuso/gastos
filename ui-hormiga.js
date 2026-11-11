@@ -273,9 +273,13 @@
                 return;
             }
             const gastosAsociados = (window.hormigaState.gastos || []).filter(gasto => gasto.categoria === categoria.nombre);
-            if (gastosAsociados.length > 0 && !window.confirm(
-                `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para asignarles nuevos gastos. ¿Querés continuar?`
-            )) return;
+            if (gastosAsociados.length > 0) {
+                const confirmar = await window.mostrarConfirmacionApp(
+                    'Eliminar categoría',
+                    `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para asignarles nuevos gastos. ¿Querés continuar?`
+                );
+                if (!confirmar) return;
+            }
             const estadoAnterior = JSON.parse(JSON.stringify(window.hormigaState));
             categorias.splice(index, 1);
             renderCatHormigaList();

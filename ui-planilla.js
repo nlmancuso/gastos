@@ -265,6 +265,39 @@
             window.saveDataToCloud(); renderApp();
         };
 
+        let resolverConfirmacionAppPendiente = null;
+        window.mostrarConfirmacionApp = function(titulo, mensaje) {
+            const modal = document.getElementById('modalConfirmacionApp');
+            const tituloModal = document.getElementById('modalConfirmacionAppTitulo');
+            const mensajeModal = document.getElementById('modalConfirmacionAppMensaje');
+            if (!modal || !tituloModal || !mensajeModal) {
+                throw new Error('No se encontró el modal de confirmación de la aplicación.');
+            }
+            if (resolverConfirmacionAppPendiente) {
+                throw new Error('Ya hay una confirmación abierta.');
+            }
+            tituloModal.textContent = titulo;
+            mensajeModal.textContent = mensaje;
+            modal.classList.remove('hidden');
+            document.getElementById('btnCancelarConfirmacionApp').focus();
+            return new Promise(resolve => {
+                resolverConfirmacionAppPendiente = resolve;
+            });
+        };
+        window.resolverConfirmacionApp = function(confirmado) {
+            const modal = document.getElementById('modalConfirmacionApp');
+            if (!modal || !resolverConfirmacionAppPendiente) return;
+            modal.classList.add('hidden');
+            const resolver = resolverConfirmacionAppPendiente;
+            resolverConfirmacionAppPendiente = null;
+            resolver(Boolean(confirmado));
+        };
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && resolverConfirmacionAppPendiente) {
+                window.resolverConfirmacionApp(false);
+            }
+        });
+
         window.renderSettingsCategories = function() {
             renderCatGeneralList(); 
             renderSubcatList();
@@ -315,15 +348,22 @@
             document.getElementById('nuevaCatGenNombre').value = ''; document.getElementById('nuevaCatGenBloque').checked = false;
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
-        window.eliminarCatGeneral = function(index) {
+        window.eliminarCatGeneral = async function(index) {
             const categorias = window.appState.categorias || [];
             const categoria = categorias[index];
             if (!categoria) return;
-            if (categorias.length <= 1) return alert("Debe haber al menos una categoría.");
+            if (categorias.length <= 1) {
+                window.mostrarMensajeApp('No se puede eliminar', 'Debe haber al menos una categoría.', 'error');
+                return;
+            }
             const gastosAsociados = (window.appState.gastos || []).filter(gasto => gasto.categoria === categoria.nombre);
-            if (gastosAsociados.length > 0 && !window.confirm(
-                `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para agruparlos o asignarles nuevos gastos. ¿Querés continuar?`
-            )) return;
+            if (gastosAsociados.length > 0) {
+                const confirmar = await window.mostrarConfirmacionApp(
+                    'Eliminar categoría',
+                    `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para agruparlos o asignarles nuevos gastos. ¿Querés continuar?`
+                );
+                if (!confirmar) return;
+            }
             categorias.splice(index, 1);
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
@@ -395,15 +435,19 @@
             });
         }
 
-        window.eliminarSubcategoria = function(idx) {
+        window.eliminarSubcategoria = async function(idx) {
             const subcategorias = window.appState.subcategorias || [];
             const subcategoria = subcategorias[idx];
             if (!subcategoria) return;
             const tieneGastosAsociados = (window.appState.gastos || []).some(gasto => gasto.subcategoriaId === subcategoria.id)
                 || Object.values(window.appState.excepcionesSubcategoria || {}).some(id => id === subcategoria.id);
-            if (tieneGastosAsociados && !window.confirm(
-                `La subcategoría "${subcategoria.nombre}" tiene gastos asociados. Los gastos no se eliminarán, pero dejarán de mostrar esta subcategoría y ya no se aplicará su porcentaje de aumento. ¿Querés continuar?`
-            )) return;
+            if (tieneGastosAsociados) {
+                const confirmar = await window.mostrarConfirmacionApp(
+                    'Eliminar subcategoría',
+                    `La subcategoría "${subcategoria.nombre}" tiene gastos asociados. Los gastos no se eliminarán, pero dejarán de mostrar esta subcategoría y ya no se aplicará su porcentaje de aumento. ¿Querés continuar?`
+                );
+                if (!confirmar) return;
+            }
             subcategorias.splice(idx, 1);
             window.saveDataToCloud();
             renderSubcatList();

@@ -1122,6 +1122,20 @@ select option {
     </div>
 </div>
     <!-- Modal Personalizado para Mensajes y Notificaciones -->
+<div id="modalConfirmacionApp" class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden" role="dialog" aria-modal="true" aria-labelledby="modalConfirmacionAppTitulo" aria-describedby="modalConfirmacionAppMensaje" onclick="resolverConfirmacionApp(false)">
+    <div class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4 text-center" onclick="event.stopPropagation()">
+        <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 id="modalConfirmacionAppTitulo" class="text-lg font-bold text-white">Confirmar eliminación</h3>
+        <p id="modalConfirmacionAppMensaje" class="text-sm text-slate-300 leading-relaxed"></p>
+        <div class="flex justify-end gap-2">
+            <button id="btnCancelarConfirmacionApp" type="button" onclick="resolverConfirmacionApp(false)" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700">Cancelar</button>
+            <button type="button" onclick="resolverConfirmacionApp(true)" class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white">Sí, eliminar</button>
+        </div>
+    </div>
+</div>
+
 <div id="modalNotificacion" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden">
     <div class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4 text-center transform transition-all">
         <div id="modalNotiIcono" class="w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl">
