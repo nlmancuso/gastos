@@ -16,10 +16,16 @@ jobs:
           node-version: '20'
 
       - name: Instalar dependencias
-        run: npm install resend firebase
+        run: npm install --no-save resend firebase-admin
+
+      - name: Probar cálculos del notificador
+        run: node --test tests/notificador-calculos.test.mjs
 
       - name: Ejecutar script de notificaciones
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_TO: ${{ secrets.MY_EMAIL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FIRESTORE_GROUP_ID: ${{ vars.FIRESTORE_GROUP_ID }}
         run: node notificador.js

@@ -1,4 +1,4 @@
-// Draft only: validate in the Firebase Emulator and migrate or disable the Node.js notifier before deployment.
+// Draft only: validate app flows and run the scheduled notifier with Firebase Admin SDK before production.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -92,7 +92,10 @@ service cloud.firestore {
 
     function validGroupId(groupId) {
       return groupId is string
-        && groupId.matches('^personal_[A-Za-z0-9_-]+$');
+        && (
+          groupId.matches('^personal_[A-Za-z0-9_-]+$')
+          || groupId.matches('^[A-Za-z0-9]{20}$')
+        );
     }
 
     function isGroupAdminById(groupId) {
@@ -187,7 +190,8 @@ service cloud.firestore {
     }
 
     match /app_data/{documentId} {
-      allow get: if ownsPersonalDocument(documentId) || isGroupMember(resource.data);
+      allow get: if ownsPersonalDocument(documentId)
+        || (resource != null && isGroupMember(resource.data));
       allow list: if false;
 
       allow create: if ownsPersonalDocument(documentId)
