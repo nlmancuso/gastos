@@ -281,6 +281,12 @@
                 window.mostrarMensajeApp('No se puede eliminar', 'Debe quedar al menos una categoría.', 'error');
                 return;
             }
+            const categoria = categorias[index];
+            if (!categoria) return;
+            const gastosAsociados = (window.appState.gastosMensuales || []).filter(gasto => gasto.categoria === categoria.nombre);
+            if (gastosAsociados.length > 0 && !window.confirm(
+                `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para asignarles nuevos gastos. ¿Querés continuar?`
+            )) return;
             categorias.splice(index, 1);
             await guardarCambiosCategoriasGastoMensual(categorias, window.appState.gastosMensuales || []);
         };

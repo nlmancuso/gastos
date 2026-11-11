@@ -644,9 +644,19 @@ window.reenviarVerificacion = async function() {
         console.error("Error al reenviar la verificación:", error);
         if (auth.currentUser) await signOut(auth);
         if (loginError) {
-            loginError.innerText = error.code === 'auth/invalid-credential'
-                ? "No se pudo validar el correo y la contraseña."
-                : "No se pudo reenviar el correo de verificación. Intentá nuevamente más tarde.";
+            const mensajesPorError = {
+                'auth/invalid-credential': "El correo o la contraseña no son correctos. Verificá los datos e intentá nuevamente.",
+                'auth/wrong-password': "La contraseña no es correcta. Revisala e intentá nuevamente.",
+                'auth/user-not-found': "No encontramos una cuenta con ese correo.",
+                'auth/user-disabled': "Esta cuenta está deshabilitada. Contactá al administrador.",
+                'auth/too-many-requests': "Hubo demasiados intentos. Esperá un rato antes de volver a probar.",
+                'auth/network-request-failed': "No se pudo conectar con Firebase. Revisá tu conexión e intentá nuevamente.",
+                'auth/operation-not-allowed': "El acceso con correo y contraseña no está habilitado en Firebase.",
+                'auth/unauthorized-continue-uri': "Firebase no autorizó el enlace de retorno. Revisá los dominios autorizados de Authentication.",
+                'auth/invalid-continue-uri': "El enlace de retorno no es válido. Revisá la configuración de Authentication."
+            };
+            loginError.innerText = mensajesPorError[error.code]
+                || "Firebase no pudo reenviar el correo. Esperá un momento y volvé a intentar.";
             loginError.classList.remove('hidden');
         }
     } finally {

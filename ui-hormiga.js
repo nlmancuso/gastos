@@ -265,12 +265,19 @@
             document.getElementById('nuevaCatHormigaNombre').value = '';
         };
         window.eliminarCatHormiga = async function(index) {
-            if (window.hormigaState.categorias.length <= 1) {
+            const categorias = window.hormigaState.categorias || [];
+            const categoria = categorias[index];
+            if (!categoria) return;
+            if (categorias.length <= 1) {
                 window.mostrarNotificacion('No se puede eliminar', 'Debe quedar al menos una categoría de Gasto Hormiga.', 'info');
                 return;
             }
+            const gastosAsociados = (window.hormigaState.gastos || []).filter(gasto => gasto.categoria === categoria.nombre);
+            if (gastosAsociados.length > 0 && !window.confirm(
+                `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para asignarles nuevos gastos. ¿Querés continuar?`
+            )) return;
             const estadoAnterior = JSON.parse(JSON.stringify(window.hormigaState));
-            window.hormigaState.categorias.splice(index, 1);
+            categorias.splice(index, 1);
             renderCatHormigaList();
             renderHormigaCategoriasSelect();
             renderHormigaApp();

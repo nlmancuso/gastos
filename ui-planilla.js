@@ -316,8 +316,15 @@
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
         window.eliminarCatGeneral = function(index) {
-            if (window.appState.categorias.length <= 1) return alert("Debe haber al menos una categoría.");
-            window.appState.categorias.splice(index, 1);
+            const categorias = window.appState.categorias || [];
+            const categoria = categorias[index];
+            if (!categoria) return;
+            if (categorias.length <= 1) return alert("Debe haber al menos una categoría.");
+            const gastosAsociados = (window.appState.gastos || []).filter(gasto => gasto.categoria === categoria.nombre);
+            if (gastosAsociados.length > 0 && !window.confirm(
+                `La categoría "${categoria.nombre}" tiene ${gastosAsociados.length} gasto(s) asociado(s). Los gastos no se eliminarán, pero la categoría dejará de estar disponible para agruparlos o asignarles nuevos gastos. ¿Querés continuar?`
+            )) return;
+            categorias.splice(index, 1);
             window.saveDataToCloud(); renderApp(); renderCatGeneralList();
         };
 
@@ -389,7 +396,15 @@
         }
 
         window.eliminarSubcategoria = function(idx) {
-            window.appState.subcategorias.splice(idx, 1);
+            const subcategorias = window.appState.subcategorias || [];
+            const subcategoria = subcategorias[idx];
+            if (!subcategoria) return;
+            const tieneGastosAsociados = (window.appState.gastos || []).some(gasto => gasto.subcategoriaId === subcategoria.id)
+                || Object.values(window.appState.excepcionesSubcategoria || {}).some(id => id === subcategoria.id);
+            if (tieneGastosAsociados && !window.confirm(
+                `La subcategoría "${subcategoria.nombre}" tiene gastos asociados. Los gastos no se eliminarán, pero dejarán de mostrar esta subcategoría y ya no se aplicará su porcentaje de aumento. ¿Querés continuar?`
+            )) return;
+            subcategorias.splice(idx, 1);
             window.saveDataToCloud();
             renderSubcatList();
         };
