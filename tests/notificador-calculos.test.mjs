@@ -67,6 +67,7 @@ test('alerts only use current-month card items and omit a paid card', () => {
         }
     ], {
         excepcionesEstado: {
+            'old-purchase_2026-10': 'PAGADO',
             'current-purchase-a_2026-11': 'PAGADO',
             'current-purchase-b_2026-11': 'PAGADO'
         }
@@ -105,6 +106,9 @@ test('groups a card once, subtracts its recorded partial payment, and ignores ol
             vencimiento: '2026-11-10'
         }
     ], {
+        excepcionesEstado: {
+            'old-purchase_2026-10': 'PAGADO'
+        },
         excepcionesMontoPagadoBloque: {
             'Mercado Pago_2026-11': 200
         }
@@ -136,6 +140,79 @@ test('alerts an overdue card carryover in the current month without duplicating 
     assert.equal(alerts.length, 1);
     assert.equal(alerts[0].monto, 800);
     assert.equal(alerts[0].vencimiento, '2026-11-10');
+});
+
+test('alerts an expense due today when it has not been paid', () => {
+    const state = crearEstado([{
+        id: 'internet',
+        concepto: 'Internet',
+        monto: 1000,
+        cuotas: 1,
+        categoria: 'Servicios',
+        startMonth: '2026-11',
+        vencimiento: '2026-11-11'
+    }]);
+
+    const alerts = calcularAlertasVencimiento(state, '2026-11-11');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].monto, 1000);
+    assert.equal(alerts[0].vencimiento, '2026-11-11');
+});
+
+test('alerts a card category due today when it has not been paid', () => {
+    const state = crearEstado([{
+        id: 'card-purchase',
+        concepto: 'Compra con tarjeta',
+        monto: 1000,
+        cuotas: 1,
+        categoria: 'Mercado Pago',
+        startMonth: '2026-11',
+        vencimiento: '2026-11-11'
+    }]);
+
+    const alerts = calcularAlertasVencimiento(state, '2026-11-11');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].concepto, 'Tarjeta: Mercado Pago');
+    assert.equal(alerts[0].monto, 1000);
+    assert.equal(alerts[0].vencimiento, '2026-11-11');
+});
+
+test('carries an overdue unpaid individual expense into the current month alert', () => {
+    const state = crearEstado([{
+        id: 'internet',
+        concepto: 'Internet',
+        monto: 1000,
+        cuotas: 1,
+        categoria: 'Servicios',
+        startMonth: '2026-10',
+        vencimiento: '2026-10-10'
+    }], {
+        excepcionesEstado: {
+            'internet_2026-10': 'VENCIDO'
+        }
+    });
+
+    const alerts = calcularAlertasVencimiento(state, '2026-11-11');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].monto, 1000);
+    assert.equal(alerts[0].vencimiento, '2026-10-10');
+});
+
+test('carries an overdue unpaid card balance into the current month alert', () => {
+    const state = crearEstado([{
+        id: 'card-purchase',
+        concepto: 'Compra con tarjeta',
+        monto: 1000,
+        cuotas: 1,
+        categoria: 'Mercado Pago',
+        startMonth: '2026-10',
+        vencimiento: '2026-10-10'
+    }]);
+
+    const alerts = calcularAlertasVencimiento(state, '2026-11-11');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].monto, 1000);
+    assert.equal(alerts[0].vencimiento, '2026-10-10');
 });
 
 test('shows only the unpaid remainder for an individual expense', () => {

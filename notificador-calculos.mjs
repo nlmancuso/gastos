@@ -281,9 +281,12 @@ function obtenerItemsConSaldo(state, targetMonth, hoy) {
             const idPago = item.idPago || item.id;
             const key = `${idPago}_${month}`;
             const amountDue = roundMoney(toNumber(item.monto) + (balancesIndividuales[idPago] || 0));
-            const amountPaid = own(pagosIndividuales, key)
-                ? clampPayment(pagosIndividuales[key], amountDue)
-                : amountDue;
+            const isMarkedPaid = String(item.estado).toUpperCase() === 'PAGADO';
+            const amountPaid = isMarkedPaid
+                ? amountDue
+                : own(pagosIndividuales, key)
+                    ? clampPayment(pagosIndividuales[key], amountDue)
+                    : 0;
             balancesIndividuales[idPago] = roundMoney(Math.max(0, amountDue - amountPaid));
             if (!item.esSaldoArrastrado) ultimosItemsIndividuales[idPago] = item;
 
@@ -304,10 +307,19 @@ function obtenerItemsConSaldo(state, targetMonth, hoy) {
                 gastosCategoria.reduce((total, item) => total + toNumber(item.monto), 0) + saldoAnterior
             );
             const key = `${name}_${month}`;
+            const actualItems = gastosCategoria.filter(item => !item.esSaldoArrastrado);
+            const allMarkedPaid = actualItems.length > 0
+                && actualItems.every(item => String(item.estado).toUpperCase() === 'PAGADO');
+            const markedPaidAmount = allMarkedPaid
+                ? amountDue
+                : actualItems
+                    .filter(item => String(item.estado).toUpperCase() === 'PAGADO')
+                    .reduce((total, item) => total + toNumber(item.monto), 0);
+            const remainingBeforeBlockPayment = roundMoney(Math.max(0, amountDue - markedPaidAmount));
             const amountPaid = own(pagosBloque, key)
-                ? clampPayment(pagosBloque[key], amountDue)
-                : amountDue;
-            balancesBloque[name] = roundMoney(Math.max(0, amountDue - amountPaid));
+                ? clampPayment(pagosBloque[key], remainingBeforeBlockPayment)
+                : 0;
+            balancesBloque[name] = roundMoney(Math.max(0, remainingBeforeBlockPayment - amountPaid));
             if (!gastosCategoria.every(item => item.esSaldoArrastrado)) {
                 ultimosItemsBloque[name] = gastosCategoria.find(item => !item.esSaldoArrastrado) || gastosCategoria[0];
             }
@@ -365,6 +377,7 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
         const processedBlocks = new Set();
 
         items.forEach(item => {
+            if (item.esSaldoArrastrado && month !== currentMonth) return;
             const category = categories.find(entry => entry.nombre === item.categoria);
             const isBlock = !!category?.vencimientoUnicoEnBloque;
 
@@ -373,7 +386,6 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
                 processedBlocks.add(item.categoria);
                 const group = items.filter(entry => entry.categoria === item.categoria);
                 const actualItems = group.filter(entry => !entry.esSaldoArrastrado);
-                if (!actualItems.length && month !== currentMonth) return;
                 const allMarkedPaid = actualItems.length > 0
                     && actualItems.every(entry => String(entry.estado).toUpperCase() === 'PAGADO');
                 if (allMarkedPaid) return;
