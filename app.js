@@ -354,12 +354,9 @@ window.cambiarRolMiembro = async function(uidMiembro, nuevoRol) {
 };
 
 const categoriasDefault = [
-    { nombre: "Gastos Fijo", color: "#10b981", esTarjeta: false, vencimientoUnicoEnBloque: false },
-    { nombre: "Servicios", color: "#f97316", esTarjeta: false, vencimientoUnicoEnBloque: false },
-    { nombre: "Santander Visa", color: "#ef4444", esTarjeta: true, vencimientoUnicoEnBloque: true },
-    { nombre: "Ciudad Visa", color: "#3b82f6", esTarjeta: true, vencimientoUnicoEnBloque: true },
-    { nombre: "Mercado Pago", color: "#f59e0b", esTarjeta: true, vencimientoUnicoEnBloque: true },
-    { nombre: "Santander Amex", color: "#f97316", esTarjeta: true, vencimientoUnicoEnBloque: true }
+    { nombre: "Gastos", color: "#10b981", esTarjeta: false, vencimientoUnicoEnBloque: false },
+    { nombre: "Banco", color: "#ef4444", esTarjeta: true, vencimientoUnicoEnBloque: true },
+    { nombre: "Mercado Pago", color: "#f59e0b", esTarjeta: true, vencimientoUnicoEnBloque: true }
 ];
 
 const subcategoriasDefault = [
