@@ -49,7 +49,7 @@ select option {
 <body class="min-h-screen pb-12">
     <!-- Modal / Overlay de Login y Registro -->
 <div id="loginOverlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl">
         <!-- Pestañas para alternar entre Iniciar Sesión y Registrarse -->
         <div class="flex border-b border-slate-800 mb-6">
             <button id="btnTabLogin" onclick="mostrarTabAuth('login')" class="flex-1 pb-3 text-sm font-bold text-amber-500 border-b-2 border-amber-500">
@@ -81,12 +81,24 @@ select option {
         <!-- Formulario de Registro -->
         <form id="formRegister" onsubmit="handleRegister(event)" class="space-y-4 hidden">
             <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Correo Electrónico</label>
-                <input type="email" id="registerEmail" placeholder="sosaleonela2024@gmail.com" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+                <label for="registerNombre" class="block text-xs font-semibold text-slate-400 mb-1">Nombre</label>
+                <input type="text" id="registerNombre" autocomplete="given-name" maxlength="80" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Contraseña</label>
-                <input type="password" id="registerPassword" required minlength="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+                <label for="registerApellido" class="block text-xs font-semibold text-slate-400 mb-1">Apellido</label>
+                <input type="text" id="registerApellido" autocomplete="family-name" maxlength="80" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+                <label for="registerEmail" class="block text-xs font-semibold text-slate-400 mb-1">Correo Electrónico</label>
+                <input type="email" id="registerEmail" autocomplete="email" placeholder="sosaleonela2024@gmail.com" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+                <label for="registerPassword" class="block text-xs font-semibold text-slate-400 mb-1">Contraseña</label>
+                <input type="password" id="registerPassword" autocomplete="new-password" required minlength="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+                <label for="registerPasswordConfirmacion" class="block text-xs font-semibold text-slate-400 mb-1">Repetí la contraseña</label>
+                <input type="password" id="registerPasswordConfirmacion" autocomplete="new-password" required minlength="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
             </div>
             <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition-colors">
                 Crear cuenta
@@ -173,7 +185,7 @@ select option {
         <section id="viewSettings" class="hidden max-w-7xl mx-auto px-4 py-6">
             <div class="mb-5">
                 <h2 class="text-xl font-bold text-white">Ajustes</h2>
-                <p class="mt-1 text-sm text-slate-400">Administrá categorías, subcategorías y el acceso al grupo.</p>
+                <p class="mt-1 text-sm text-slate-400">Administrá tu perfil, categorías, subcategorías, notificaciones y el acceso al grupo.</p>
             </div>
             <div id="seccionDatosDemo" class="hidden mb-5 rounded-2xl border border-violet-900/60 bg-violet-950/20 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -195,6 +207,9 @@ select option {
                     <button id="btnSettingsgrupo" onclick="switchSettingsSection('grupo')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left">
                         <i class="fa-solid fa-users-gear w-4"></i> Gestión de grupo
                     </button>
+                    <button id="btnSettingsperfil" onclick="switchSettingsSection('perfil')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left">
+                        <i class="fa-solid fa-user w-4"></i> Perfil
+                    </button>
                     <button id="btnSettingsnotificaciones" onclick="switchSettingsSection('notificaciones')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left">
                         <i class="fa-solid fa-bell w-4"></i> Notificaciones
                     </button>
@@ -203,6 +218,33 @@ select option {
                     <div id="settingsSectioncategorias" class="hidden"></div>
                     <div id="settingsSectionsubcategorias" class="hidden"></div>
                     <div id="settingsSectiongrupo" class="hidden"></div>
+                    <div id="settingsSectionperfil" class="hidden card-bg rounded-2xl p-6">
+                        <div class="mb-5">
+                            <h3 class="text-base font-bold text-white">Perfil</h3>
+                            <p class="mt-1 text-sm text-slate-400">El nombre y apellido que guardes acá son privados. El correo se toma de tu cuenta.</p>
+                        </div>
+                        <form id="formPerfil" onsubmit="guardarPerfil(event)" class="max-w-xl space-y-4">
+                            <div>
+                                <label for="perfilNombre" class="mb-1 block text-xs font-semibold text-slate-400">Nombre</label>
+                                <input id="perfilNombre" name="nombre" type="text" autocomplete="given-name" maxlength="80" required
+                                    class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-slate-200 focus:border-emerald-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="perfilApellido" class="mb-1 block text-xs font-semibold text-slate-400">Apellido</label>
+                                <input id="perfilApellido" name="apellido" type="text" autocomplete="family-name" maxlength="80" required
+                                    class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-slate-200 focus:border-emerald-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="perfilEmail" class="mb-1 block text-xs font-semibold text-slate-400">Correo electrónico</label>
+                                <input id="perfilEmail" name="email" type="email" readonly
+                                    class="w-full cursor-not-allowed rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-400">
+                                <p class="mt-1 text-xs text-slate-500">El correo pertenece a tu cuenta y no se cambia desde esta sección.</p>
+                            </div>
+                            <button type="submit" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500">
+                                Guardar perfil
+                            </button>
+                        </form>
+                    </div>
                     <div id="settingsSectionnotificaciones" class="hidden card-bg rounded-2xl p-6">
                         <div class="mb-5">
                             <h3 class="text-base font-bold text-white">Historial de invitaciones</h3>

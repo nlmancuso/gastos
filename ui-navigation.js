@@ -123,7 +123,7 @@
                 document.getElementById(id).className = 'px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer';
             });
 
-            ['categorias', 'subcategorias', 'grupo', 'notificaciones'].forEach(section => {
+            ['categorias', 'subcategorias', 'grupo', 'perfil', 'notificaciones'].forEach(section => {
                 document.getElementById(`settingsSection${section}`).classList.toggle('hidden', section !== sectionName);
                 const button = document.getElementById(`btnSettings${section}`);
                 button.className = section === sectionName
@@ -135,6 +135,8 @@
                 if (typeof window.renderSettingsCategories === 'function') window.renderSettingsCategories();
             } else if (sectionName === 'grupo') {
                 window.renderMiembrosGrupoSettings();
+            } else if (sectionName === 'perfil') {
+                window.renderPerfil();
             } else if (sectionName === 'notificaciones') {
                 window.renderHistorialNotificaciones();
             }

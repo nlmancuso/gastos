@@ -77,6 +77,7 @@ let invitacionesUsuario = [];
 let invitacionesOcultas = new Set();
 let invitacionesSeleccionadas = new Set();
 let emailUsuarioInvitaciones = '';
+let perfilUsuario = { nombre: '', apellido: '' };
 let flujoVerificacionEnCurso = false;
 
 function escapeHtml(value) {
@@ -572,30 +573,69 @@ window.handleLogin = async function(e) {
 
 window.handleRegister = async function(e) {
     if (e) e.preventDefault();
+    const nombreEl = document.getElementById('registerNombre');
+    const apellidoEl = document.getElementById('registerApellido');
     const emailEl = document.getElementById('registerEmail');
     const passEl = document.getElementById('registerPassword');
+    const confirmacionEl = document.getElementById('registerPasswordConfirmacion');
     const loginError = document.getElementById('loginError');
 
-    if (!emailEl || !passEl) return;
+    if (!nombreEl || !apellidoEl || !emailEl || !passEl || !confirmacionEl) return;
+    const nombre = nombreEl.value.trim();
+    const apellido = apellidoEl.value.trim();
     const email = emailEl.value.trim().toLowerCase();
     const pass = passEl.value;
+    const confirmacion = confirmacionEl.value;
 
     if (loginError) loginError.classList.add('hidden');
+    if (!nombre || !apellido) {
+        if (loginError) {
+            loginError.innerText = "Ingresá tu nombre y apellido.";
+            loginError.classList.remove('hidden');
+        }
+        return;
+    }
+    if (pass !== confirmacion) {
+        if (loginError) {
+            loginError.innerText = "Las contraseñas no coinciden. Revisalas e intentá nuevamente.";
+            loginError.classList.remove('hidden');
+        }
+        confirmacionEl.focus();
+        return;
+    }
+
     window.showLoading();
 
+    let cuentaCreada = false;
+    let perfilGuardado = false;
+    let verificacionEnviada = false;
     try {
         flujoVerificacionEnCurso = true;
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
+        cuentaCreada = true;
+
+        try {
+            await setDoc(doc(db, "notificaciones_usuario", user.uid), {
+                perfil: { nombre, apellido }
+            }, { merge: true });
+            perfilGuardado = true;
+        } catch (error) {
+            console.error("No se pudo guardar el perfil durante el registro:", error);
+        }
+
         await sendEmailVerification(user, {
             url: 'https://nlmancuso.github.io/gastos/'
         });
+        verificacionEnviada = true;
         await signOut(auth);
         window.showLogin();
         window.mostrarNotificacion(
-            "Revisá tu correo",
-            "Te enviamos un enlace de verificación de Firebase. Confirmá tu correo y después iniciá sesión para crear tu espacio personal.",
-            "info"
+            perfilGuardado ? "Revisá tu correo" : "Cuenta creada con un detalle",
+            perfilGuardado
+                ? "Te enviamos un enlace de verificación de Firebase. Confirmá tu correo y después iniciá sesión para crear tu espacio personal."
+                : "Te enviamos el enlace de verificación, pero no pudimos guardar tu nombre y apellido. Después de verificar tu correo, iniciá sesión y completalos en Ajustes → Perfil.",
+            perfilGuardado ? "info" : "error"
         );
     } catch (error) {
         console.error("Error al registrar usuario:", error);
@@ -604,8 +644,18 @@ window.handleRegister = async function(e) {
         window.mostrarTabAuth('register');
         if (loginError) {
             let msg = "No se pudo crear la cuenta.";
-            if (error.code === 'auth/email-already-in-use') msg = "El correo ya se encuentra registrado.";
-            if (error.code === 'auth/weak-password') msg = "La contraseña debe tener al menos 6 caracteres.";
+            if (cuentaCreada) {
+                msg = verificacionEnviada
+                    ? "La cuenta se creó y el correo de verificación se envió, pero no se pudo cerrar la sesión. Volvé a iniciar sesión."
+                    : "La cuenta se creó, pero no se pudo enviar el correo de verificación. Ingresá tu correo y contraseña y usá la opción para reenviar el mensaje.";
+                if (!perfilGuardado) {
+                    msg += " También vas a tener que completar tu nombre y apellido en Ajustes → Perfil.";
+                }
+            } else if (error.code === 'auth/email-already-in-use') {
+                msg = "El correo ya se encuentra registrado.";
+            } else if (error.code === 'auth/weak-password') {
+                msg = "La contraseña debe tener al menos 6 caracteres.";
+            }
             loginError.innerText = msg;
             loginError.classList.remove('hidden');
         }
@@ -870,6 +920,8 @@ onAuthStateChanged(auth, async (user) => {
         invitacionesOcultas = new Set();
         invitacionesSeleccionadas = new Set();
         emailUsuarioInvitaciones = '';
+        perfilUsuario = { nombre: '', apellido: '' };
+        window.renderPerfil();
         window.renderBandejaNotificaciones([]);
         window.renderHistorialNotificaciones();
     }
@@ -882,19 +934,75 @@ function escucharNotificacionesOcultas(uid) {
 
     const preferenciasRef = doc(db, "notificaciones_usuario", uid);
     unsubscribeNotificacionesOcultas = onSnapshot(preferenciasRef, (snapshot) => {
-        const idsOcultos = snapshot.exists() ? snapshot.data().invitacionesOcultas : [];
+        const preferencias = snapshot.exists() ? snapshot.data() : {};
+        const idsOcultos = preferencias.invitacionesOcultas;
         invitacionesOcultas = new Set(Array.isArray(idsOcultos) ? idsOcultos : []);
+        const perfilGuardado = preferencias.perfil;
+        perfilUsuario = {
+            nombre: typeof perfilGuardado?.nombre === 'string' ? perfilGuardado.nombre : '',
+            apellido: typeof perfilGuardado?.apellido === 'string' ? perfilGuardado.apellido : ''
+        };
         invitacionesSeleccionadas = new Set(
             [...invitacionesSeleccionadas].filter(id =>
                 !invitacionesOcultas.has(id) && invitacionesUsuario.some(inv => inv.id === id)
             )
         );
+        window.renderPerfil();
         window.renderHistorialNotificaciones();
     }, (error) => {
         console.error("Error al cargar las notificaciones ocultas:", error);
         window.mostrarNotificacion("No se pudieron cargar tus preferencias", "Revisá tu conexión e intentá nuevamente.", "error");
     });
 }
+
+window.renderPerfil = function() {
+    const user = auth.currentUser;
+    const nombre = document.getElementById('perfilNombre');
+    const apellido = document.getElementById('perfilApellido');
+    const email = document.getElementById('perfilEmail');
+    if (nombre) nombre.value = perfilUsuario.nombre;
+    if (apellido) apellido.value = perfilUsuario.apellido;
+    if (email) email.value = user?.email || '';
+};
+
+window.guardarPerfil = async function(event) {
+    event.preventDefault();
+    if (window.demoModeActive) return;
+    const user = auth.currentUser;
+    const nombre = document.getElementById('perfilNombre')?.value.trim();
+    const apellido = document.getElementById('perfilApellido')?.value.trim();
+
+    if (!user) {
+        window.mostrarNotificacion("No se pudo guardar el perfil", "Iniciá sesión nuevamente e intentá otra vez.", "error");
+        return;
+    }
+    if (!nombre || !apellido) {
+        window.mostrarNotificacion("Faltan datos", "Completá nombre y apellido para guardar el perfil.", "error");
+        return;
+    }
+
+    const boton = document.querySelector('#formPerfil button[type="submit"]');
+    const textoOriginal = boton?.innerHTML;
+    if (boton) {
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+    }
+
+    try {
+        await setDoc(doc(db, "notificaciones_usuario", user.uid), {
+            perfil: { nombre, apellido }
+        }, { merge: true });
+        window.mostrarNotificacion("Perfil guardado", "Se actualizaron tus datos personales.", "exito");
+    } catch (error) {
+        console.error("Error al guardar el perfil:", error);
+        window.mostrarNotificacion("No se pudo guardar el perfil", "Revisá la conexión e intentá nuevamente.", "error");
+    } finally {
+        if (boton) {
+            boton.disabled = false;
+            boton.innerHTML = textoOriginal;
+        }
+    }
+};
 
 function escucharInvitacionesUsuario(userEmail) {
     if (unsubscribeInvitacionesRecibidas) unsubscribeInvitacionesRecibidas();
@@ -967,51 +1075,30 @@ window.renderBandejaNotificaciones = function(invitaciones) {
         badge.classList.add('hidden');
     }
 
-    const invitacionesActivas = invitacionesRecibidas.filter(inv =>
-        inv.estado === "PENDIENTE" || inv.estado === "ACEPTADO"
-    );
-    if (invitacionesActivas.length === 0) {
+    if (pendientes.length === 0) {
+        lista.onclick = null;
         lista.innerHTML = `<p class="text-xs text-slate-500 text-center py-2">No tenés invitaciones nuevas.</p>`;
         return;
     }
 
-    lista.innerHTML = invitacionesActivas.map(inv => {
+    lista.innerHTML = pendientes.map(inv => {
         const remitente = escapeHtml(inv.remitenteEmail);
         const grupoNombre = escapeHtml(inv.grupoNombre);
         const rol = escapeHtml(inv.rol);
         const id = escapeHtml(inv.id);
         const grupoId = escapeHtml(inv.grupoId);
 
-        if (inv.estado === "PENDIENTE") {
-            return `
-                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
-                    <p class="text-slate-300">
-                        <strong class="text-amber-400">${remitente}</strong> te invitó a unirte a <strong>${grupoNombre}</strong> (${rol}).
-                    </p>
-                    <div class="flex gap-2 justify-end">
-                        <button data-accion="responder" data-id="${id}" data-grupo-id="${grupoId}" data-rol="${rol}" data-estado="RECHAZADO" class="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg font-semibold text-[11px]">
-                            Rechazar
-                        </button>
-                        <button data-accion="responder" data-id="${id}" data-grupo-id="${grupoId}" data-rol="${rol}" data-estado="ACEPTADO" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg font-bold text-[11px]">
-                            Aceptar
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
         return `
-            <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">✓ Pertenece al grupo</span>
-                    <span class="text-slate-500 text-[10px]">${rol}</span>
-                </div>
-                <p class="text-slate-300 text-[11px]">
-                    <strong>${grupoNombre}</strong> (Invitado por ${remitente})
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
+                <p class="text-slate-300">
+                    <strong class="text-amber-400">${remitente}</strong> te invitó a unirte a <strong>${grupoNombre}</strong> (${rol}).
                 </p>
-                <div class="flex justify-end">
-                    <button data-accion="salir" data-id="${id}" data-grupo-id="${grupoId}" class="px-2 py-0.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 rounded-lg font-medium text-[10px] transition-colors">
-                        Salir del grupo
+                <div class="flex gap-2 justify-end">
+                    <button data-accion="responder" data-id="${id}" data-grupo-id="${grupoId}" data-rol="${rol}" data-estado="RECHAZADO" class="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg font-semibold text-[11px]">
+                        Rechazar
+                    </button>
+                    <button data-accion="responder" data-id="${id}" data-grupo-id="${grupoId}" data-rol="${rol}" data-estado="ACEPTADO" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg font-bold text-[11px]">
+                        Aceptar
                     </button>
                 </div>
             </div>
@@ -1024,8 +1111,6 @@ window.renderBandejaNotificaciones = function(invitaciones) {
 
         if (button.dataset.accion === 'responder') {
             window.responderInvitacion(button.dataset.id, button.dataset.grupoId, button.dataset.estado);
-        } else if (button.dataset.accion === 'salir') {
-            window.salirDelGrupoConId(button.dataset.grupoId);
         }
     };
 };
@@ -1747,6 +1832,11 @@ function renderMiembrosGrupo() {
                         </select>
                         <button onclick="removerMiembroGrupo('${uid}')" class="text-rose-400 hover:text-rose-300 p-1.5" title="Quitar miembro"><i class="fa-solid fa-user-xmark"></i></button>
                     </div>
+                ` : ''}
+                ${!esEspacioPersonal && esYoMismo ? `
+                    <button onclick="salirDelGrupoActual()" class="text-rose-400 hover:text-rose-300 px-2 py-1 rounded-lg text-[11px] font-semibold">
+                        Salir del grupo
+                    </button>
                 ` : ''}
             </div>
         `;
