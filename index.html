@@ -44,6 +44,81 @@ select option {
     background-color: #020617 !important; /* bg-slate-950 */
     color: #f8fafc !important; /* text-slate-50 */
 }
+body.importes-ocultos [data-privacy-amount]:not(input) {
+    color: transparent !important;
+    position: relative;
+    user-select: none;
+}
+body.importes-ocultos [data-privacy-amount]:not(input)::after {
+    content: "••••••";
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    color: #cbd5e1;
+    white-space: nowrap;
+    pointer-events: none;
+}
+body.importes-ocultos input[data-privacy-amount] {
+    -webkit-text-security: disc;
+}
+@media (max-width: 767px) {
+    #appMainNavigation {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        overflow: visible;
+    }
+    #appMainNavigation > button {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-width: 0;
+        padding: 0.5rem 0.125rem;
+        font-size: 0.6875rem;
+        white-space: nowrap;
+    }
+    #appMainNavigation > button > i {
+        font-size: 0.9rem;
+    }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+    #appMainNavigation > button {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        white-space: nowrap;
+    }
+}
+@media (max-width: 420px) {
+    #appHeaderControls {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    #appHeaderWorkspace,
+    #appHeaderMonth,
+    #appHeaderActions {
+        grid-column: 1;
+    }
+    #appHeaderWorkspace {
+        justify-self: stretch;
+    }
+    #selectorVista {
+        max-width: none;
+    }
+    #appHeaderActions {
+        justify-content: space-between;
+    }
+    #btnNuevoGasto .btnNuevoGastoLabel,
+    #textoSincronizacion {
+        display: none;
+    }
+    #estadoSincronizacion {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    #dropdownNotificaciones {
+        width: min(20rem, calc(100vw - 1.5rem));
+    }
+}
     </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -117,31 +192,35 @@ select option {
 
     <!-- CONTENIDO APP -->
     <div id="appContent" class="hidden">
-        <header class="max-w-7xl mx-auto px-4 pt-6 pb-2">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-950 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-wallet text-xl"></i></div>
-                    <div><h1 class="text-xl font-bold text-white">Control de Gastos</h1><p class="text-xs text-slate-400" id="grupoStatus">Cargando...</p></div>
+        <header class="max-w-7xl mx-auto px-3 sm:px-4 pt-3 sm:pt-6 pb-2">
+            <div id="appHeaderControls" class="grid grid-cols-2 items-center gap-x-3 gap-y-3 mb-3 xl:flex xl:justify-between xl:gap-4 xl:mb-4">
+                <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-emerald-950 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-wallet text-xl"></i></div>
+                    <div class="min-w-0"><h1 class="text-base sm:text-xl font-bold text-white">Control de Gastos</h1><p class="max-w-full truncate text-[10px] sm:text-xs text-slate-400" id="grupoStatus">Cargando...</p></div>
                 </div>
-                <div class="flex items-center gap-3">
+                <div id="appHeaderWorkspace" class="flex min-w-0 w-full items-center justify-end xl:w-auto xl:min-w-[200px]">
     <!-- Selector de Vistas (Combo) -->
-<select id="selectorVista" onchange="cambiarVistaSeleccionada(this.value)" class="bg-slate-900 border border-amber-500/50 text-slate-200 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500 transition-all cursor-pointer shadow-lg shadow-amber-500/5">
+<select id="selectorVista" onchange="cambiarVistaSeleccionada(this.value)" class="w-full max-w-[240px] truncate bg-slate-900 border border-amber-500/50 text-slate-200 text-[11px] sm:text-xs font-semibold rounded-xl px-2 sm:px-3 py-2 outline-none focus:border-amber-500 transition-all cursor-pointer shadow-lg shadow-amber-500/5">
     <!-- Se poblará dinámicamente por JS -->
 </select>
 </div>
-                <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                <div id="appHeaderMonth" class="col-span-2 mx-auto flex w-full max-w-[280px] items-center justify-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 xl:mx-0 xl:w-auto">
                     <button data-demo-allow onclick="navigateMonth(-1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-left"></i></button>
                     <span id="displayMonthText" class="text-sm font-bold text-white px-4 min-w-[140px] text-center">Cargando...</span>
                     <button data-demo-allow onclick="navigateMonth(1)" class="text-slate-400 hover:text-white px-3 py-1"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
-<div class="flex items-center gap-3">
-    <button onclick="openModalGasto()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
-        <i class="fa-solid fa-plus"></i> Nuevo Gasto
+<div id="appHeaderActions" class="col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3 xl:flex-nowrap">
+    <button id="btnNuevoGasto" onclick="openModalGasto()" aria-label="Nuevo gasto" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2">
+        <i class="fa-solid fa-plus"></i><span class="btnNuevoGastoLabel">Nuevo Gasto</span>
     </button>
     
     <!-- BOTÓN CONFIGURACIÓN DE CATEGORÍAS -->
     <button id="btnConfigCat" onclick="openSettingsSection('categorias')" class="p-2.5 rounded-lg card-bg text-slate-400 hover:text-white transition" title="Ajustes">
         <i class="fa-solid fa-gear text-sm"></i>
+    </button>
+
+    <button id="btnToggleImportes" onclick="toggleImportesOcultos()" aria-label="Ocultar importes" aria-pressed="false" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors" title="Ocultar importes">
+        <i class="fa-solid fa-eye" aria-hidden="true"></i>
     </button>
     
     <!-- Botón de Notificaciones / Invitaciones -->
@@ -163,18 +242,18 @@ select option {
         <i class="fa-solid fa-right-from-bracket text-sm"></i>
     </button>
     
-    <div id="estadoSincronizacion" class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-slate-400">
+    <div id="estadoSincronizacion" class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-2 sm:px-3 py-1.5 rounded-full text-xs text-slate-400">
         <span id="indicadorSincronizacion" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span id="textoSincronizacion">Sincronizado</span>
+        <span id="textoSincronizacion" class="hidden sm:inline">Sincronizado</span>
     </div>
 </div>
             </div>
             <!-- NAVEGACIÓN INSTANTÁNEA (SPA) -->
-            <div class="flex border-b border-slate-800 overflow-x-auto">
-                <button data-demo-allow onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i> Planilla de Gastos</button>
-                <button data-demo-allow onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i> Análisis y Gráficos</button>
-                <button data-demo-allow onclick="switchTab('saldos')" id="btnTabSaldos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-building-columns text-emerald-400"></i> Saldos y Bancos</button>
-                <button data-demo-allow onclick="switchTab('gastos')" id="btnTabGastos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-receipt text-sky-400"></i> Gastos del Mes y Hormiga</button>
+            <div id="appMainNavigation" class="flex border-b border-slate-800 overflow-x-auto">
+                <button data-demo-allow onclick="switchTab('planilla')" id="btnTabPlanilla" class="px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-table-list"></i><span class="hidden md:inline">Planilla de Gastos</span><span class="md:hidden">Planilla</span></button>
+                <button data-demo-allow onclick="switchTab('analisis')" id="btnTabAnalisis" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-chart-pie"></i><span class="hidden md:inline">Análisis y Gráficos</span><span class="md:hidden">Análisis</span></button>
+                <button data-demo-allow onclick="switchTab('saldos')" id="btnTabSaldos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-building-columns text-emerald-400"></i><span class="hidden md:inline">Saldos y Bancos</span><span class="md:hidden">Saldos</span></button>
+                <button data-demo-allow onclick="switchTab('gastos')" id="btnTabGastos" class="px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-receipt text-sky-400"></i><span class="hidden md:inline">Gastos del Mes y Hormiga</span><span class="md:hidden">Gastos</span></button>
             </div>
             <div id="bannerModoDemo" class="hidden mt-3 rounded-xl border border-violet-800/70 bg-violet-950/50 px-4 py-3 text-xs text-violet-200 flex items-center justify-between gap-3">
                 <span><i class="fa-solid fa-flask mr-2"></i><strong>Modo demo local:</strong> datos ficticios de dos perfiles, 12 meses de historial y gastos recurrentes proyectados 3 meses con aumentos de ejemplo. No se guarda nada en Firebase.</span>
@@ -263,12 +342,12 @@ select option {
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="card-bg p-5 rounded-2xl">
                     <div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-slate-400 uppercase">INGRESO / SUELDO</span><button onclick="openModalSueldo()" class="text-xs text-emerald-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-pen text-[10px]"></i> Editar</button></div>
-                    <h2 id="cardSueldo" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
+                    <h2 id="cardSueldo" data-privacy-amount class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2>
                 </div>
-                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">GASTOS FIJOS</span><h2 id="cardGastosFijos" class="text-2xl font-extrabold text-amber-500 my-1">$ 0,00</h2></div>
-                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">TOTAL TARJETAS</span><h2 id="cardTarjetas" class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2></div>
-                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">GASTOS TOTALES</span><h2 id="cardGastosTotales" class="text-2xl font-extrabold text-rose-500 my-1">$ 0,00</h2></div>
-                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">RESTO DISPONIBLE</span><h2 id="cardResto" class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">GASTOS FIJOS</span><h2 id="cardGastosFijos" data-privacy-amount class="text-2xl font-extrabold text-amber-500 my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">TOTAL TARJETAS</span><h2 id="cardTarjetas" data-privacy-amount class="text-2xl font-extrabold text-blue-accent my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">GASTOS TOTALES</span><h2 id="cardGastosTotales" data-privacy-amount class="text-2xl font-extrabold text-rose-500 my-1">$ 0,00</h2></div>
+                <div class="card-bg p-5 rounded-2xl"><span class="text-xs font-bold text-slate-400 uppercase">RESTO DISPONIBLE</span><h2 id="cardResto" data-privacy-amount class="text-2xl font-extrabold text-green-accent my-1">$ 0,00</h2></div>
             </div>
             
             <div class="card-bg p-5 rounded-2xl shadow-xl space-y-4">

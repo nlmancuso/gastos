@@ -1,3 +1,14 @@
+        window.toggleImportesOcultos = function() {
+            const ocultos = document.body.classList.toggle('importes-ocultos');
+            const button = document.getElementById('btnToggleImportes');
+            const label = ocultos ? 'Mostrar importes' : 'Ocultar importes';
+
+            button.setAttribute('aria-label', label);
+            button.setAttribute('aria-pressed', String(ocultos));
+            button.title = label;
+            button.innerHTML = `<i class="fa-solid ${ocultos ? 'fa-eye-slash' : 'fa-eye'}" aria-hidden="true"></i>`;
+        };
+
         function obtenerItemsPlanillaConSaldo(targetMonth) {
             const pagosIndividuales = window.appState.excepcionesMontoPagado || {};
             const pagosBloque = window.appState.excepcionesMontoPagadoBloque || {};

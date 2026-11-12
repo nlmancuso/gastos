@@ -2366,7 +2366,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                     </div>
                     <label class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
                         <span class="text-[10px] text-slate-400 font-bold uppercase">Pagado:</span>
-                        <input type="number" min="0" max="${totalDebidoBloque}" step="0.01" value="${totalPagadoBloque}" data-categoria="${encodeURIComponent(categoria)}" onchange="actualizarMontoPagadoPlanilla(this, true)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-24 bg-transparent text-emerald-300 font-bold text-xs outline-none disabled:opacity-60" aria-label="Monto pagado de ${categoria}">
+                        <input type="number" min="0" max="${totalDebidoBloque}" step="0.01" value="${totalPagadoBloque}" data-categoria="${encodeURIComponent(categoria)}" data-privacy-amount onchange="actualizarMontoPagadoPlanilla(this, true)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-24 bg-transparent text-emerald-300 font-bold text-xs outline-none disabled:opacity-60" aria-label="Monto pagado de ${categoria}">
                     </label>
                     <span class="text-[10px] font-bold border px-2 py-1 rounded-full ${colorEstadoPagoBloque}">${estadoPagoBloque}</span>
                 </div>
@@ -2383,7 +2383,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                         <span class="text-[11px] bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-semibold">${gastosCat.length} ítem${gastosCat.length === 1 ? '' : 's'}</span>
                         ${controlesCabeceraHtml}
                     </div>
-                    <span class="text-sm font-extrabold text-emerald-400 shrink-0">TOTAL: ${fmt(esBloque ? totalDebidoBloque : totalCat)}</span>
+                    <span class="text-sm font-extrabold text-emerald-400 shrink-0">TOTAL: <span data-privacy-amount class="relative inline-block">${fmt(esBloque ? totalDebidoBloque : totalCat)}</span></span>
                 </div>
                 ${isAbierto ? `
                     <div class="overflow-x-auto">
