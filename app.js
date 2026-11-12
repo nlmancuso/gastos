@@ -5,6 +5,7 @@ import { renderActiveView } from "./view-renderer.mjs";
 import {
     calcularMontoConInflacion,
     crearHistorialAumentos,
+    esExcepcionMontoGenerada,
     mesAnterior,
     mesSiguiente,
     mesTieneCambioProgramado,
@@ -1640,9 +1641,11 @@ window.recalcularExcepcionesInflacionSubcategoria = function(subcategoriaId, sub
             const montoGuardado = excepcionesMonto[clave];
 
             if (montoGuardado !== undefined) {
-                const esMontoGenerado = excepcionesGeneradas[clave] === true ||
-                    (excepcionesGeneradas[clave] !== false &&
-                        Math.abs((Number.parseFloat(montoGuardado) || 0) - montoAnteriorCalculado) < 0.005);
+                const esMontoGenerado = esExcepcionMontoGenerada(
+                    montoGuardado,
+                    montoAnteriorCalculado,
+                    excepcionesGeneradas[clave]
+                );
                 if (esMontoGenerado) {
                     excepcionesMonto[clave] = montoActualCalculado;
                     excepcionesGeneradas[clave] = true;

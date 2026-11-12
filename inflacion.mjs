@@ -80,6 +80,12 @@ export function redondearMonto(monto) {
     return Math.round((Number.parseFloat(monto) + Number.EPSILON) * 100) / 100;
 }
 
+export function esExcepcionMontoGenerada(montoGuardado, montoEsperado, fueMarcadaGenerada) {
+    if (fueMarcadaGenerada === true) return true;
+    const diferencia = Math.abs(Number.parseFloat(montoGuardado) - Number.parseFloat(montoEsperado));
+    return Number.isFinite(diferencia) && diferencia < 0.005;
+}
+
 export function obtenerPrimerMesCambioProgramado(subcategoria, mesBase, mesObjetivo) {
     if (!Array.isArray(subcategoria?.historialAumentos)) return '';
     const cambios = subcategoria.historialAumentos

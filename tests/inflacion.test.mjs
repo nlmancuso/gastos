@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     calcularMontoConInflacion,
     crearHistorialAumentos,
+    esExcepcionMontoGenerada,
     obtenerPrimerMesCambioProgramado,
     obtenerPorcentajeAumentoSubcategoria
 } from '../inflacion.mjs';
@@ -73,6 +74,12 @@ test('no redondea meses anteriores al cambio de tasa', () => {
         ),
         0.06
     );
+});
+
+test('reconoce importes automáticos aunque tengan un marcador manual antiguo', () => {
+    assert.equal(esExcepcionMontoGenerada(1100, 1100, false), true);
+    assert.equal(esExcepcionMontoGenerada(1050, 1100, false), false);
+    assert.equal(esExcepcionMontoGenerada(1050, 1100, true), true);
 });
 
 test('una nueva configuración reemplaza cambios posteriores desde su vigencia', () => {
