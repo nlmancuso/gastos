@@ -16,6 +16,7 @@
         let chartGastoMensualUsuarios = null;
         let gastoMensualPendienteDeEliminar = null;
         let guardandoGastoMensual = false;
+        let gastosMensualesExportables = [];
 
         function obtenerCategoriasGastoMensual() {
             if (!Array.isArray(window.appState.categoriasGastosMensuales)) {
@@ -320,6 +321,30 @@
             renderGastoMensualApp();
         };
 
+        window.exportarGastosMensualesCsv = function() {
+            if (gastosMensualesExportables.length === 0) {
+                window.mostrarMensajeApp('Sin gastos para exportar', 'No hay gastos visibles para el mes seleccionado.', 'info');
+                return;
+            }
+            const mes = window.appState.currentMonth || '2026-10';
+            const formatoMoneda = monto => '$ ' + (Number(monto) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const filas = gastosMensualesExportables.map(gasto => [
+                gasto.fecha ? gasto.fecha.split('-').reverse().join('/') : '',
+                gasto.concepto || '',
+                gasto.categoria || 'Sin categoría',
+                gasto.medioPago || 'Efectivo',
+                gasto.usuarioEmail
+                    ? gasto.usuarioEmail.split('@')[0]
+                    : (gasto.usuarioUid ? `Usuario ${gasto.usuarioUid.slice(0, 8)}` : 'Sin identificar'),
+                formatoMoneda(gasto.monto)
+            ]);
+            window.descargarCsvConPipes(
+                `gastos_mensuales_${mes}.csv`,
+                ['Fecha', 'Descripción', 'Categoría', 'Medio de pago', 'Cargado por', 'Monto'],
+                filas
+            );
+        };
+
         window.renderGastoMensualApp = function() {
             const mes = window.appState.currentMonth || '2026-10';
             const mesTexto = window.formatMonthDisplay(mes);
@@ -417,6 +442,7 @@
                     if (valorA > valorB) return ordenGastosMensuales.ascendente ? 1 : -1;
                     return 0;
                 });
+            gastosMensualesExportables = gastosFiltrados;
             renderGraficosGastoMensual();
 
             const tabla = document.getElementById('tablaGastoMensualCuerpo');
@@ -601,11 +627,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: {
-                                display: datasets.length > 0,
-                                position: 'bottom',
-                                labels: { color: '#cbd5e1' }
-                            }
+                            legend: { display: false }
                         },
                         scales: {
                             x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },

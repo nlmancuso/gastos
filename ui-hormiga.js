@@ -1,3 +1,5 @@
+        let gastosHormigaExportables = [];
+
         document.addEventListener('DOMContentLoaded', () => {
             const fechaInput = document.getElementById('hormigaFecha');
             if (fechaInput) fechaInput.value = obtenerFechaLocalParaInput();
@@ -72,6 +74,7 @@
                     if (valA > valB) return sortAsc ? 1 : -1;
                     return 0;
                 });
+                gastosHormigaExportables = itemsFiltrados;
 
                 if (itemsFiltrados.length === 0) tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan.</td></tr>`;
                 else {
@@ -84,6 +87,27 @@
             }
             renderHormigaCharts();
         }
+
+        window.exportarGastosHormigaCsv = function() {
+            if (gastosHormigaExportables.length === 0) {
+                window.mostrarMensajeApp('Sin gastos para exportar', 'No hay gastos Hormiga visibles para el mes seleccionado.', 'info');
+                return;
+            }
+            const mes = window.appState.currentMonth || '2026-10';
+            const formatoMoneda = monto => '$ ' + (Number(monto) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const filas = gastosHormigaExportables.map(gasto => [
+                gasto.fecha ? gasto.fecha.split('-').reverse().join('/') : '',
+                gasto.concepto || '',
+                gasto.categoria || 'Sin categoría',
+                gasto.medioPago || 'Efectivo',
+                formatoMoneda(gasto.monto)
+            ]);
+            window.descargarCsvConPipes(
+                `gastos_hormiga_${mes}.csv`,
+                ['Fecha', 'Descripción', 'Categoría', 'Medio de pago', 'Monto'],
+                filas
+            );
+        };
 
         function renderHormigaCategoriasSelect() {
             const select = document.getElementById('hormigaCategoriaSelect');

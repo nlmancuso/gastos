@@ -39,6 +39,25 @@
             }
         }
 
+        function crearEtiquetaFiltro(checked, value, color, texto, onChange) {
+            const label = document.createElement('label');
+            label.className = `cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${checked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`;
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.value = String(value ?? '');
+            input.checked = checked;
+            input.className = 'hidden';
+            input.addEventListener('change', () => onChange(input));
+
+            const indicador = document.createElement('span');
+            indicador.className = 'w-2 h-2 rounded-full';
+            indicador.style.backgroundColor = color;
+
+            label.append(input, indicador, document.createTextNode(String(texto ?? '')));
+            return label;
+        }
+
         function initRecurrentesCheckboxesList() {
             const container = document.getElementById('containerFiltrosRecurrentesGrid'); if (!container) return;
             let mapIdsUnicos = new Map();
@@ -47,12 +66,12 @@
                 if (g.isRecurrente || baseEsFijo) { if (!mapIdsUnicos.has(g.id)) mapIdsUnicos.set(g.id, g.concepto); }
             });
             if (window.filtrosRecurrentesGrid.length === 0 && window.appState.recurrentesPreferidos?.length > 0) window.filtrosRecurrentesGrid = [...window.appState.recurrentesPreferidos];
-            container.innerHTML = '';
+            container.replaceChildren();
             let colorPalette = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#84cc16']; let colorIdx = 0;
             mapIdsUnicos.forEach((concepto, id) => {
                 const isChecked = window.filtrosRecurrentesGrid.length === 0 || window.filtrosRecurrentesGrid.includes(id);
                 let color = colorPalette[colorIdx % colorPalette.length]; colorIdx++;
-                container.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroRecurrenteGrid(this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>${concepto}</label>`;
+                container.appendChild(crearEtiquetaFiltro(isChecked, id, color, concepto, input => window.toggleFiltroRecurrenteGrid(input)));
             });
         }
         window.toggleFiltroRecurrenteGrid = function(checkbox) {
@@ -76,18 +95,18 @@
 
             const contTotales = document.getElementById('containerFiltrosGraficoTotales');
             if (contTotales) {
-                contTotales.innerHTML = '';
+                contTotales.replaceChildren();
                 [ { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Ingresos / Sueldo", color: "#10b981" } ].forEach(item => {
                     const isChecked = window.filtrosGraficoTotales.length === 0 || window.filtrosGraficoTotales.includes(item.nombre);
-                    contTotales.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Totales', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}</label>`;
+                    contTotales.appendChild(crearEtiquetaFiltro(isChecked, item.nombre, item.color, item.nombre, input => window.toggleFiltroGrafico('Totales', input)));
                 });
             }
             const contEvolCat = document.getElementById('containerFiltrosGraficoEvolCat');
             if (contEvolCat) {
-                contEvolCat.innerHTML = '';
+                contEvolCat.replaceChildren();
                 catList.forEach(cat => {
                     const isChecked = window.filtrosGraficoEvolCat.length === 0 || window.filtrosGraficoEvolCat.includes(cat.nombre);
-                    contEvolCat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${cat.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolCat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${cat.color};"></span>${cat.nombre}</label>`;
+                    contEvolCat.appendChild(crearEtiquetaFiltro(isChecked, cat.nombre, cat.color, cat.nombre, input => window.toggleFiltroGrafico('EvolCat', input)));
                 });
             }
             
@@ -97,20 +116,20 @@
                 if (!window.filtrosGraficoEvolSubcat) {
                     window.filtrosGraficoEvolSubcat = [];
                 }
-                contEvolSubcat.innerHTML = '';
+                contEvolSubcat.replaceChildren();
                 subcatList.forEach((sub, idx) => {
                     const color = colorPalette[idx % colorPalette.length];
                     const isChecked = window.filtrosGraficoEvolSubcat.length === 0 || window.filtrosGraficoEvolSubcat.includes(sub.id);
-                    contEvolSubcat.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${sub.id}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('EvolSubcat', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${color};"></span>${sub.nombre}</label>`;
+                    contEvolSubcat.appendChild(crearEtiquetaFiltro(isChecked, sub.id, color, sub.nombre, input => window.toggleFiltroGrafico('EvolSubcat', input)));
                 });
             }
 
             const contBalance = document.getElementById('containerFiltrosGraficoBalance');
             if (contBalance) {
-                contBalance.innerHTML = '';
+                contBalance.replaceChildren();
                 [ { nombre: "Ingreso / Sueldo", color: "#10b981" }, { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Resto Disponible", color: "#3b82f6" } ].forEach(item => {
                     const isChecked = window.filtrosGraficoBalance.length === 0 || window.filtrosGraficoBalance.includes(item.nombre);
-                    contBalance.innerHTML += `<label class="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1.5 ${isChecked ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-900/60 text-slate-500 border-slate-800'}"><input type="checkbox" value="${item.nombre}" ${isChecked ? 'checked' : ''} onchange="toggleFiltroGrafico('Balance', this)" class="hidden"><span class="w-2 h-2 rounded-full" style="background-color: ${item.color};"></span>${item.nombre}</label>`;
+                    contBalance.appendChild(crearEtiquetaFiltro(isChecked, item.nombre, item.color, item.nombre, input => window.toggleFiltroGrafico('Balance', input)));
                 });
             }
         }
@@ -249,4 +268,3 @@
             const ctxBalance = document.getElementById('chartBalanceGeneral');
             if (ctxBalance) chartInstBalance = updateOrCreateChart(chartInstBalance, ctxBalance, { type: 'bar', data: { labels: labelsMonths, datasets: datasetsBalance }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         }
-

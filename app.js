@@ -91,6 +91,27 @@ function escapeHtml(value) {
 }
 window.escapeHtml = escapeHtml;
 
+window.descargarCsvConPipes = function(nombreArchivo, encabezados, filas) {
+    const escaparCelda = valor => {
+        let texto = String(valor ?? '');
+        if (/^[\t\r\n ]*[=+\-@]/.test(texto)) texto = `'${texto}`;
+        return `"${texto.replace(/"/g, '""')}"`;
+    };
+    const contenido = [encabezados, ...filas]
+        .map(fila => fila.map(escaparCelda).join('|'))
+        .join('\r\n');
+    const archivo = new Blob(['\uFEFF', contenido], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(archivo);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombreArchivo;
+    enlace.style.display = 'none';
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 function parseInvitationDate(value) {
     const date = value ? new Date(value) : null;
     return date && !Number.isNaN(date.getTime()) ? date : null;

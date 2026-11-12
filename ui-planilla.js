@@ -312,11 +312,11 @@
             if (!container) return; container.innerHTML = '';
             (window.appState.categorias || []).forEach((cat, index) => {
                 container.innerHTML += `
-                    <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                    <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
                         <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2.5 flex-1">
-                                <input type="color" value="${cat.color}" onchange="actualizarCatGenCampo(${index}, 'color', this.value)" class="w-8 h-8 rounded bg-slate-900 border border-slate-800 cursor-pointer p-0.5">
-                                <input type="text" value="${cat.nombre}" onchange="actualizarCatGenCampo(${index}, 'nombre', this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-white focus:outline-none">
+                                <input type="color" value="${cat.color}" onchange="actualizarCatGenCampo(${index}, 'color', this.value)" class="w-10 h-10 rounded bg-slate-900 border border-slate-800 cursor-pointer p-1">
+                                <input type="text" value="${cat.nombre}" onchange="actualizarCatGenCampo(${index}, 'nombre', this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-sm font-bold text-white focus:outline-none">
                             </div>
                             <button onclick="eliminarCatGeneral(${index})" class="text-rose-400 hover:text-rose-300 p-2" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button>
                         </div>
@@ -425,11 +425,11 @@
             container.innerHTML = '';
             (window.appState.subcategorias || []).forEach((s, idx) => {
                 container.innerHTML += `
-                    <div class="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs">
-                        <span class="font-bold text-slate-300">${s.nombre}</span>
+                    <div class="flex items-center justify-between gap-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-sm">
+                        <span class="font-bold text-slate-200">${s.nombre}</span>
                         <div class="flex items-center gap-2">
-                            <span class="bg-amber-950 text-amber-400 font-mono px-2 py-0.5 rounded border border-amber-800">${s.porcentajeAumento || 0}%</span>
-                            <button onclick="eliminarSubcategoria(${idx})" class="text-rose-400 hover:text-rose-300 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                            <span class="bg-amber-950 text-amber-400 font-mono px-3 py-1 rounded-lg border border-amber-800">${s.porcentajeAumento || 0}%</span>
+                            <button type="button" onclick="eliminarSubcategoria(${idx})" aria-label="Eliminar subcategoría ${s.nombre}" title="Eliminar subcategoría" class="text-rose-400 hover:text-rose-300 p-2"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>`;
             });
