@@ -374,26 +374,34 @@
             const subcatId = document.getElementById('gastoSubcategoria').value;
             const isRecurrente = document.getElementById('gastoIsRecurrente').checked;
             const startMonth = document.getElementById('gastoStartMonth').value || window.appState.currentMonth;
-
-            let pctAplicar = 0;
-            if (pctIndivStr !== '') {
-                pctAplicar = parseFloat(pctIndivStr) || 0;
-            } else if (subcatId) {
-                const subcat = (window.appState.subcategorias || []).find(s => s.id === subcatId);
-                if (subcat) pctAplicar = parseFloat(subcat.porcentajeAumento) || 0;
-            }
+            const subcat = (window.appState.subcategorias || []).find(s => s.id === subcatId);
+            const tieneTasa = pctIndivStr !== '' || Boolean(
+                subcat &&
+                ((Number.parseFloat(subcat.porcentajeAumento) || 0) > 0 ||
+                    (subcat.historialAumentos || []).some(cambio => Number.parseFloat(cambio.porcentajeAumento) > 0))
+            );
 
             const container = document.getElementById('containerVistaPreviaInflacion');
             const grid = document.getElementById('gridVistaPrevia6Meses');
 
-            if (montoBase > 0 && pctAplicar > 0 && startMonth && isRecurrente) {
+            if (montoBase > 0 && tieneTasa && startMonth && isRecurrente) {
                 grid.innerHTML = '';
                 let [currY, currM] = startMonth.split('-').map(Number);
-                let montoAcum = montoBase;
 
                 for (let i = 0; i < 6; i++) {
-                    if (i > 0) montoAcum = montoAcum * (1 + (pctAplicar / 100));
-                    const monthText = window.formatMonthDisplay(`${currY}-${String(currM).padStart(2, '0')}`);
+                    const mesProyectado = `${currY}-${String(currM).padStart(2, '0')}`;
+                    const montoAcum = window.calcularMontoConInflacion(
+                        montoBase,
+                        startMonth,
+                        mesProyectado,
+                        mes => pctIndivStr !== ''
+                            ? (parseFloat(pctIndivStr) || 0)
+                            : window.getPorcentajeAumentoSubcategoria(subcat, mes),
+                        pctIndivStr === ''
+                            ? window.obtenerPrimerMesCambioProgramado(subcat, startMonth, mesProyectado)
+                            : ''
+                    );
+                    const monthText = window.formatMonthDisplay(mesProyectado);
                     const fmtMonto = "$ " + montoAcum.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     
                     grid.innerHTML += `<div class="flex justify-between border-b border-slate-800/60 pb-1"><span>${monthText}:</span> <strong class="text-emerald-400">${fmtMonto}</strong></div>`;
@@ -412,7 +420,7 @@
             const pct = parseFloat(document.getElementById('nuevaSubcatPct').value) || 0;
             if (!nombre) return;
             if (!window.appState.subcategorias) window.appState.subcategorias = [];
-            window.appState.subcategorias.push({ id: `sub_${Date.now()}`, nombre, porcentajeAumento: pct });
+            window.appState.subcategorias.push({ id: `sub_${Date.now()}`, nombre, porcentajeAumento: pct, historialAumentos: [] });
             document.getElementById('nuevaSubcatNombre').value = '';
             document.getElementById('nuevaSubcatPct').value = '';
             window.saveDataToCloud();
@@ -423,17 +431,72 @@
             const container = document.getElementById('listaSubcatGeneralConfig');
             if (!container) return;
             container.innerHTML = '';
+            const mesActual = window.appState.currentMonth || new Date().toISOString().slice(0, 7);
             (window.appState.subcategorias || []).forEach((s, idx) => {
+                const porcentajeActual = window.getPorcentajeAumentoSubcategoria?.(s, mesActual) ?? s.porcentajeAumento ?? 0;
                 container.innerHTML += `
-                    <div class="flex items-center justify-between gap-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-sm">
-                        <span class="font-bold text-slate-200">${s.nombre}</span>
-                        <div class="flex items-center gap-2">
-                            <span class="bg-amber-950 text-amber-400 font-mono px-3 py-1 rounded-lg border border-amber-800">${s.porcentajeAumento || 0}%</span>
-                            <button type="button" onclick="eliminarSubcategoria(${idx})" aria-label="Eliminar subcategoría ${s.nombre}" title="Eliminar subcategoría" class="text-rose-400 hover:text-rose-300 p-2"><i class="fa-solid fa-trash-can"></i></button>
+                    <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-sm space-y-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="font-bold text-slate-200">${s.nombre}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-amber-950 text-amber-400 font-mono px-3 py-1 rounded-lg border border-amber-800">${porcentajeActual}% vigente</span>
+                                <button type="button" onclick="eliminarSubcategoria(${idx})" aria-label="Eliminar subcategoría ${s.nombre}" title="Eliminar subcategoría" class="text-rose-400 hover:text-rose-300 p-2"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
                         </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3 border-t border-slate-800 pt-3">
+                            <div>
+                                <label for="subcatInflacionPct_${idx}" class="mb-1 block text-xs font-semibold text-slate-400">Nuevo aumento (%)</label>
+                                <input type="number" id="subcatInflacionPct_${idx}" min="0" step="0.1" value="${porcentajeActual}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            </div>
+                            <div>
+                                <label for="subcatInflacionMes_${idx}" class="mb-1 block text-xs font-semibold text-slate-400">Vigente desde</label>
+                                <input type="month" id="subcatInflacionMes_${idx}" value="${mesActual}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            </div>
+                            <button type="button" onclick="actualizarInflacionSubcategoria(${idx})" class="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-4 py-2 text-xs font-bold transition">Aplicar</button>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Los meses anteriores quedan iguales. La nueva tasa se usa desde el mes indicado.</p>
                     </div>`;
             });
         }
+
+        window.actualizarInflacionSubcategoria = async function(idx) {
+            const subcategoria = window.appState.subcategorias?.[idx];
+            const porcentajeInput = document.getElementById(`subcatInflacionPct_${idx}`);
+            const mesInput = document.getElementById(`subcatInflacionMes_${idx}`);
+            if (!subcategoria || !porcentajeInput || !mesInput) return;
+
+            const porcentaje = Number(porcentajeInput.value);
+            const desdeMes = mesInput.value;
+            if (!Number.isFinite(porcentaje) || porcentaje < 0) {
+                window.mostrarNotificacion("Porcentaje inválido", "Ingresá un porcentaje igual o mayor a cero.", "error");
+                return;
+            }
+            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(desdeMes)) {
+                window.mostrarNotificacion("Mes inválido", "Seleccioná el mes desde el que se aplicará el nuevo porcentaje.", "error");
+                return;
+            }
+
+            const subcategoriaAnterior = JSON.parse(JSON.stringify(subcategoria));
+            const subcategoriaActualizada = {
+                ...subcategoria,
+                historialAumentos: window.crearHistorialAumentosSubcategoria(
+                    subcategoria.historialAumentos,
+                    desdeMes,
+                    porcentaje
+                )
+            };
+            window.appState.subcategorias[idx] = subcategoriaActualizada;
+            window.recalcularExcepcionesInflacionSubcategoria(
+                subcategoria.id,
+                subcategoriaAnterior,
+                subcategoriaActualizada,
+                desdeMes
+            );
+            await window.saveDataToCloud();
+            renderSubcatList();
+            const mesTexto = window.formatMonthDisplay?.(desdeMes) || desdeMes;
+            window.mostrarNotificacion("Inflación actualizada", `El ${porcentaje}% se aplicará desde ${mesTexto}.`, "exito");
+        };
 
         window.eliminarSubcategoria = async function(idx) {
             const subcategorias = window.appState.subcategorias || [];
@@ -509,10 +572,11 @@
 
             const selectSubcat = document.getElementById('gastoSubcategoria'); 
             selectSubcat.innerHTML = '<option value="">Sin Subcategoría</option>';
+            const mesTasa = document.getElementById('gastoStartMonth').value || window.appState.currentMonth;
             (window.appState.subcategorias || []).forEach(s => { 
                 const opt = document.createElement('option'); 
                 opt.value = s.id; 
-                opt.innerHTML = `${s.nombre} (${s.porcentajeAumento || 0}%)`; 
+                opt.innerHTML = `${s.nombre} (${window.getPorcentajeAumentoSubcategoria(s, mesTasa)}%)`;
                 selectSubcat.appendChild(opt); 
             });
 
@@ -575,7 +639,7 @@
             (window.appState.subcategorias || []).forEach(s => { 
                 const opt = document.createElement('option'); 
                 opt.value = s.id; 
-                opt.innerHTML = `${s.nombre} (${s.porcentajeAumento || 0}%)`; 
+                opt.innerHTML = `${s.nombre} (${window.getPorcentajeAumentoSubcategoria(s, currentActiveMonth)}%)`;
                 if (s.id === subcatActual) opt.selected = true;
                 selectSubcat.appendChild(opt); 
             });
@@ -602,12 +666,15 @@
             if (!window.appState.gastos) window.appState.gastos = [];
             if (!window.appState.aumentosIndividuales) window.appState.aumentosIndividuales = {};
             if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+            if (!window.appState.excepcionesMontoGeneradas) window.appState.excepcionesMontoGeneradas = {};
             if (!window.appState.excepcionesVencimiento) window.appState.excepcionesVencimiento = {};
             if (!window.appState.excepcionesCategoria) window.appState.excepcionesCategoria = {};
             if (!window.appState.excepcionesSubcategoria) window.appState.excepcionesSubcategoria = {};
 
             if (id) {
-                window.appState.excepcionesMonto[`${id}_${currentActiveMonth}`] = monto;
+                const claveMontoActual = `${id}_${currentActiveMonth}`;
+                window.appState.excepcionesMonto[claveMontoActual] = monto;
+                delete window.appState.excepcionesMontoGeneradas[claveMontoActual];
                 window.appState.excepcionesVencimiento[`${id}_${currentActiveMonth}`] = vencimiento;
                 window.appState.excepcionesCategoria[`${id}_${currentActiveMonth}`] = categoria;
                 window.appState.excepcionesSubcategoria[`${id}_${currentActiveMonth}`] = subcategoriaId;
@@ -616,14 +683,6 @@
                 let [currY, currM] = currentActiveMonth.split('-').map(Number);
                 let montoPropagado = monto;
                 let fechaPropagada = vencimiento;
-
-                let pctPropagacion = 0;
-                if (pctAumentoVal !== '') {
-                    pctPropagacion = parseFloat(pctAumentoVal) || 0;
-                } else if (subcategoriaId) {
-                    const subcat = (window.appState.subcategorias || []).find(s => s.id === subcategoriaId);
-                    if (subcat) pctPropagacion = parseFloat(subcat.porcentajeAumento) || 0;
-                }
 
                 for (let i = 1; i <= 36; i++) {
                     currM++;
@@ -634,12 +693,18 @@
                         fechaPropagada = window.sumarUnMesAFecha(fechaPropagada);
                         window.appState.excepcionesVencimiento[`${id}_${nextMonthStr}`] = fechaPropagada;
                     }
+                    window.appState.excepcionesCategoria[`${id}_${nextMonthStr}`] = categoria;
+                    window.appState.excepcionesSubcategoria[`${id}_${nextMonthStr}`] = subcategoriaId;
+                    const pctPropagacion = window.getPorcentajeAumentoGasto(
+                        window.appState.gastos.find(g => g.id === id) || { id, subcategoriaId },
+                        nextMonthStr
+                    );
                     if (pctPropagacion > 0) {
                         montoPropagado = montoPropagado * (1 + (pctPropagacion / 100));
                     }
-                    window.appState.excepcionesMonto[`${id}_${nextMonthStr}`] = Math.round(montoPropagado * 100) / 100;
-                    window.appState.excepcionesCategoria[`${id}_${nextMonthStr}`] = categoria;
-                    window.appState.excepcionesSubcategoria[`${id}_${nextMonthStr}`] = subcategoriaId;
+                    const claveMontoSiguiente = `${id}_${nextMonthStr}`;
+                    window.appState.excepcionesMonto[claveMontoSiguiente] = Math.round(montoPropagado * 100) / 100;
+                    window.appState.excepcionesMontoGeneradas[claveMontoSiguiente] = true;
                 }
 
                 const idx = window.appState.gastos.findIndex(g => g.id === id);
@@ -749,6 +814,9 @@ window.ejecutarEliminacionGasto = function() {
         window.appState.gastos = (window.appState.gastos || []).filter(g => g.id !== id);
         delete window.appState.excepcionesEliminacion[id];
         if (window.appState.aumentosIndividuales) delete window.appState.aumentosIndividuales[id];
+        Object.keys(window.appState.excepcionesMontoGeneradas || {}).forEach(k => {
+            if (k.startsWith(`${id}_`)) delete window.appState.excepcionesMontoGeneradas[k];
+        });
         
         Object.keys(window.appState.excepcionesEliminacionSoloMes || {}).forEach(k => {
             if (k.startsWith(`${id}_`)) delete window.appState.excepcionesEliminacionSoloMes[k];

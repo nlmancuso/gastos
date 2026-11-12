@@ -2,6 +2,16 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, doc, setDoc as firestoreSetDoc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, onSnapshot, collection, addDoc as firestoreAddDoc, query, where, updateDoc as firestoreUpdateDoc, arrayRemove, arrayUnion, runTransaction as firestoreRunTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { renderActiveView } from "./view-renderer.mjs";
+import {
+    calcularMontoConInflacion,
+    crearHistorialAumentos,
+    mesAnterior,
+    mesSiguiente,
+    mesTieneCambioProgramado,
+    obtenerPrimerMesCambioProgramado,
+    obtenerPorcentajeAumentoSubcategoria,
+    redondearMonto
+} from "./inflacion.mjs";
 
 let pendingDatabaseOperations = 0;
 let databaseActivityTimer = null;
@@ -396,6 +406,7 @@ const appStateLimpioBase = {
     gastos: [],
     gastosMensuales: [],
     excepcionesMonto: {},
+    excepcionesMontoGeneradas: {},
     excepcionesCategoria: {},
     excepcionesVencimiento: {},
     excepcionesVencimientoGrid: {},
@@ -435,6 +446,7 @@ function crearEstadoDesdeDatosGuardados(appStateGuardado, mesLocalGuardado, mesP
     if (!Array.isArray(estado.categorias)) estado.categorias = JSON.parse(JSON.stringify(categoriasDefault));
     if (!Array.isArray(estado.subcategorias)) estado.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
     if (!Array.isArray(estado.gastosMensuales)) estado.gastosMensuales = [];
+    if (!estado.excepcionesMontoGeneradas || typeof estado.excepcionesMontoGeneradas !== 'object') estado.excepcionesMontoGeneradas = {};
     if (!estado.aumentosIndividuales || typeof estado.aumentosIndividuales !== 'object') estado.aumentosIndividuales = {};
     if (!estado.excepcionesEliminacionSoloMes || typeof estado.excepcionesEliminacionSoloMes !== 'object') {
         estado.excepcionesEliminacionSoloMes = {};
@@ -1541,17 +1553,114 @@ window.getSueldoForMonth = function(targetMonth) {
     return sueldoAplicar;
 };
 
-window.getPorcentajeAumentoGasto = function(gasto) {
-    if (window.appState.aumentosIndividuales?.[gasto.id] !== undefined && window.appState.aumentosIndividuales[gasto.id] !== '') {
-        return parseFloat(window.appState.aumentosIndividuales[gasto.id]) || 0;
+window.getPorcentajeAumentoSubcategoria = obtenerPorcentajeAumentoSubcategoria;
+window.crearHistorialAumentosSubcategoria = crearHistorialAumentos;
+window.calcularMontoConInflacion = calcularMontoConInflacion;
+window.mesTieneCambioProgramado = mesTieneCambioProgramado;
+window.obtenerPrimerMesCambioProgramado = obtenerPrimerMesCambioProgramado;
+window.mesSiguienteInflacion = mesSiguiente;
+
+window.getPorcentajeAumentoGasto = function(gasto, targetMonth) {
+    if (!gasto) return 0;
+    const aumentoIndividual = window.appState.aumentosIndividuales?.[gasto.id];
+    if (aumentoIndividual !== undefined && aumentoIndividual !== '') {
+        return parseFloat(aumentoIndividual) || 0;
     }
-    if (gasto.subcategoriaId) {
-        const subcat = (window.appState.subcategorias || []).find(s => s.id === gasto.subcategoriaId);
-        if (subcat && subcat.porcentajeAumento) {
-            return parseFloat(subcat.porcentajeAumento) || 0;
+
+    const mes = targetMonth || window.appState.currentMonth || defaultLocalMonth;
+    const claveSubcategoria = `${gasto.id}_${mes}`;
+    const subcategoriaId = window.appState.excepcionesSubcategoria?.[claveSubcategoria] !== undefined
+        ? window.appState.excepcionesSubcategoria[claveSubcategoria]
+        : gasto.subcategoriaId;
+    const subcategoria = (window.appState.subcategorias || []).find(item => item.id === subcategoriaId);
+    return obtenerPorcentajeAumentoSubcategoria(subcategoria, mes);
+};
+
+window.recalcularExcepcionesInflacionSubcategoria = function(subcategoriaId, subcategoriaAnterior, subcategoriaActual, desdeMes) {
+    if (!window.appState.excepcionesMonto) window.appState.excepcionesMonto = {};
+    if (!window.appState.excepcionesMontoGeneradas) window.appState.excepcionesMontoGeneradas = {};
+
+    const excepcionesMonto = window.appState.excepcionesMonto;
+    const excepcionesGeneradas = window.appState.excepcionesMontoGeneradas;
+    const excepcionesSubcategoria = window.appState.excepcionesSubcategoria || {};
+    const gastos = window.appState.gastos || [];
+
+    for (const gasto of gastos) {
+        const aumentoIndividual = window.appState.aumentosIndividuales?.[gasto.id];
+        if (aumentoIndividual !== undefined && aumentoIndividual !== '') continue;
+
+        const prefijoGasto = `${gasto.id}_`;
+        const usaSubcategoria = gasto.subcategoriaId === subcategoriaId ||
+            Object.entries(excepcionesSubcategoria).some(([clave, id]) =>
+                clave.startsWith(prefijoGasto) && id === subcategoriaId
+            );
+        if (!usaSubcategoria) continue;
+
+        const categoria = String(window.appState.excepcionesCategoria?.[`${gasto.id}_${desdeMes}`] ?? gasto.categoria ?? '').toLowerCase();
+        const esRecurrente = gasto.isRecurrente ||
+            categoria.includes('fijo') ||
+            categoria.includes('servicio');
+        if (!esRecurrente) continue;
+
+        const mesInicioGasto = gasto.startMonth || desdeMes;
+        const primerMesARecalcular = mesInicioGasto >= desdeMes
+            ? mesSiguiente(mesInicioGasto)
+            : desdeMes;
+        if (!primerMesARecalcular) continue;
+
+        const mesesConExcepcion = Object.keys(excepcionesMonto)
+            .filter(clave => clave.startsWith(prefijoGasto))
+            .map(clave => clave.slice(prefijoGasto.length))
+            .filter(mes => /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) && mes >= primerMesARecalcular)
+            .sort();
+        if (!mesesConExcepcion.length) continue;
+
+        const ultimoMes = mesesConExcepcion[mesesConExcepcion.length - 1];
+        const mesBase = mesAnterior(primerMesARecalcular);
+        const itemBase = window.getCalculatedDataForMonth(mesBase).items.find(item => item.id === gasto.id);
+        let montoAnterior = Number.parseFloat(itemBase?.monto ?? gasto.monto) || 0;
+        let montoActual = montoAnterior;
+        let mes = primerMesARecalcular;
+
+        while (mes <= ultimoMes) {
+            const clave = `${gasto.id}_${mes}`;
+            const subcategoriaDelMes = excepcionesSubcategoria[clave] !== undefined
+                ? excepcionesSubcategoria[clave]
+                : gasto.subcategoriaId;
+            const tasaAnterior = subcategoriaDelMes === subcategoriaId
+                ? obtenerPorcentajeAumentoSubcategoria(subcategoriaAnterior, mes)
+                : window.getPorcentajeAumentoGasto(gasto, mes);
+            const tasaActual = subcategoriaDelMes === subcategoriaId
+                ? obtenerPorcentajeAumentoSubcategoria(subcategoriaActual, mes)
+                : window.getPorcentajeAumentoGasto(gasto, mes);
+            const montoAnteriorSinRedondear = montoAnterior * (1 + tasaAnterior / 100);
+            const montoActualSinRedondear = montoActual * (1 + tasaActual / 100);
+            const montoAnteriorCalculado = redondearMonto(montoAnteriorSinRedondear);
+            const montoActualCalculado = redondearMonto(montoActualSinRedondear);
+            const montoGuardado = excepcionesMonto[clave];
+
+            if (montoGuardado !== undefined) {
+                const esMontoGenerado = excepcionesGeneradas[clave] === true ||
+                    (excepcionesGeneradas[clave] !== false &&
+                        Math.abs((Number.parseFloat(montoGuardado) || 0) - montoAnteriorCalculado) < 0.005);
+                if (esMontoGenerado) {
+                    excepcionesMonto[clave] = montoActualCalculado;
+                    excepcionesGeneradas[clave] = true;
+                    montoAnterior = montoAnteriorCalculado;
+                    montoActual = montoActualCalculado;
+                } else {
+                    excepcionesGeneradas[clave] = false;
+                    montoAnterior = Number.parseFloat(montoGuardado) || 0;
+                    montoActual = montoAnterior;
+                }
+            } else {
+                montoAnterior = montoAnteriorCalculado;
+                montoActual = montoActualCalculado;
+            }
+
+            mes = mesSiguiente(mes);
         }
     }
-    return 0;
 };
 
 window.getCalculatedDataForMonth = function(targetMonth) {
@@ -1607,19 +1716,21 @@ window.getCalculatedDataForMonth = function(targetMonth) {
         const catEsFijo = categoriaAplicar.toLowerCase().includes('fijo') || categoriaAplicar.toLowerCase().includes('servicio');
         const isRecurrente = gasto.isRecurrente || baseEsFijo || catEsFijo;
 
-        const pctAumento = window.getPorcentajeAumentoGasto(gasto);
-        if (isRecurrente && pctAumento > 0 && targetMonth > baseMonthStr) {
-            const [bY, bM] = baseMonthStr.split('-').map(Number);
-            const [tY, tM] = targetMonth.split('-').map(Number);
-            const diffMeses = (tY - bY) * 12 + (tM - bM);
-
-            if (diffMeses > 0) {
-                let montoCalculado = montoAplicar;
-                for (let m = 0; m < diffMeses; m++) {
-                    montoCalculado = montoCalculado * (1 + (pctAumento / 100));
-                }
-                montoAplicar = Math.round(montoCalculado * 100) / 100;
-            }
+        const subcategoriaIdParaTasa = window.appState.excepcionesSubcategoria?.[excepcionCatKey] ?? gasto.subcategoriaId;
+        const subcategoriaParaTasa = (window.appState.subcategorias || []).find(item => item.id === subcategoriaIdParaTasa);
+        const tieneAumentoIndividual = window.appState.aumentosIndividuales?.[gasto.id] !== undefined &&
+            window.appState.aumentosIndividuales[gasto.id] !== '';
+        const mesInicioRedondeo = !tieneAumentoIndividual
+            ? obtenerPrimerMesCambioProgramado(subcategoriaParaTasa, baseMonthStr, targetMonth)
+            : '';
+        if (isRecurrente && targetMonth > baseMonthStr) {
+            montoAplicar = calcularMontoConInflacion(
+                montoAplicar,
+                baseMonthStr,
+                targetMonth,
+                mes => window.getPorcentajeAumentoGasto(gasto, mes),
+                mesInicioRedondeo
+            );
         }
 
         let generatedItems = [];
@@ -2173,8 +2284,11 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                 let pctDisplay = '-';
                 if (pctIndiv !== undefined && pctIndiv !== '') {
                     pctDisplay = `${pctIndiv}% <span class="text-[10px] text-amber-400" title="Individual">(Ind)</span>`;
-                } else if (subcatObj && subcatObj.porcentajeAumento) {
-                    pctDisplay = `${subcatObj.porcentajeAumento}% <span class="text-[10px] text-slate-500" title="Subcategoría">(Sub)</span>`;
+                } else if (subcatObj) {
+                    const porcentajeSubcategoria = obtenerPorcentajeAumentoSubcategoria(subcatObj, currentMonth);
+                    if (porcentajeSubcategoria) {
+                        pctDisplay = `${porcentajeSubcategoria}% <span class="text-[10px] text-slate-500" title="Subcategoría">(Sub)</span>`;
+                    }
                 }
 
                 let vencimientoCellHtml = '';
