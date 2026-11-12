@@ -823,6 +823,7 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
 
 onAuthStateChanged(auth, async (user) => {
     window.actualizarVisibilidadDemoLocal?.();
+    window.configurarPreferenciaImportesUsuario?.(user?.uid || null);
     if (user) {
         if (flujoVerificacionEnCurso) return;
         window.showLoading();

@@ -1,4 +1,5 @@
-        const CLAVE_IMPORTES_OCULTOS = 'gastos_importes_ocultos';
+        const PREFIJO_IMPORTES_OCULTOS = 'gastos_importes_ocultos';
+        let uidPreferenciaImportes = null;
 
         function establecerVisibilidadImportes(ocultos) {
             document.body.classList.toggle('importes-ocultos', ocultos);
@@ -12,13 +13,25 @@
             button.innerHTML = `<i class="fa-solid ${ocultos ? 'fa-eye-slash' : 'fa-eye'}" aria-hidden="true"></i>`;
         }
 
+        function obtenerClaveImportesOcultos(uid) {
+            return uid ? `${PREFIJO_IMPORTES_OCULTOS}_${uid}` : null;
+        }
+
+        window.configurarPreferenciaImportesUsuario = function(uid) {
+            uidPreferenciaImportes = uid || null;
+            const clave = obtenerClaveImportesOcultos(uidPreferenciaImportes);
+            establecerVisibilidadImportes(clave ? localStorage.getItem(clave) === 'true' : false);
+        };
+
         window.toggleImportesOcultos = function() {
             const ocultos = !document.body.classList.contains('importes-ocultos');
-            localStorage.setItem(CLAVE_IMPORTES_OCULTOS, String(ocultos));
+            const uid = window.auth?.currentUser?.uid || uidPreferenciaImportes;
+            const clave = obtenerClaveImportesOcultos(uid);
+            if (clave) localStorage.setItem(clave, String(ocultos));
             establecerVisibilidadImportes(ocultos);
         };
 
-        establecerVisibilidadImportes(localStorage.getItem(CLAVE_IMPORTES_OCULTOS) === 'true');
+        window.configurarPreferenciaImportesUsuario(window.auth?.currentUser?.uid || null);
 
         function obtenerItemsPlanillaConSaldo(targetMonth) {
             const pagosIndividuales = window.appState.excepcionesMontoPagado || {};
