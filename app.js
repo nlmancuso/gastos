@@ -1602,10 +1602,10 @@ window.recalcularExcepcionesInflacionSubcategoria = function(subcategoriaId, sub
             categoria.includes('servicio');
         if (!esRecurrente) continue;
 
-        const mesInicioGasto = gasto.startMonth || desdeMes;
-        const primerMesARecalcular = mesInicioGasto >= desdeMes
-            ? mesSiguiente(mesInicioGasto)
+        const mesInicioGasto = /^\d{4}-(0[1-9]|1[0-2])$/.test(gasto.startMonth || '')
+            ? gasto.startMonth
             : desdeMes;
+        const primerMesARecalcular = mesInicioGasto > desdeMes ? mesInicioGasto : desdeMes;
         if (!primerMesARecalcular) continue;
 
         const mesesConExcepcion = Object.keys(excepcionesMonto)
@@ -1613,9 +1613,9 @@ window.recalcularExcepcionesInflacionSubcategoria = function(subcategoriaId, sub
             .map(clave => clave.slice(prefijoGasto.length))
             .filter(mes => /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) && mes >= primerMesARecalcular)
             .sort();
-        if (!mesesConExcepcion.length) continue;
-
-        const ultimoMes = mesesConExcepcion[mesesConExcepcion.length - 1];
+        const ultimoMes = mesesConExcepcion.length
+            ? mesesConExcepcion[mesesConExcepcion.length - 1]
+            : primerMesARecalcular;
         const mesBase = mesAnterior(primerMesARecalcular);
         const itemBase = window.getCalculatedDataForMonth(mesBase).items.find(item => item.id === gasto.id);
         let montoAnterior = Number.parseFloat(itemBase?.monto ?? gasto.monto) || 0;
@@ -1656,6 +1656,10 @@ window.recalcularExcepcionesInflacionSubcategoria = function(subcategoriaId, sub
             } else {
                 montoAnterior = montoAnteriorCalculado;
                 montoActual = montoActualCalculado;
+                if (mes === primerMesARecalcular && subcategoriaDelMes === subcategoriaId) {
+                    excepcionesMonto[clave] = montoActualCalculado;
+                    excepcionesGeneradas[clave] = true;
+                }
             }
 
             mes = mesSiguiente(mes);
