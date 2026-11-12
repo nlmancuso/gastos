@@ -126,6 +126,12 @@ async function enviarAlertas() {
         return;
     }
 
+    if (process.env.ENVIAR_CORREO !== 'true') {
+        const cardAlerts = alerts.filter(item => item.esTarjeta).length;
+        console.log(`Prueba sin envío: ${alerts.length} alerta(s), ${cardAlerts} de tarjeta(s). No se envió ningún correo.`);
+        return;
+    }
+
     const total = Math.round(alerts.reduce((sum, item) => sum + item.monto, 0) * 100) / 100;
     const resend = new Resend(requiredEnv('RESEND_API_KEY'));
     const { data, error } = await resend.emails.send({

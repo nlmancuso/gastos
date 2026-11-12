@@ -6,7 +6,7 @@ on:
       enviar_correo:
         description: "Enviar el correo después de las pruebas"
         required: true
-        default: true
+        default: false
         type: boolean
 
 jobs:
@@ -28,11 +28,11 @@ jobs:
         run: node --test tests/notificador-calculos.test.mjs
 
       - name: Ejecutar script de notificaciones
-        if: ${{ inputs.enviar_correo }}
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_TO: ${{ secrets.MY_EMAIL }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           FIRESTORE_GROUP_ID: ${{ vars.FIRESTORE_GROUP_ID }}
+          ENVIAR_CORREO: ${{ inputs.enviar_correo }}
         run: node notificador.js
