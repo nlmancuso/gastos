@@ -428,6 +428,23 @@ function crearEstadoPersonal(user) {
     return estado;
 }
 
+function crearEstadoDesdeDatosGuardados(appStateGuardado, mesLocalGuardado, mesPredeterminado) {
+    const estado = JSON.parse(JSON.stringify(appStateLimpioBase));
+    const datosGuardados = appStateGuardado && typeof appStateGuardado === 'object'
+        ? appStateGuardado
+        : {};
+    Object.assign(estado, datosGuardados);
+    estado.currentMonth = mesLocalGuardado || estado.currentMonth || mesPredeterminado;
+    if (!Array.isArray(estado.categorias)) estado.categorias = JSON.parse(JSON.stringify(categoriasDefault));
+    if (!Array.isArray(estado.subcategorias)) estado.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
+    if (!Array.isArray(estado.gastosMensuales)) estado.gastosMensuales = [];
+    if (!estado.aumentosIndividuales || typeof estado.aumentosIndividuales !== 'object') estado.aumentosIndividuales = {};
+    if (!estado.excepcionesEliminacionSoloMes || typeof estado.excepcionesEliminacionSoloMes !== 'object') {
+        estado.excepcionesEliminacionSoloMes = {};
+    }
+    return estado;
+}
+
 if (auth.currentUser) {
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) loginOverlay.classList.add('hidden');
@@ -758,15 +775,9 @@ window.cambiarVistaSeleccionada = async function(vistaId) {
         if (window.demoModeActive) return;
         if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.appState) {
-                const mesGuardadoLocal = localStorage.getItem(claveMesLocal);
-                window.appState = {
-                    ...window.appState,
-                    ...data.appState,
-                    currentMonth: mesGuardadoLocal || data.appState.currentMonth || defaultLocalMonth
-                };
-                localStorage.setItem(claveMesLocal, window.appState.currentMonth);
-            }
+            const mesGuardadoLocal = localStorage.getItem(claveMesLocal);
+            window.appState = crearEstadoDesdeDatosGuardados(data.appState, mesGuardadoLocal, defaultLocalMonth);
+            localStorage.setItem(claveMesLocal, window.appState.currentMonth);
         } else {
             if (targetDocId.startsWith("personal_")) {
                 window.appState = crearEstadoPersonal(auth.currentUser);
@@ -849,21 +860,10 @@ onAuthStateChanged(auth, async (user) => {
             if (window.demoModeActive) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                if (data.appState) {
-                    const claveMesLocal = `currentMonth_${targetDocId}`;
-                    const mesGuardadoLocal = localStorage.getItem(claveMesLocal);
-                    window.appState = {
-                        ...window.appState,
-                        ...data.appState,
-                        currentMonth: mesGuardadoLocal || data.appState.currentMonth || currentLocalMonthStr
-                    };
-                    localStorage.setItem(claveMesLocal, window.appState.currentMonth);
-                    if (!window.appState.subcategorias) window.appState.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
-                    if (!window.appState.aumentosIndividuales) window.appState.aumentosIndividuales = {};
-                    if (!window.appState.excepcionesEliminacionSoloMes) window.appState.excepcionesEliminacionSoloMes = {};
-                    if (!Array.isArray(window.appState.gastosMensuales)) window.appState.gastosMensuales = [];
-                    if (!window.appState.currentMonth) window.appState.currentMonth = currentLocalMonthStr;
-                }
+                const claveMesLocal = `currentMonth_${targetDocId}`;
+                const mesGuardadoLocal = localStorage.getItem(claveMesLocal);
+                window.appState = crearEstadoDesdeDatosGuardados(data.appState, mesGuardadoLocal, currentLocalMonthStr);
+                localStorage.setItem(claveMesLocal, window.appState.currentMonth);
             } else {
                 if (targetDocId.startsWith("personal_")) {
                     window.appState = crearEstadoPersonal(user);
@@ -936,6 +936,9 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeInvitacionesEnviadas) { unsubscribeInvitacionesEnviadas(); unsubscribeInvitacionesEnviadas = null; }
         if (unsubscribeNotificacionesOcultas) { unsubscribeNotificacionesOcultas(); unsubscribeNotificacionesOcultas = null; }
         window.docHormigaRef = null;
+        window.appState = JSON.parse(JSON.stringify(appStateLimpioBase));
+        window.currentGrupo = null;
+        window.docRef = null;
         window.hormigaState = crearEstadoHormigaInicial();
         invitacionesUsuario = [];
         invitacionesOcultas = new Set();
