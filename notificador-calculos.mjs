@@ -392,8 +392,6 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
     [currentMonth, nextTargetMonth].forEach(month => {
         const items = obtenerItemsConSaldo(state || {}, month, hoy);
         const categories = Array.isArray(state?.categorias) ? state.categorias : [];
-        const paidIndividualMap = state?.excepcionesMontoPagado || {};
-        const paidBlockMap = state?.excepcionesMontoPagadoBloque || {};
         const processedBlocks = new Set();
 
         items.forEach(item => {
@@ -412,30 +410,21 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
 
                 const dueItem = group.find(entry => entry.montoDebidoBloque !== undefined);
                 const amountDue = toNumber(dueItem?.montoDebidoBloque);
-                const markedPaidAmount = actualItems
-                    .filter(entry => String(entry.estado).toUpperCase() === 'PAGADO')
-                    .reduce((total, entry) => total + toNumber(entry.monto), 0);
-                const remainingBeforeBlockPayment = roundMoney(Math.max(0, amountDue - markedPaidAmount));
-                const key = `${item.categoria}_${month}`;
-                const amountPaid = own(paidBlockMap, key)
-                    ? clampPayment(paidBlockMap[key], remainingBeforeBlockPayment)
-                    : 0;
-                const remaining = roundMoney(Math.max(0, remainingBeforeBlockPayment - amountPaid));
                 const dueDateValue = actualItems.find(entry =>
                     String(entry.estado).toUpperCase() !== 'PAGADO' && normalizarFecha(entry.vencimiento)
                 )?.vencimiento
-                    || state?.vencimientosTarjetas?.[key]
+                    || state?.vencimientosTarjetas?.[`${item.categoria}_${month}`]
                     || state?.vencimientosTarjetas?.[item.categoria]
                     || group.find(entry => normalizarFecha(entry.vencimiento))?.vencimiento;
                 const dueDate = normalizarFecha(dueDateValue);
 
-                if (remaining > 0 && dueDate && dueDate <= tomorrow) {
+                if (amountDue > 0 && dueDate && dueDate <= tomorrow) {
                     alerts.push({
                         id: `${item.categoria}_${month}`,
                         concepto: `Tarjeta: ${item.categoria}`,
                         categoria: item.categoria,
                         vencimiento: dueDate,
-                        monto: remaining,
+                        monto: amountDue,
                         esTarjeta: true
                     });
                 }
@@ -444,20 +433,15 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
 
             if (String(item.estado).toUpperCase() === 'PAGADO') return;
             const idPago = item.idPago || item.id;
-            const key = `${idPago}_${month}`;
             const amountDue = toNumber(item.montoDebido ?? item.monto);
-            const amountPaid = own(paidIndividualMap, key)
-                ? clampPayment(paidIndividualMap[key], amountDue)
-                : 0;
-            const remaining = roundMoney(Math.max(0, amountDue - amountPaid));
             const dueDate = normalizarFecha(item.vencimiento);
-            if (remaining > 0 && dueDate && dueDate <= tomorrow) {
+            if (amountDue > 0 && dueDate && dueDate <= tomorrow) {
                 alerts.push({
                     id: `${idPago}_${month}`,
                     concepto: item.concepto || item.categoria || 'Gasto',
                     categoria: item.categoria || 'Otros',
                     vencimiento: dueDate,
-                    monto: remaining,
+                    monto: amountDue,
                     esTarjeta: false
                 });
             }

@@ -76,7 +76,7 @@ test('alerts only use current-month card items and omit a paid card', () => {
     assert.deepEqual(calcularAlertasVencimiento(state, '2026-11-11'), []);
 });
 
-test('groups a card once, subtracts its recorded partial payment, and ignores old purchases', () => {
+test('groups a card once, uses its full total despite the recorded payment, and ignores old purchases', () => {
     const state = crearEstado([
         {
             id: 'old-purchase',
@@ -107,17 +107,19 @@ test('groups a card once, subtracts its recorded partial payment, and ignores ol
         }
     ], {
         excepcionesEstado: {
-            'old-purchase_2026-10': 'PAGADO'
+            'old-purchase_2026-10': 'PAGADO',
+            'current-purchase-a_2026-11': 'PENDIENTE',
+            'current-purchase-b_2026-11': 'PENDIENTE'
         },
         excepcionesMontoPagadoBloque: {
-            'Mercado Pago_2026-11': 200
+            'Mercado Pago_2026-11': 800
         }
     });
 
     const alerts = calcularAlertasVencimiento(state, '2026-11-11');
     assert.equal(alerts.length, 1);
     assert.equal(alerts[0].concepto, 'Tarjeta: Mercado Pago');
-    assert.equal(alerts[0].monto, 600);
+    assert.equal(alerts[0].monto, 800);
     assert.equal(alerts[0].vencimiento, '2026-11-10');
 });
 
@@ -267,7 +269,7 @@ test('carries an overdue unpaid card balance into the current month alert', () =
     assert.equal(alerts[0].vencimiento, '2026-10-10');
 });
 
-test('shows only the unpaid remainder for an individual expense', () => {
+test('uses the full individual expense amount despite a recorded partial payment', () => {
     const state = crearEstado([{
         id: 'internet',
         concepto: 'Internet',
@@ -277,6 +279,9 @@ test('shows only the unpaid remainder for an individual expense', () => {
         startMonth: '2026-11',
         vencimiento: '2026-11-11'
     }], {
+        excepcionesEstado: {
+            'internet_2026-11': 'PENDIENTE'
+        },
         excepcionesMontoPagado: {
             'internet_2026-11': 350
         }
@@ -284,7 +289,7 @@ test('shows only the unpaid remainder for an individual expense', () => {
 
     const alerts = calcularAlertasVencimiento(state, '2026-11-11');
     assert.equal(alerts.length, 1);
-    assert.equal(alerts[0].monto, 650);
+    assert.equal(alerts[0].monto, 1000);
 });
 
 test('does not alert for individually paid expenses', () => {
