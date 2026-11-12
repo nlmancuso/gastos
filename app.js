@@ -2319,7 +2319,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                     `;
                     montoPagadoCellHtml = `
                         <td class="px-4 py-3 text-right">
-                            <input type="number" min="0" max="${g.monto}" step="0.01" value="${g.montoPagado ?? g.monto}" data-id="${g.idPago || g.id}" onchange="actualizarMontoPagadoPlanilla(this, false)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 disabled:opacity-60" aria-label="Monto pagado de ${escapeHtml(g.concepto)}">
+                            <input type="number" min="0" max="${g.monto}" step="0.01" value="${g.montoPagado ?? g.monto}" data-id="${g.idPago || g.id}" data-privacy-amount onchange="actualizarMontoPagadoPlanilla(this, false)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 disabled:opacity-60" aria-label="Monto pagado de ${escapeHtml(g.concepto)}">
                         </td>
                     `;
                 }
@@ -2334,7 +2334,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                         <td class="px-4 py-3 text-slate-300 font-medium">${subcatNombre}</td>
                         ${vencimientoCellHtml}
                         <td class="px-4 py-3 font-mono text-amber-300 font-bold">${pctDisplay}</td>
-                        <td class="px-4 py-3 text-right font-extrabold text-white">${fmt(g.monto)}</td>
+                        <td class="px-4 py-3 text-right font-extrabold text-white"><span data-privacy-amount class="relative inline-block">${fmt(g.monto)}</span></td>
                         ${montoPagadoCellHtml}
                         ${estadoCellHtml}
                         <td class="px-4 py-3 text-right">

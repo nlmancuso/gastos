@@ -1,13 +1,24 @@
-        window.toggleImportesOcultos = function() {
-            const ocultos = document.body.classList.toggle('importes-ocultos');
+        const CLAVE_IMPORTES_OCULTOS = 'gastos_importes_ocultos';
+
+        function establecerVisibilidadImportes(ocultos) {
+            document.body.classList.toggle('importes-ocultos', ocultos);
             const button = document.getElementById('btnToggleImportes');
+            if (!button) return;
             const label = ocultos ? 'Mostrar importes' : 'Ocultar importes';
 
             button.setAttribute('aria-label', label);
             button.setAttribute('aria-pressed', String(ocultos));
             button.title = label;
             button.innerHTML = `<i class="fa-solid ${ocultos ? 'fa-eye-slash' : 'fa-eye'}" aria-hidden="true"></i>`;
+        }
+
+        window.toggleImportesOcultos = function() {
+            const ocultos = !document.body.classList.contains('importes-ocultos');
+            localStorage.setItem(CLAVE_IMPORTES_OCULTOS, String(ocultos));
+            establecerVisibilidadImportes(ocultos);
         };
+
+        establecerVisibilidadImportes(localStorage.getItem(CLAVE_IMPORTES_OCULTOS) === 'true');
 
         function obtenerItemsPlanillaConSaldo(targetMonth) {
             const pagosIndividuales = window.appState.excepcionesMontoPagado || {};
