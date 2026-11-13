@@ -503,13 +503,17 @@ export function calcularAlertasPorDestinatario(espacios, hoy = obtenerFechaArgen
         .sort((left, right) => left.email.localeCompare(right.email, 'en'));
 }
 
-export function reconstruirMiembrosEspacio(miembrosActuales, invitacionesAceptadas = [], usuarioAdministrador = null) {
+export function reconstruirMiembrosEspacio(miembrosActuales, invitaciones = [], adminUid = '') {
     const miembros = miembrosActuales && typeof miembrosActuales === 'object' && !Array.isArray(miembrosActuales)
         ? { ...miembrosActuales }
         : {};
     if (Object.keys(miembros).length > 0) return miembros;
 
-    invitacionesAceptadas.forEach(invitacion => {
+    const correosAdministradores = new Set();
+    invitaciones.forEach(invitacion => {
+        if (typeof invitacion?.remitenteEmail === 'string' && invitacion.remitenteEmail.trim()) {
+            correosAdministradores.add(invitacion.remitenteEmail.trim());
+        }
         if (
             invitacion?.estado !== 'ACEPTADO'
             || typeof invitacion.destinatarioUid !== 'string'
@@ -521,12 +525,9 @@ export function reconstruirMiembrosEspacio(miembrosActuales, invitacionesAceptad
         };
     });
 
-    if (
-        typeof usuarioAdministrador?.uid === 'string'
-        && typeof usuarioAdministrador.email === 'string'
-    ) {
-        miembros[usuarioAdministrador.uid] = {
-            email: usuarioAdministrador.email,
+    if (adminUid && correosAdministradores.size === 1) {
+        miembros[adminUid] = {
+            email: [...correosAdministradores][0],
             rol: 'admin'
         };
     }

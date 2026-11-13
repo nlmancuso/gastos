@@ -372,19 +372,18 @@ test('recovers an empty workspace membership only from accepted invites and its 
     const members = reconstruirMiembrosEspacio({}, [
         {
             estado: 'PENDIENTE',
+            remitenteEmail: 'admin@example.com',
             destinatarioUid: 'uid-pending',
             destinatarioEmail: 'pending@example.com'
         },
         {
             estado: 'ACEPTADO',
+            remitenteEmail: 'admin@example.com',
             destinatarioUid: 'uid-accepted',
             destinatarioEmail: 'accepted@example.com',
             rol: 'editor'
         }
-    ], {
-        uid: 'uid-admin',
-        email: 'admin@example.com'
-    });
+    ], 'uid-admin');
 
     assert.deepEqual(members, {
         'uid-accepted': { email: 'accepted@example.com', rol: 'editor' },

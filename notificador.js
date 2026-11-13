@@ -1,5 +1,4 @@
 import { cert, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
     calcularAlertasPorDestinatario,
@@ -41,10 +40,10 @@ function inicializarFirestore() {
     return getFirestore(app);
 }
 
-async function obtenerEspaciosConMiembros(db, auth) {
+async function obtenerEspaciosConMiembros(db) {
     const [espaciosSnapshot, invitacionesSnapshot] = await Promise.all([
         db.collection('app_data').get(),
-        db.collection('invitaciones').where('estado', '==', 'ACEPTADO').get()
+        db.collection('invitaciones').get()
     ]);
     const invitacionesPorGrupo = new Map();
     invitacionesSnapshot.forEach(snapshot => {
@@ -68,21 +67,12 @@ async function obtenerEspaciosConMiembros(db, auth) {
         const miembrosActuales = grupoInfo.miembros && typeof grupoInfo.miembros === 'object' && !Array.isArray(grupoInfo.miembros)
             ? { ...grupoInfo.miembros }
             : {};
-        let usuarioAdministrador = null;
         const adminUid = typeof grupoInfo.adminUid === 'string' ? grupoInfo.adminUid : '';
-
-        if (Object.keys(miembrosActuales).length === 0 && adminUid) {
-            try {
-                usuarioAdministrador = await auth.getUser(adminUid);
-            } catch (error) {
-                if (error.code !== 'auth/user-not-found') throw error;
-            }
-        }
 
         const miembros = reconstruirMiembrosEspacio(
             miembrosActuales,
             invitacionesPorGrupo.get(documento.id) || [],
-            usuarioAdministrador
+            adminUid
         );
 
         if (Object.keys(miembros).length === 0) {
@@ -162,7 +152,7 @@ function crearHtmlAlerta(items, total, hoy) {
 
 async function enviarAlertas() {
     const db = inicializarFirestore();
-    const espacios = await obtenerEspaciosConMiembros(db, getAuth());
+    const espacios = await obtenerEspaciosConMiembros(db);
 
     const today = obtenerFechaArgentina();
     const recipients = calcularAlertasPorDestinatario(espacios, today);
