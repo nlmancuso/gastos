@@ -2409,6 +2409,12 @@ window.renderPlanillaAgrupadaTabla = function(items) {
     const catList = window.appState.categorias || categoriasDefault;
     const currentMonth = window.appState.currentMonth || defaultLocalMonth;
     const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+    const estilosVencimiento = {
+        PENDIENTE: { texto: 'text-amber-500', borde: 'border-amber-800/60', fondo: 'bg-amber-950/60' },
+        PAGADO: { texto: 'text-emerald-400', borde: 'border-emerald-800/60', fondo: 'bg-emerald-950/60' },
+        VENCIDO: { texto: 'text-rose-400', borde: 'border-rose-800/60', fondo: 'bg-rose-950/60' }
+    };
+    const estiloVencimiento = estado => estilosVencimiento[estado] || estilosVencimiento.PENDIENTE;
 
     Object.entries(grupos).forEach(([categoria, gastosCat]) => {
         const catObj = catList.find(c => c.nombre === categoria);
@@ -2435,6 +2441,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
         const vencimientoValFirst = window.appState.excepcionesVencimientoGrid?.[gridKeyFirst] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKeyFirst] : vencimientoGrupo;
         
         const estadoValFirst = gastosCat[0]?.estado || 'PENDIENTE';
+        const colorVencimientoCabecera = estiloVencimiento(estadoValFirst);
 
         let rowsHtml = '';
         if (isAbierto) {
@@ -2442,6 +2449,10 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                 const gridKey = `${g.id}_${currentMonth}`;
                 const vencimientoVal = window.appState.excepcionesVencimientoGrid?.[gridKey] !== undefined ? window.appState.excepcionesVencimientoGrid[gridKey] : (g.vencimiento || '');
                 const estadoVal = g.estado || 'PENDIENTE';
+                const colorVencimiento = estiloVencimiento(estadoVal);
+                const clasesVencimiento = vencimientoVal
+                    ? `${colorVencimiento.texto} ${colorVencimiento.borde} ${colorVencimiento.fondo} font-bold`
+                    : 'text-slate-300 border-slate-800 bg-slate-950';
 
                 const subcatIdActual = window.appState.excepcionesSubcategoria?.[gridKey] !== undefined ? window.appState.excepcionesSubcategoria[gridKey] : g.subcategoriaId;
                 const subcatObj = (window.appState.subcategorias || []).find(s => s.id === subcatIdActual);
@@ -2465,7 +2476,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                 if (!esBloque) {
                     vencimientoCellHtml = `
                         <td class="px-4 py-3">
-                            <input type="date" value="${vencimientoVal}" onchange="actualizarVencimientoGrid('${g.id}', '${currentMonth}', this.value, '${categoria}')" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs ${vencimientoVal ? 'text-amber-400 font-bold border-amber-800/60 bg-amber-950/60' : 'text-slate-300'} focus:outline-none">
+                            <input type="date" value="${vencimientoVal}" onchange="actualizarVencimientoGrid('${g.id}', '${currentMonth}', this.value, '${categoria}')" class="border rounded-lg px-2 py-1 text-xs ${clasesVencimiento} focus:outline-none">
                         </td>
                     `;
                     estadoCellHtml = `
@@ -2512,9 +2523,9 @@ window.renderPlanillaAgrupadaTabla = function(items) {
         if (esBloque) {
             controlesCabeceraHtml = `
                 <div class="flex flex-wrap items-center gap-2" onclick="event.stopPropagation()">
-                    <div class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
+                    <div class="flex items-center gap-1.5 rounded-lg border px-2 py-1 ${vencimientoValFirst ? `${colorVencimientoCabecera.borde} ${colorVencimientoCabecera.fondo}` : 'bg-slate-950/80 border-slate-800'}">
                         <span class="text-[10px] text-slate-400 font-bold uppercase">Venc:</span>
-                        <input type="date" value="${vencimientoValFirst || ''}" onchange="actualizarVencimientoGrid('${gastosCat[0]?.id}', '${currentMonth}', this.value, '${categoria}')" class="bg-transparent text-amber-400 font-bold text-xs outline-none cursor-pointer">
+                        <input type="date" value="${vencimientoValFirst || ''}" onchange="actualizarVencimientoGrid('${gastosCat[0]?.id}', '${currentMonth}', this.value, '${categoria}')" class="bg-transparent ${vencimientoValFirst ? colorVencimientoCabecera.texto : 'text-slate-300'} font-bold text-xs outline-none cursor-pointer">
                     </div>
                     <div class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
                         <span class="text-[10px] text-slate-400 font-bold uppercase">Estado:</span>
