@@ -427,12 +427,13 @@
         window.handleSaveSueldo = async function(e) {
             e.preventDefault();
             const currentMonth = window.appState.currentMonth || '2026-10';
-            const monto = parseFloat(document.getElementById('inputSueldoMonto').value) || 0;
+            const monto = Number(document.getElementById('inputSueldoMonto').value);
             if (!window.appState.sueldos) window.appState.sueldos = {};
             window.appState.sueldos[currentMonth] = monto;
-            if (!await window.saveDataToCloud()) return;
+            const guardado = window.guardarSueldoMes(currentMonth, monto);
             window.closeModal('modalSueldo');
             renderApp();
+            await guardado;
         };
 
         function renderFiltrosCategoriasPills() {

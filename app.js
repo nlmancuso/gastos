@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc as firestoreSetDoc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, onSnapshot, collection, addDoc as firestoreAddDoc, query, where, updateDoc as firestoreUpdateDoc, arrayRemove, arrayUnion, runTransaction as firestoreRunTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, FieldPath, setDoc as firestoreSetDoc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, onSnapshot, collection, addDoc as firestoreAddDoc, query, where, updateDoc as firestoreUpdateDoc, arrayRemove, arrayUnion, runTransaction as firestoreRunTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { renderActiveView } from "./view-renderer.mjs";
 import {
@@ -1468,6 +1468,28 @@ window.saveDataToCloud = async function() {
     } catch (e) {
         console.error("Error guardando los datos:", e);
         window.mostrarNotificacion("No se pudieron guardar los cambios", "Revisá tu conexión e intentá nuevamente.", "error");
+        return false;
+    }
+};
+
+window.guardarSueldoMes = async function(mes, monto) {
+    if (window.demoModeActive) return true;
+    if (!window.docRef) {
+        console.error("Error guardando el sueldo: no hay un grupo activo.");
+        window.mostrarNotificacion("No se pudo guardar el sueldo", "Revisá tu conexión e intentá nuevamente.", "error");
+        return false;
+    }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes) || !Number.isFinite(monto)) {
+        console.error("Error guardando el sueldo: el mes o el importe no son válidos.");
+        window.mostrarNotificacion("No se pudo guardar el sueldo", "Revisá el mes y el importe e intentá nuevamente.", "error");
+        return false;
+    }
+    try {
+        await updateDoc(window.docRef, new FieldPath("appState", "sueldos", mes), monto);
+        return true;
+    } catch (error) {
+        console.error("Error guardando el sueldo:", error);
+        window.mostrarNotificacion("No se pudo guardar el sueldo", "Revisá tu conexión y tus permisos e intentá nuevamente.", "error");
         return false;
     }
 };
