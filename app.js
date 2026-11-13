@@ -20,6 +20,7 @@ import {
     calcularRetirosAhorroParaMes,
     obtenerConfiguracionAhorro
 } from "./ahorro.mjs";
+import { evaluarExpresionImporte } from "./importe.mjs";
 
 let pendingDatabaseOperations = 0;
 let databaseActivityTimer = null;
@@ -68,6 +69,61 @@ const getDocs = (...args) => trackDatabaseOperation(() => firestoreGetDocs(...ar
 const addDoc = (...args) => trackDatabaseOperation(() => firestoreAddDoc(...args));
 const updateDoc = (...args) => trackDatabaseOperation(() => firestoreUpdateDoc(...args));
 const runTransaction = (...args) => trackDatabaseOperation(() => firestoreRunTransaction(...args));
+
+window.normalizarCampoImporte = function(input) {
+    if (!(input instanceof HTMLInputElement) || !input.hasAttribute('data-amount-input')) return true;
+    input.setCustomValidity('');
+    if (!input.value.trim()) return true;
+
+    let monto;
+    try {
+        monto = evaluarExpresionImporte(input.value);
+    } catch (error) {
+        input.setCustomValidity('Ingresá un importe válido. Podés usar +, -, *, / y paréntesis.');
+        return false;
+    }
+
+    const minimo = input.getAttribute('min');
+    const maximo = input.getAttribute('max');
+    if (minimo !== null && monto < Number(minimo)) {
+        input.setCustomValidity(`El importe debe ser igual o mayor a ${minimo}.`);
+        return false;
+    }
+    if (maximo !== null && monto > Number(maximo)) {
+        input.setCustomValidity(`El importe debe ser igual o menor a ${maximo}.`);
+        return false;
+    }
+    input.value = String(monto);
+    return true;
+};
+
+document.addEventListener('input', event => {
+    const input = event.target;
+    if (input instanceof HTMLInputElement && input.hasAttribute('data-amount-input')) {
+        input.setCustomValidity('');
+    }
+}, true);
+
+document.addEventListener('change', event => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.hasAttribute('data-amount-input')) return;
+    if (!window.normalizarCampoImporte(input)) {
+        event.stopImmediatePropagation();
+        input.reportValidity();
+        return;
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+}, true);
+
+document.addEventListener('submit', event => {
+    const camposImporte = [...event.target.querySelectorAll('[data-amount-input]')]
+        .filter(input => !input.matches(':disabled'));
+    const campoInvalido = camposImporte.find(input => !window.normalizarCampoImporte(input));
+    if (!campoInvalido) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    campoInvalido.reportValidity();
+}, true);
 
 const firebaseConfig = {
     apiKey: "AIzaSyDwRTcVpwoHJfTZ-eUr5ileTks5LN-npOE",
@@ -2401,7 +2457,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                     `;
                     montoPagadoCellHtml = `
                         <td class="px-4 py-3 text-right">
-                            <input type="number" min="0" max="${g.monto}" step="0.01" value="${g.montoPagado ?? g.monto}" data-id="${g.idPago || g.id}" data-privacy-amount onchange="actualizarMontoPagadoPlanilla(this, false)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 disabled:opacity-60" aria-label="Monto pagado de ${escapeHtml(g.concepto)}">
+                            <input type="text" inputmode="decimal" data-amount-input min="0" title="Acepta operaciones como 2+2" max="${g.monto}" value="${g.montoPagado ?? g.monto}" data-id="${g.idPago || g.id}" data-privacy-amount onchange="actualizarMontoPagadoPlanilla(this, false)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 disabled:opacity-60" aria-label="Monto pagado de ${escapeHtml(g.concepto)}">
                         </td>
                     `;
                 }
@@ -2448,7 +2504,7 @@ window.renderPlanillaAgrupadaTabla = function(items) {
                     </div>
                     <label class="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
                         <span class="text-[10px] text-slate-400 font-bold uppercase">Pagado:</span>
-                        <input type="number" min="0" max="${totalDebidoBloque}" step="0.01" value="${totalPagadoBloque}" data-categoria="${encodeURIComponent(categoria)}" data-privacy-amount onchange="actualizarMontoPagadoPlanilla(this, true)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-24 bg-transparent text-emerald-300 font-bold text-xs outline-none disabled:opacity-60" aria-label="Monto pagado de ${categoria}">
+                        <input type="text" inputmode="decimal" data-amount-input min="0" title="Acepta operaciones como 2+2" max="${totalDebidoBloque}" value="${totalPagadoBloque}" data-categoria="${encodeURIComponent(categoria)}" data-privacy-amount onchange="actualizarMontoPagadoPlanilla(this, true)" ${window.esUsuarioEditor() ? '' : 'disabled'} class="w-24 bg-transparent text-emerald-300 font-bold text-xs outline-none disabled:opacity-60" aria-label="Monto pagado de ${categoria}">
                     </label>
                     <span class="text-[10px] font-bold border px-2 py-1 rounded-full ${colorEstadoPagoBloque}">${estadoPagoBloque}</span>
                 </div>

@@ -151,7 +151,7 @@
                 return;
             }
             const monto = Number(input.value);
-            const maximo = Number(input.max);
+            const maximo = Number(input.getAttribute('max'));
             if (!Number.isFinite(monto) || monto < 0 || monto > maximo) {
                 window.mostrarMensajeApp('Monto no válido', 'El monto pagado debe estar entre cero y el total adeudado.', 'error');
                 renderPlanillaTab();
@@ -236,6 +236,7 @@
         window.actualizarTipoAhorro = function() {
             const esPorcentaje = document.getElementById('inputAhorroTipo').value === 'porcentaje';
             const input = document.getElementById('inputAhorroValor');
+            input.setCustomValidity('');
             document.getElementById('labelAhorroValor').textContent = esPorcentaje
                 ? 'Porcentaje del sueldo (%)'
                 : 'Importe mensual ($)';
@@ -243,11 +244,18 @@
                 ? 'El porcentaje se calcula sobre el sueldo de cada mes. El ahorro se descuenta del resto disponible; los meses anteriores quedan iguales.'
                 : 'El importe se repite en los meses siguientes. El ahorro se descuenta del resto disponible; los meses anteriores quedan iguales.';
             if (esPorcentaje) {
+                input.type = 'number';
+                input.removeAttribute('data-amount-input');
+                input.min = '0';
                 input.max = '100';
                 input.step = '0.01';
             } else {
+                input.type = 'text';
+                input.inputMode = 'decimal';
+                input.setAttribute('data-amount-input', '');
+                input.min = '0';
                 input.removeAttribute('max');
-                input.step = '0.01';
+                input.removeAttribute('step');
             }
         };
 
