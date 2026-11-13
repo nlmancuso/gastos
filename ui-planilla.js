@@ -212,13 +212,13 @@
             document.getElementById('modalSueldo').classList.remove('hidden');
         };
 
-        window.handleSaveSueldo = function(e) {
+        window.handleSaveSueldo = async function(e) {
             e.preventDefault();
             const currentMonth = window.appState.currentMonth || '2026-10';
             const monto = parseFloat(document.getElementById('inputSueldoMonto').value) || 0;
             if (!window.appState.sueldos) window.appState.sueldos = {};
             window.appState.sueldos[currentMonth] = monto;
-            window.saveDataToCloud();
+            if (!await window.saveDataToCloud()) return;
             window.closeModal('modalSueldo');
             renderApp();
         };
@@ -264,7 +264,7 @@
         let draggedRowId = null;
         window.dragStart = function(e) { draggedRowId = e.currentTarget.getAttribute('data-id'); e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
         window.dragOver = function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
-        window.dropItem = function(e, categoria) {
+        window.dropItem = async function(e, categoria) {
             e.preventDefault();
             const targetRow = e.target.closest('tr');
             if (!targetRow) return;
@@ -279,25 +279,27 @@
                 nuevosIds.splice(toIdx, 0, draggedRowId);
                 if (!window.appState.ordenItemsCategoria) window.appState.ordenItemsCategoria = {};
                 window.appState.ordenItemsCategoria[categoria] = nuevosIds;
-                window.saveDataToCloud();
+                if (!await window.saveDataToCloud()) return;
                 renderApp();
             }
         };
 
         window.toggleCategoriaAcordeon = function(catNombre) { window.categoriasAbiertasMap[catNombre] = !window.categoriasAbiertasMap[catNombre]; renderApp(); };
-        window.actualizarVencimientoGrid = function(gastoId, monthStr, nuevaFecha, categoriaNombre) {
+        window.actualizarVencimientoGrid = async function(gastoId, monthStr, nuevaFecha, categoriaNombre) {
             if (!window.appState.excepcionesVencimientoGrid) window.appState.excepcionesVencimientoGrid = {};
             const catObj = (window.appState.categorias || []).find(c => c.nombre === categoriaNombre);
             if (catObj && catObj.vencimientoUnicoEnBloque) {
                 const calc = window.getCalculatedDataForMonth(monthStr);
                 calc.items.forEach(item => { if (item.categoria === categoriaNombre) window.appState.excepcionesVencimientoGrid[`${item.id}_${monthStr}`] = nuevaFecha; });
             } else { window.appState.excepcionesVencimientoGrid[`${gastoId}_${monthStr}`] = nuevaFecha; }
-            window.saveDataToCloud(); renderApp();
+            if (!await window.saveDataToCloud()) return;
+            renderApp();
         };
-        window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
+        window.actualizarEstadoGasto = async function(gastoId, monthStr, nuevoEstado) {
             if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
             window.appState.excepcionesEstado[`${gastoId}_${monthStr}`] = nuevoEstado;
-            window.saveDataToCloud(); renderApp();
+            if (!await window.saveDataToCloud()) return;
+            renderApp();
         };
 
         let resolverConfirmacionAppPendiente = null;
@@ -362,7 +364,7 @@
                     </div>`;
             });
         }
-        window.actualizarCatGenCampo = function(index, campo, valor) {
+        window.actualizarCatGenCampo = async function(index, campo, valor) {
             if (!window.appState.categorias[index]) return;
             const nombreAnterior = window.appState.categorias[index].nombre;
             if (campo === 'nombre') {
@@ -371,17 +373,19 @@
                 (window.appState.gastos || []).forEach(g => { if (g.categoria === nombreAnterior) g.categoria = nuevoNombre; });
                 window.appState.categorias[index].nombre = nuevoNombre;
             } else { window.appState.categorias[index][campo] = valor; }
-            window.saveDataToCloud(); renderApp(); renderCatGeneralList();
+            if (!await window.saveDataToCloud()) return;
+            renderApp(); renderCatGeneralList();
         };
-        window.agregarCategoriaGeneral = function() {
+        window.agregarCategoriaGeneral = async function() {
             const nombre = document.getElementById('nuevaCatGenNombre').value.trim();
             const color = document.getElementById('nuevaCatGenColor').value;
             const vencimientoUnicoEnBloque = document.getElementById('nuevaCatGenBloque').checked;
             if (!nombre) return;
             if (!window.appState.categorias) window.appState.categorias = [];
             window.appState.categorias.push({ nombre, color, esTarjeta: vencimientoUnicoEnBloque, vencimientoUnicoEnBloque });
+            if (!await window.saveDataToCloud()) return;
             document.getElementById('nuevaCatGenNombre').value = ''; document.getElementById('nuevaCatGenBloque').checked = false;
-            window.saveDataToCloud(); renderApp(); renderCatGeneralList();
+            renderApp(); renderCatGeneralList();
         };
         window.eliminarCatGeneral = async function(index) {
             const categorias = window.appState.categorias || [];
@@ -400,7 +404,8 @@
                 if (!confirmar) return;
             }
             categorias.splice(index, 1);
-            window.saveDataToCloud(); renderApp(); renderCatGeneralList();
+            if (!await window.saveDataToCloud()) return;
+            renderApp(); renderCatGeneralList();
         };
 
         window.actualizarVistaPreviaInflacionModal = function() {
@@ -450,15 +455,15 @@
             }
         };
 
-        window.agregarSubcategoriaGeneral = function() {
+        window.agregarSubcategoriaGeneral = async function() {
             const nombre = document.getElementById('nuevaSubcatNombre').value.trim();
             const pct = parseFloat(document.getElementById('nuevaSubcatPct').value) || 0;
             if (!nombre) return;
             if (!window.appState.subcategorias) window.appState.subcategorias = [];
             window.appState.subcategorias.push({ id: `sub_${Date.now()}`, nombre, porcentajeAumento: pct, historialAumentos: [] });
+            if (!await window.saveDataToCloud()) return;
             document.getElementById('nuevaSubcatNombre').value = '';
             document.getElementById('nuevaSubcatPct').value = '';
-            window.saveDataToCloud();
             renderSubcatList();
         };
 
@@ -527,7 +532,7 @@
                 subcategoriaActualizada,
                 desdeMes
             );
-            await window.saveDataToCloud();
+            if (!await window.saveDataToCloud()) return;
             renderSubcatList();
             const mesTexto = window.formatMonthDisplay?.(desdeMes) || desdeMes;
             window.mostrarNotificacion("Inflación actualizada", `El ${porcentaje}% se aplicará desde ${mesTexto}.`, "exito");
@@ -547,7 +552,7 @@
                 if (!confirmar) return;
             }
             subcategorias.splice(idx, 1);
-            window.saveDataToCloud();
+            if (!await window.saveDataToCloud()) return;
             renderSubcatList();
         };
 
@@ -683,7 +688,7 @@
             document.getElementById('modalGasto').classList.remove('hidden');
         };
 
-        window.handleSaveGasto = function(e) {
+        window.handleSaveGasto = async function(e) {
             e.preventDefault();
             const id = document.getElementById('gastoId').value;
             const concepto = document.getElementById('gastoConcepto').value.trim();
@@ -756,7 +761,7 @@
                 if (pctAumentoVal !== '') window.appState.aumentosIndividuales[newId] = pctAumentoVal;
             }
 
-            window.saveDataToCloud();
+            if (!await window.saveDataToCloud()) return;
             window.closeModal('modalGasto');
             renderApp();
         };
@@ -831,7 +836,7 @@ window.volverASeleccionEliminacion = function() {
 };
 
 // Ejecuta la eliminación definitiva una vez confirmado por el usuario
-window.ejecutarEliminacionGasto = function() {
+window.ejecutarEliminacionGasto = async function() {
     if (!gastoAEliminarId || !tipoEliminacionSeleccionado) return;
 
     const id = gastoAEliminarId;
@@ -858,7 +863,7 @@ window.ejecutarEliminacionGasto = function() {
         });
     }
 
-    window.saveDataToCloud();
+    if (!await window.saveDataToCloud()) return;
     if (typeof window.closeModal === 'function') window.closeModal('modalEliminarGasto');
     gastoAEliminarId = null;
     tipoEliminacionSeleccionado = null;

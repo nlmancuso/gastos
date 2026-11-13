@@ -184,7 +184,7 @@
             });
         }
 
-        window.handleSaveCuenta = function(event) {
+        window.handleSaveCuenta = async function(event) {
             event.preventDefault();
             const currentMonth = window.appState.currentMonth || '2026-10';
             const id = document.getElementById('cuentaId').value;
@@ -213,15 +213,15 @@
                     gastosFijosAsociados
                 });
             }
-            window.saveDataToCloud();
+            if (!await window.saveDataToCloud()) return;
             closeModal('modalCuenta');
             renderSaldosApp();
         };
 
-        window.deleteCuenta = function(id) {
+        window.deleteCuenta = async function(id) {
             if (confirm('¿Estás seguro de eliminar esta cuenta?')) {
                 window.appState.cuentasBancarias = (window.appState.cuentasBancarias || []).filter(cuenta => cuenta.id !== id);
-                window.saveDataToCloud();
+                if (!await window.saveDataToCloud()) return;
                 renderSaldosApp();
             }
         };

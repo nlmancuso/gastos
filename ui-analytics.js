@@ -20,21 +20,21 @@
             if (elTo) elTo.value = window.appState.chartRangeTo;
         }
 
-        function resetDefaultMonthRange() {
+        async function resetDefaultMonthRange() {
             window.appState.chartRangeFrom = null;
             window.appState.chartRangeTo = null;
-            window.saveDataToCloud();
+            if (!await window.saveDataToCloud()) return;
             initChartRangeInputs();
             renderCharts();
         }
 
-        function applyCustomMonthRange() {
+        async function applyCustomMonthRange() {
             const elFrom = document.getElementById('chartMonthFrom').value; 
             const elTo = document.getElementById('chartMonthTo').value;
             if (elFrom && elTo && elFrom <= elTo) {
                 window.appState.chartRangeFrom = elFrom;
                 window.appState.chartRangeTo = elTo;
-                window.saveDataToCloud();
+                if (!await window.saveDataToCloud()) return;
                 renderCharts();
             }
         }

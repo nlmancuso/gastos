@@ -1375,17 +1375,24 @@ window.salirDelGrupoActual = async function() {
 };
 
 window.saveDataToCloud = async function() {
-    if (window.demoModeActive) return;
+    if (window.demoModeActive) return true;
+    if (!window.docRef) {
+        const error = new Error("No hay un grupo activo para guardar los cambios.");
+        console.error("Error guardando los datos:", error);
+        window.mostrarNotificacion("No se pudieron guardar los cambios", "Revisá tu conexión e intentá nuevamente.", "error");
+        return false;
+    }
     try {
-        if (!window.docRef) return;
         const appStateToSave = JSON.parse(JSON.stringify(window.appState));
         delete appStateToSave.gastosMensuales;
         delete appStateToSave.excepcionesMontoPagado;
         delete appStateToSave.excepcionesMontoPagadoBloque;
         await setDoc(window.docRef, { appState: appStateToSave }, { merge: true });
+        return true;
     } catch (e) {
         console.error("Error guardando los datos:", e);
         window.mostrarNotificacion("No se pudieron guardar los cambios", "Revisá tu conexión e intentá nuevamente.", "error");
+        return false;
     }
 };
 
@@ -1881,7 +1888,7 @@ window.volverASeleccionEliminacion = function() {
     if (pasoConfirmacion) pasoConfirmacion.classList.add('hidden');
 };
 
-window.ejecutarEliminacionGasto = function() {
+window.ejecutarEliminacionGasto = async function() {
     if (!window.esUsuarioEditor()) {
         window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
         return;
@@ -1909,7 +1916,7 @@ window.ejecutarEliminacionGasto = function() {
         });
     }
 
-    window.saveDataToCloud();
+    if (!await window.saveDataToCloud()) return;
     if (typeof window.closeModal === 'function') window.closeModal('modalEliminarGasto');
     gastoAEliminarId = null;
     tipoEliminacionSeleccionado = null;
@@ -2152,7 +2159,7 @@ window.cancelarInvitacion = async function(index) {
     }
 };
 
-window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
+window.actualizarEstadoGasto = async function(gastoId, monthStr, nuevoEstado) {
     if (!window.appState.excepcionesEstado) window.appState.excepcionesEstado = {};
     
     const gasto = (window.appState.gastos || []).find(g => g.id === gastoId);
@@ -2172,11 +2179,11 @@ window.actualizarEstadoGasto = function(gastoId, monthStr, nuevoEstado) {
         window.appState.excepcionesEstado[`${gastoId}_${monthStr}`] = nuevoEstado;
     }
 
-    window.saveDataToCloud(); 
+    if (!await window.saveDataToCloud()) return;
     renderApp();
 };
 
-window.actualizarEstadoGastoMasivo = function(gastoId, nuevoEstado) {
+window.actualizarEstadoGastoMasivo = async function(gastoId, nuevoEstado) {
     if (!window.esUsuarioEditor()) {
         window.mostrarNotificacion("Acceso denegado", "Tu cuenta tiene permisos de solo lectura.", "error");
         return;
@@ -2206,7 +2213,7 @@ window.actualizarEstadoGastoMasivo = function(gastoId, nuevoEstado) {
         window.appState.excepcionesEstado[estadoKey] = nuevoEstado;
     }
 
-    window.saveDataToCloud();
+    if (!await window.saveDataToCloud()) return;
     renderApp();
 };
 
