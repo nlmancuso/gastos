@@ -1,9 +1,11 @@
 import { cert, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
     calcularAlertasPorDestinatario,
     escaparHtml,
     formatearMonto,
+    reconstruirMiembrosEspacio,
     obtenerFechaArgentina
 } from './notificador-calculos.mjs';
 
@@ -37,6 +39,64 @@ function inicializarFirestore() {
         projectId: configuredProjectId
     });
     return getFirestore(app);
+}
+
+async function obtenerEspaciosConMiembros(db, auth) {
+    const [espaciosSnapshot, invitacionesSnapshot] = await Promise.all([
+        db.collection('app_data').get(),
+        db.collection('invitaciones').where('estado', '==', 'ACEPTADO').get()
+    ]);
+    const invitacionesPorGrupo = new Map();
+    invitacionesSnapshot.forEach(snapshot => {
+        const invitacion = snapshot.data();
+        if (typeof invitacion.grupoId !== 'string') return;
+        const invitaciones = invitacionesPorGrupo.get(invitacion.grupoId) || [];
+        invitaciones.push(invitacion);
+        invitacionesPorGrupo.set(invitacion.grupoId, invitaciones);
+    });
+
+    const espacios = [];
+    for (const documento of espaciosSnapshot.docs) {
+        const appState = documento.data()?.appState;
+        if (!appState || !Array.isArray(appState.gastos)) {
+            throw new Error(`El espacio "${documento.id}" no contiene una lista válida de gastos.`);
+        }
+
+        const grupoInfo = appState.grupoInfo && typeof appState.grupoInfo === 'object'
+            ? appState.grupoInfo
+            : {};
+        const miembrosActuales = grupoInfo.miembros && typeof grupoInfo.miembros === 'object' && !Array.isArray(grupoInfo.miembros)
+            ? { ...grupoInfo.miembros }
+            : {};
+        let usuarioAdministrador = null;
+        const adminUid = typeof grupoInfo.adminUid === 'string' ? grupoInfo.adminUid : '';
+
+        if (Object.keys(miembrosActuales).length === 0 && adminUid) {
+            try {
+                usuarioAdministrador = await auth.getUser(adminUid);
+            } catch (error) {
+                if (error.code !== 'auth/user-not-found') throw error;
+            }
+        }
+
+        const miembros = reconstruirMiembrosEspacio(
+            miembrosActuales,
+            invitacionesPorGrupo.get(documento.id) || [],
+            usuarioAdministrador
+        );
+
+        if (Object.keys(miembros).length === 0) {
+            console.warn(`Se omite el espacio "${documento.id}": no se pudieron identificar miembros actuales.`);
+            continue;
+        }
+
+        espacios.push({
+            id: documento.id,
+            appState: { ...appState, grupoInfo: { ...grupoInfo, miembros } }
+        });
+    }
+
+    return espacios;
 }
 
 function crearHtmlAlerta(items, total, hoy) {
@@ -102,11 +162,7 @@ function crearHtmlAlerta(items, total, hoy) {
 
 async function enviarAlertas() {
     const db = inicializarFirestore();
-    const snapshot = await db.collection('app_data').get();
-    const espacios = snapshot.docs.map(doc => ({
-        id: doc.id,
-        appState: doc.data()?.appState
-    }));
+    const espacios = await obtenerEspaciosConMiembros(db, getAuth());
 
     const today = obtenerFechaArgentina();
     const recipients = calcularAlertasPorDestinatario(espacios, today);

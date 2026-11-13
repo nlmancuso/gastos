@@ -5,7 +5,8 @@ import {
     calcularAlertasPorDestinatario,
     escaparHtml,
     formatearMonto,
-    normalizarFecha
+    normalizarFecha,
+    reconstruirMiembrosEspacio
 } from '../notificador-calculos.mjs';
 
 const tarjetaMercadoPago = {
@@ -365,6 +366,30 @@ test('aggregates workspace alerts per owner and accepted group member', () => {
             ]]
         ]
     );
+});
+
+test('recovers an empty workspace membership only from accepted invites and its admin', () => {
+    const members = reconstruirMiembrosEspacio({}, [
+        {
+            estado: 'PENDIENTE',
+            destinatarioUid: 'uid-pending',
+            destinatarioEmail: 'pending@example.com'
+        },
+        {
+            estado: 'ACEPTADO',
+            destinatarioUid: 'uid-accepted',
+            destinatarioEmail: 'accepted@example.com',
+            rol: 'editor'
+        }
+    ], {
+        uid: 'uid-admin',
+        email: 'admin@example.com'
+    });
+
+    assert.deepEqual(members, {
+        'uid-accepted': { email: 'accepted@example.com', rol: 'editor' },
+        'uid-admin': { email: 'admin@example.com', rol: 'admin' }
+    });
 });
 
 test('normalizes supported dates, formats cents, and escapes HTML', () => {

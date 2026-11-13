@@ -503,6 +503,37 @@ export function calcularAlertasPorDestinatario(espacios, hoy = obtenerFechaArgen
         .sort((left, right) => left.email.localeCompare(right.email, 'en'));
 }
 
+export function reconstruirMiembrosEspacio(miembrosActuales, invitacionesAceptadas = [], usuarioAdministrador = null) {
+    const miembros = miembrosActuales && typeof miembrosActuales === 'object' && !Array.isArray(miembrosActuales)
+        ? { ...miembrosActuales }
+        : {};
+    if (Object.keys(miembros).length > 0) return miembros;
+
+    invitacionesAceptadas.forEach(invitacion => {
+        if (
+            invitacion?.estado !== 'ACEPTADO'
+            || typeof invitacion.destinatarioUid !== 'string'
+            || typeof invitacion.destinatarioEmail !== 'string'
+        ) return;
+        miembros[invitacion.destinatarioUid] = {
+            email: invitacion.destinatarioEmail,
+            rol: invitacion.rol || 'lector'
+        };
+    });
+
+    if (
+        typeof usuarioAdministrador?.uid === 'string'
+        && typeof usuarioAdministrador.email === 'string'
+    ) {
+        miembros[usuarioAdministrador.uid] = {
+            email: usuarioAdministrador.email,
+            rol: 'admin'
+        };
+    }
+
+    return miembros;
+}
+
 export function formatearMonto(monto) {
     return new Intl.NumberFormat('es-AR', {
         minimumFractionDigits: 2,
