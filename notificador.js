@@ -1,4 +1,3 @@
-import { Resend } from 'resend';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
@@ -122,25 +121,35 @@ async function enviarAlertas() {
         return;
     }
 
-    const emailFrom = requiredEnv('EMAIL_FROM');
-    if (emailFrom.toLowerCase().includes('onboarding@resend.dev')) {
-        throw new Error('EMAIL_FROM debe usar un dominio verificado en Resend para enviar a otros usuarios.');
-    }
-
-    const resend = new Resend(requiredEnv('RESEND_API_KEY'));
+    const emailJsPublicKey = requiredEnv('EMAILJS_PUBLIC_KEY');
+    const emailJsTemplateId = requiredEnv('EMAILJS_ALERTS_TEMPLATE_ID');
+    const emailJsServiceId = process.env.EMAILJS_SERVICE_ID?.trim() || 'service_hib3aln';
     const erroresEnvio = [];
     for (const [index, recipient] of recipients.entries()) {
         const total = Math.round(recipient.alerts.reduce((sum, item) => sum + item.monto, 0) * 100) / 100;
         try {
-            const { data, error } = await resend.emails.send({
-                from: emailFrom,
-                to: recipient.email,
-                subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes/vencidos`,
-                html: crearHtmlAlerta(recipient.alerts, total, today)
+            const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    service_id: emailJsServiceId,
+                    template_id: emailJsTemplateId,
+                    user_id: emailJsPublicKey,
+                    template_params: {
+                        to_email: recipient.email,
+                        subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes/vencidos`,
+                        html_content: crearHtmlAlerta(recipient.alerts, total, today)
+                    }
+                })
             });
 
-            if (error) throw new Error(error.message);
-            if (!data?.id) throw new Error('Resend no devolvió un identificador de correo enviado.');
+            if (!response.ok) {
+                const detalle = (await response.text()).trim();
+                const detalleSeguro = detalle.toLowerCase().includes(recipient.email.toLowerCase())
+                    ? 'El proveedor incluyó el destinatario en el detalle del error.'
+                    : detalle.slice(0, 200);
+                throw new Error(`EmailJS respondió HTTP ${response.status}${detalleSeguro ? `: ${detalleSeguro}` : '.'}`);
+            }
         } catch (error) {
             const mensaje = error instanceof Error ? error.message : 'Error desconocido';
             const mensajeSinCorreo = mensaje.split(recipient.email).join('[destinatario]');
@@ -152,7 +161,7 @@ async function enviarAlertas() {
     if (erroresEnvio.length > 0) {
         throw new Error(`Falló el envío de ${erroresEnvio.length} de ${recipients.length} correos.`);
     }
-    console.log(`Se enviaron ${recipients.length} correos individuales con ${totalAlerts} alerta(s).`);
+    console.log(`EmailJS aceptó ${recipients.length} correos individuales con ${totalAlerts} alerta(s).`);
 }
 
 enviarAlertas().catch(error => {

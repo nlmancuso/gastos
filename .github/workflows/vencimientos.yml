@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       enviar_correo:
-        description: "Enviar correos individuales a los miembros (requiere EMAIL_FROM de dominio verificado en Resend)"
+        description: "Enviar correos individuales a los miembros mediante EmailJS"
         required: true
         default: false
         type: boolean
@@ -33,8 +33,8 @@ jobs:
 
       - name: Ejecutar script de notificaciones
         env:
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          EMAILJS_PUBLIC_KEY: ${{ vars.EMAILJS_PUBLIC_KEY }}
+          EMAILJS_ALERTS_TEMPLATE_ID: template_hezrjyv
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           ENVIAR_CORREO: ${{ inputs.enviar_correo }}
