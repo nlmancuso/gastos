@@ -33,7 +33,7 @@
 
         window.configurarPreferenciaImportesUsuario(window.auth?.currentUser?.uid || null);
 
-        function obtenerItemsPlanillaConSaldo(targetMonth) {
+        function obtenerItemsPlanillaConSaldo(targetMonth, mesComparacion) {
             const pagosIndividuales = window.appState.excepcionesMontoPagado || {};
             const pagosBloque = window.appState.excepcionesMontoPagadoBloque || {};
             const balancesIndividuales = {};
@@ -45,7 +45,8 @@
                 .map(gasto => gasto.startMonth)
                 .filter(mes => /^\d{4}-\d{2}$/.test(mes || '') && mes <= targetMonth);
             let mes = mesesConInicio.length ? mesesConInicio.sort()[0] : targetMonth;
-            const itemsObjetivo = [];
+            const itemsPorMes = { [targetMonth]: [] };
+            if (mesComparacion) itemsPorMes[mesComparacion] = [];
 
             const avanzarMes = valor => {
                 let [año, numeroMes] = valor.split('-').map(Number);
@@ -138,10 +139,54 @@
                     });
                 });
 
-                if (mes === targetMonth) itemsObjetivo.push(...resultadoMes);
+                if (mes === targetMonth || mes === mesComparacion) itemsPorMes[mes] = resultadoMes;
                 mes = avanzarMes(mes);
             }
-            return itemsObjetivo;
+            return itemsPorMes;
+        }
+
+        function obtenerMesAnterior(mes) {
+            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes || '')) return '';
+            const [anio, numeroMes] = mes.split('-').map(Number);
+            return numeroMes === 1
+                ? `${anio - 1}-12`
+                : `${anio}-${String(numeroMes - 1).padStart(2, '0')}`;
+        }
+
+        function obtenerNombreMesComparacion(mes, mesActual) {
+            const [anio, numeroMes] = mes.split('-').map(Number);
+            const nombre = new Intl.DateTimeFormat('es-AR', { month: 'long' }).format(new Date(anio, numeroMes - 1, 1));
+            return anio === Number(mesActual.slice(0, 4)) ? nombre : `${nombre} ${anio}`;
+        }
+
+        function actualizarIndicadorComparacion(id, montoActual, montoAnterior, nombreMes) {
+            const indicador = document.getElementById(id);
+            if (!indicador) return;
+
+            let tendencia = 'neutral';
+            let icono = 'fa-minus';
+            let texto = `0% vs ${nombreMes}`;
+            if (montoAnterior === 0) {
+                if (montoActual > 0) {
+                    tendencia = 'increase';
+                    icono = 'fa-arrow-trend-up';
+                    texto = `Nuevo vs ${nombreMes}`;
+                }
+            } else {
+                const porcentaje = ((montoActual - montoAnterior) / Math.abs(montoAnterior)) * 100;
+                if (porcentaje > 0.05) {
+                    tendencia = 'increase';
+                    icono = 'fa-arrow-trend-up';
+                    texto = `${Math.abs(porcentaje).toLocaleString('es-AR', { maximumFractionDigits: 1 })}% vs ${nombreMes}`;
+                } else if (porcentaje < -0.05) {
+                    tendencia = 'decrease';
+                    icono = 'fa-arrow-trend-down';
+                    texto = `${Math.abs(porcentaje).toLocaleString('es-AR', { maximumFractionDigits: 1 })}% vs ${nombreMes}`;
+                }
+            }
+
+            indicador.className = `metric-change metric-change-${tendencia}`;
+            indicador.innerHTML = `<i class="fa-solid ${icono}" aria-hidden="true"></i><span>${texto}</span>`;
         }
 
         window.actualizarMontoPagadoPlanilla = async function(input, esBloque) {
@@ -174,9 +219,12 @@
         function renderPlanillaTab() {
             const currentMonth = window.appState.currentMonth || '2026-10';
             const calculo = window.getCalculatedDataForMonth(currentMonth);
-            const items = obtenerItemsPlanillaConSaldo(currentMonth);
+            const mesAnterior = obtenerMesAnterior(currentMonth);
+            const itemsPorMes = obtenerItemsPlanillaConSaldo(currentMonth, mesAnterior);
+            const items = itemsPorMes[currentMonth] || [];
+            const itemsMesAnterior = itemsPorMes[mesAnterior] || [];
             const categorias = window.appState.categorias || [];
-            const sumarTotalesPorTipo = esTarjeta => items.reduce((total, item) => {
+            const sumarTotalesPorTipo = (listaItems, esTarjeta) => listaItems.reduce((total, item) => {
                 const categoria = categorias.find(cat => cat.nombre === item.categoria);
                 const esCategoriaTarjeta = categoria ? categoria.esTarjeta : true;
                 if (esCategoriaTarjeta !== esTarjeta) return total;
@@ -186,16 +234,20 @@
                 }
                 return total + (Number(item.monto) || 0);
             }, 0);
-            const totalFijos = sumarTotalesPorTipo(false);
-            const totalTarjetas = sumarTotalesPorTipo(true);
+            const totalFijos = sumarTotalesPorTipo(items, false);
+            const totalTarjetas = sumarTotalesPorTipo(items, true);
+            const totalFijosMesAnterior = sumarTotalesPorTipo(itemsMesAnterior, false);
+            const totalTarjetasMesAnterior = sumarTotalesPorTipo(itemsMesAnterior, true);
             const { sueldoActual } = calculo;
             const redondearCentavos = monto => Math.round(monto * 100) / 100;
             const totalFijosRedondeado = redondearCentavos(totalFijos);
             const totalTarjetasRedondeado = redondearCentavos(totalTarjetas);
             const totalGastosMes = redondearCentavos(totalFijosRedondeado + totalTarjetasRedondeado);
+            const totalGastosMesAnterior = redondearCentavos(totalFijosMesAnterior + totalTarjetasMesAnterior);
             const ahorroMes = window.getAhorroForMonth(currentMonth);
             const retirosAhorroMes = window.getRetirosAhorroForMonth(currentMonth);
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+            const nombreMesAnterior = obtenerNombreMesComparacion(mesAnterior, currentMonth);
 
             if(document.getElementById('cardSueldo')) document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
             if(document.getElementById('cardGastosFijos')) document.getElementById('cardGastosFijos').innerText = fmt(totalFijosRedondeado);
@@ -203,6 +255,9 @@
             if(document.getElementById('cardGastosTotales')) document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
             if(document.getElementById('cardAhorro')) document.getElementById('cardAhorro').innerText = fmt(ahorroMes);
             if(document.getElementById('cardResto')) document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes - ahorroMes + retirosAhorroMes);
+            actualizarIndicadorComparacion('cardCambioGastosFijos', totalFijosRedondeado, redondearCentavos(totalFijosMesAnterior), nombreMesAnterior);
+            actualizarIndicadorComparacion('cardCambioTarjetas', totalTarjetasRedondeado, redondearCentavos(totalTarjetasMesAnterior), nombreMesAnterior);
+            actualizarIndicadorComparacion('cardCambioGastosTotales', totalGastosMes, totalGastosMesAnterior, nombreMesAnterior);
 
             renderFiltrosCategoriasPills();
             window.renderPlanillaAgrupadaTabla(items);

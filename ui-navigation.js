@@ -1,7 +1,92 @@
         let currentActiveTab = 'planilla';
+        const sidebarTabs = [
+            ['planilla', 'btnTabPlanilla'],
+            ['analisis', 'btnTabAnalisis'],
+            ['saldos', 'btnTabSaldos'],
+            ['gastos', 'btnTabGastos']
+        ];
+        const sidebarButtonBase = 'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors';
+
+        function actualizarNavegacionLateral(tabName, ajustesActivos = false) {
+            sidebarTabs.forEach(([tab, id]) => {
+                const button = document.getElementById(id);
+                const activo = !ajustesActivos && tab === tabName;
+                button.className = activo
+                    ? `sidebar-nav-button ${sidebarButtonBase} border border-emerald-500/20 bg-emerald-500/10 text-emerald-400`
+                    : `sidebar-nav-button ${sidebarButtonBase} text-slate-400 hover:bg-slate-800/70 hover:text-white`;
+            });
+            const botonAjustes = document.getElementById('btnConfigCat');
+            const ajustesOcultos = botonAjustes.classList.contains('hidden') || botonAjustes.style.display === 'none';
+            botonAjustes.className = ajustesActivos
+                ? `${sidebarButtonBase} border border-emerald-500/20 bg-emerald-500/10 text-emerald-400`
+                : `${sidebarButtonBase} text-slate-400 hover:bg-slate-800/70 hover:text-white`;
+            if (ajustesOcultos) {
+                botonAjustes.classList.add('hidden');
+                botonAjustes.style.display = 'none';
+            }
+        }
+
+        function actualizarBotonMenuLateral() {
+            const boton = document.getElementById('btnToggleSidebar');
+            const icono = document.getElementById('iconToggleSidebar');
+            if (!boton || !icono) return;
+            const esMovil = window.matchMedia('(max-width: 767px)').matches;
+            const estaAbierto = esMovil
+                ? document.getElementById('appContent').classList.contains('sidebar-mobile-open')
+                : !document.body.classList.contains('app-sidebar-collapsed');
+            const texto = esMovil
+                ? (estaAbierto ? 'Cerrar barra lateral' : 'Abrir barra lateral')
+                : (estaAbierto ? 'Ocultar barra lateral' : 'Mostrar barra lateral');
+            boton.setAttribute('aria-label', texto);
+            boton.setAttribute('aria-expanded', String(estaAbierto));
+            boton.title = texto;
+            icono.className = `fa-solid ${esMovil && estaAbierto ? 'fa-xmark' : estaAbierto ? 'fa-bars' : 'fa-angles-right'}`;
+        }
+
+        function aplicarPreferenciaMenuLateral() {
+            const colapsado = localStorage.getItem('app_sidebar_collapsed') === 'true';
+            document.body.classList.toggle('app-sidebar-collapsed', colapsado);
+            actualizarBotonMenuLateral();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', aplicarPreferenciaMenuLateral, { once: true });
+        } else {
+            aplicarPreferenciaMenuLateral();
+        }
+
+        window.toggleAppSidebar = function() {
+            const appContent = document.getElementById('appContent');
+            if (window.matchMedia('(max-width: 767px)').matches) {
+                appContent.classList.toggle('sidebar-mobile-open');
+                document.getElementById('appSidebarOverlay').classList.toggle('hidden', !appContent.classList.contains('sidebar-mobile-open'));
+            } else {
+                const colapsado = !document.body.classList.contains('app-sidebar-collapsed');
+                document.body.classList.toggle('app-sidebar-collapsed', colapsado);
+                localStorage.setItem('app_sidebar_collapsed', String(colapsado));
+            }
+            actualizarBotonMenuLateral();
+        };
+
+        window.closeAppSidebarMobile = function() {
+            const appContent = document.getElementById('appContent');
+            appContent.classList.remove('sidebar-mobile-open');
+            document.getElementById('appSidebarOverlay').classList.add('hidden');
+            actualizarBotonMenuLateral();
+        };
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') window.closeAppSidebarMobile();
+        });
+
+        window.addEventListener('resize', () => {
+            if (!window.matchMedia('(max-width: 767px)').matches) window.closeAppSidebarMobile();
+        });
 
         window.switchTab = function(tabName) {
             currentActiveTab = tabName;
+            actualizarNavegacionLateral(tabName);
+            window.closeAppSidebarMobile();
             
             document.getElementById('viewSettings').classList.add('hidden');
             document.getElementById('viewPlanilla').classList.add('hidden');
@@ -9,29 +94,20 @@
             document.getElementById('viewSaldos').classList.add('hidden');
             document.getElementById('viewGastos').classList.add('hidden');
 
-            document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
-            document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
-            document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
-            document.getElementById('btnTabGastos').className = "px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer";
-
             if (tabName === 'planilla') {
                 document.getElementById('viewPlanilla').classList.remove('hidden');
-                document.getElementById('btnTabPlanilla').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
                 renderPlanillaTab();
             } else if (tabName === 'analisis') {
                 document.getElementById('viewAnalisis').classList.remove('hidden');
-                document.getElementById('btnTabAnalisis').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
                 initChartRangeInputs();
                 initRecurrentesCheckboxesList();
                 renderFiltrosGraficosCheckboxes();
                 renderCharts();
             } else if (tabName === 'saldos') {
                 document.getElementById('viewSaldos').classList.remove('hidden');
-                document.getElementById('btnTabSaldos').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
                 renderSaldosApp();
             } else if (tabName === 'gastos') {
                 document.getElementById('viewGastos').classList.remove('hidden');
-                document.getElementById('btnTabGastos').className = "px-5 py-2.5 text-sm font-semibold tab-btn-active flex items-center gap-2 cursor-pointer";
                 window.cambiarTipoGastoUnificado(document.getElementById('tipoGastoUnificado').value);
             }
         };
@@ -133,6 +209,8 @@
             const grupoPanel = document.getElementById('modalGestionGrupo');
             document.getElementById(`settingsSection${sectionName}`).appendChild(categoriasPanel);
             document.getElementById('settingsSectiongrupo').appendChild(grupoPanel);
+            actualizarNavegacionLateral(null, true);
+            window.closeAppSidebarMobile();
             categoriasPanel.className = ['categorias', 'subcategorias'].includes(sectionName) ? 'w-full' : 'hidden';
             grupoPanel.className = sectionName === 'grupo' ? 'w-full' : 'hidden';
             document.getElementById('settingsCategoriasPanelContent').classList.toggle('hidden', sectionName !== 'categorias');
@@ -142,9 +220,6 @@
             document.getElementById('viewSaldos').classList.add('hidden');
             document.getElementById('viewGastos').classList.add('hidden');
             document.getElementById('viewSettings').classList.remove('hidden');
-            ['btnTabPlanilla', 'btnTabAnalisis', 'btnTabSaldos', 'btnTabGastos'].forEach(id => {
-                document.getElementById(id).className = 'px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer';
-            });
 
             ['categorias', 'subcategorias', 'grupo', 'perfil', 'notificaciones'].forEach(section => {
                 document.getElementById(`settingsSection${section}`).classList.toggle('hidden', section !== sectionName);
