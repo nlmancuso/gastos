@@ -542,6 +542,17 @@ window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
                 gruposPermitidos.set(data.grupoId, data.remitenteEmail || '');
             }
         });
+        const gruposCandidatos = await Promise.all(
+            [...gruposPermitidos].map(async ([grupoId, remitenteEmail]) => {
+                try {
+                    const grupoSnap = await getDoc(doc(db, "app_data", grupoId));
+                    return { grupoId, remitenteEmail, grupoSnap };
+                } catch (error) {
+                    if (error.code === 'permission-denied' || error.code === 'not-found') return null;
+                    throw error;
+                }
+            })
+        );
 
         selector.innerHTML = '';
 
@@ -550,16 +561,9 @@ window.poblarSelectorVistas = async function(vistaSeleccionadaActual) {
         optPersonal.textContent = "🏠 Mi Espacio Personal";
         selector.appendChild(optPersonal);
 
-        for (const [grupoId, remitenteEmail] of gruposPermitidos) {
-            const grupoRef = doc(db, "app_data", grupoId);
-            let grupoSnap;
-            try {
-                grupoSnap = await getDoc(grupoRef);
-            } catch (error) {
-                if (error.code === 'permission-denied' || error.code === 'not-found') continue;
-                throw error;
-            }
-
+        for (const grupoCandidato of gruposCandidatos) {
+            if (!grupoCandidato) continue;
+            const { grupoId, remitenteEmail, grupoSnap } = grupoCandidato;
             if (!grupoSnap.exists()) continue;
             const docData = grupoSnap.data();
             const grupoInfo = docData.appState?.grupoInfo;
@@ -841,7 +845,12 @@ onAuthStateChanged(auth, async (user) => {
 
         try {
             await user.reload();
-            await user.getIdToken(true);
+            if (user.emailVerified) {
+                const tokenResult = await user.getIdTokenResult();
+                if (tokenResult.claims.email_verified !== true) {
+                    await user.getIdToken(true);
+                }
+            }
         } catch (error) {
             console.error("No se pudo actualizar el estado de autenticación:", error);
             await signOut(auth);
