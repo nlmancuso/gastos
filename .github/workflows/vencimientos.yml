@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       enviar_correo:
-        description: "Enviar el correo después de las pruebas"
+        description: "Enviar correos individuales a los miembros (requiere EMAIL_FROM de dominio verificado en Resend)"
         required: true
         default: false
         type: boolean
@@ -34,9 +34,8 @@ jobs:
       - name: Ejecutar script de notificaciones
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_TO: ${{ secrets.MY_EMAIL }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-          FIRESTORE_GROUP_ID: ${{ vars.FIRESTORE_GROUP_ID }}
           ENVIAR_CORREO: ${{ inputs.enviar_correo }}
         run: node notificador.js

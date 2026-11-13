@@ -454,6 +454,55 @@ export function calcularAlertasVencimiento(state, hoy = obtenerFechaArgentina())
     );
 }
 
+export function calcularAlertasPorDestinatario(espacios, hoy = obtenerFechaArgentina()) {
+    if (!Array.isArray(espacios)) throw new TypeError('Los espacios deben ser una lista.');
+    if (!isValidDate(hoy)) throw new TypeError('La fecha de hoy debe tener formato AAAA-MM-DD.');
+
+    const destinatarios = new Map();
+
+    espacios.forEach(espacio => {
+        const id = typeof espacio?.id === 'string' ? espacio.id.trim() : '';
+        const state = espacio?.appState;
+        if (!id || !state || !Array.isArray(state.gastos)) {
+            throw new TypeError('Cada espacio debe incluir un identificador y una lista válida de gastos.');
+        }
+
+        const miembros = state.grupoInfo?.miembros;
+        if (!miembros || typeof miembros !== 'object' || Array.isArray(miembros)) {
+            throw new TypeError(`El espacio "${id}" no tiene una lista válida de miembros.`);
+        }
+
+        const alerts = calcularAlertasVencimiento(state, hoy);
+        if (alerts.length === 0) return;
+
+        const nombreEspacio = id.startsWith('personal_')
+            ? 'Mi Espacio Personal'
+            : String(state.grupoInfo?.nombreGrupo || 'Grupo Control de Gastos');
+        const miembrosEspacio = Object.entries(miembros);
+        if (miembrosEspacio.length === 0) {
+            throw new Error(`El espacio "${id}" tiene alertas, pero no tiene miembros.`);
+        }
+
+        miembrosEspacio.forEach(([uid, miembro]) => {
+            const email = typeof miembro?.email === 'string' ? miembro.email.trim() : '';
+            if (!email) {
+                throw new Error(`El miembro "${uid}" del espacio "${id}" no tiene un correo válido.`);
+            }
+
+            const clave = email.toLowerCase();
+            if (!destinatarios.has(clave)) {
+                destinatarios.set(clave, { email, alerts: [] });
+            }
+            destinatarios.get(clave).alerts.push(
+                ...alerts.map(alert => ({ ...alert, espacio: nombreEspacio }))
+            );
+        });
+    });
+
+    return [...destinatarios.values()]
+        .sort((left, right) => left.email.localeCompare(right.email, 'en'));
+}
+
 export function formatearMonto(monto) {
     return new Intl.NumberFormat('es-AR', {
         minimumFractionDigits: 2,

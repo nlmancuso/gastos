@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     calcularAlertasVencimiento,
+    calcularAlertasPorDestinatario,
     escaparHtml,
     formatearMonto,
     normalizarFecha
@@ -308,6 +309,62 @@ test('does not alert for individually paid expenses', () => {
     });
 
     assert.deepEqual(calcularAlertasVencimiento(state, '2026-11-11'), []);
+});
+
+test('aggregates workspace alerts per owner and accepted group member', () => {
+    const personal = crearEstado([{
+        id: 'internet',
+        concepto: 'Internet',
+        monto: 1000,
+        cuotas: 1,
+        categoria: 'Servicios',
+        startMonth: '2026-11',
+        vencimiento: '2026-11-11'
+    }], {
+        grupoInfo: {
+            miembros: {
+                'uid-ana': { email: 'ana@example.com', rol: 'admin' }
+            }
+        }
+    });
+    const shared = crearEstado([{
+        id: 'luz',
+        concepto: 'Luz',
+        monto: 2000,
+        cuotas: 1,
+        categoria: 'Servicios',
+        startMonth: '2026-11',
+        vencimiento: '2026-11-12'
+    }], {
+        grupoInfo: {
+            nombreGrupo: 'Casa',
+            miembros: {
+                'uid-ana': { email: 'ana@example.com', rol: 'admin' },
+                'uid-juan': { email: 'juan@example.com', rol: 'editor', invitacionId: 'inv-1' }
+            }
+        }
+    });
+
+    const recipients = calcularAlertasPorDestinatario([
+        { id: 'personal_uid-ana', appState: personal },
+        { id: 'group-casa', appState: shared }
+    ], '2026-11-11');
+
+    assert.deepEqual(
+        recipients.map(recipient => [
+            recipient.email,
+            recipient.alerts.map(alert => [alert.espacio, alert.concepto])
+        ]),
+        [
+            ['ana@example.com', [
+                ['Mi Espacio Personal', 'Internet'],
+                ['Casa', 'Luz']
+            ]],
+            ['juan@example.com', [
+                ['Casa', 'Luz']
+            ]]
+        ]
+    );
 });
 
 test('normalizes supported dates, formats cents, and escapes HTML', () => {

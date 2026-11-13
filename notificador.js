@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
-    calcularAlertasVencimiento,
+    calcularAlertasPorDestinatario,
     escaparHtml,
     formatearMonto,
     obtenerFechaArgentina
@@ -40,15 +40,6 @@ function inicializarFirestore() {
     return getFirestore(app);
 }
 
-function obtenerDestinatarios() {
-    const recipients = requiredEnv('EMAIL_TO')
-        .split(/[,;]/)
-        .map(email => email.trim())
-        .filter(Boolean);
-    if (recipients.length === 0) throw new Error('EMAIL_TO no contiene destinatarios válidos.');
-    return recipients;
-}
-
 function crearHtmlAlerta(items, total, hoy) {
     const listaGastosHtml = items.map(item => {
         const estadoBadge = item.vencimiento < hoy
@@ -58,6 +49,9 @@ function crearHtmlAlerta(items, total, hoy) {
                 : { texto: 'VENCE MAÑANA', color: '#f59e0b' };
         const concepto = item.esTarjeta ? `💳 ${item.concepto}` : item.concepto;
         const vencimiento = item.vencimiento.split('-').reverse().join('/');
+        const espacioHtml = item.espacio
+            ? `<div style="font-size: 11px; color: #64748b; margin-top: 3px;">Espacio: ${escaparHtml(item.espacio)}</div>`
+            : '';
 
         return `
             <div style="padding: 15px 5px 15px 0; border-bottom: 1px solid #eaeaea;">
@@ -67,6 +61,7 @@ function crearHtmlAlerta(items, total, hoy) {
                         <div style="font-size: 12px; color: #666; margin-top: 3px;">
                             ${item.esTarjeta ? 'Categoría agrupada' : `Categoría: ${escaparHtml(item.categoria)}`} | Vence: ${vencimiento}
                         </div>
+                        ${espacioHtml}
                     </div>
                     <div style="text-align: right; min-width: 120px; padding-right: 10px;">
                         <div style="font-size: 15px; font-weight: bold; color: #111;">$${formatearMonto(item.monto)}</div>
@@ -108,42 +103,56 @@ function crearHtmlAlerta(items, total, hoy) {
 
 async function enviarAlertas() {
     const db = inicializarFirestore();
-    const groupId = requiredEnv('FIRESTORE_GROUP_ID');
-    const snapshot = await db.collection('app_data').doc(groupId).get();
-    if (!snapshot.exists) {
-        throw new Error('No se encontró el documento de gastos configurado en Firestore.');
-    }
-
-    const appState = snapshot.data()?.appState;
-    if (!appState || !Array.isArray(appState.gastos)) {
-        throw new Error('El documento de Firestore no contiene una lista válida de gastos.');
-    }
+    const snapshot = await db.collection('app_data').get();
+    const espacios = snapshot.docs.map(doc => ({
+        id: doc.id,
+        appState: doc.data()?.appState
+    }));
 
     const today = obtenerFechaArgentina();
-    const alerts = calcularAlertasVencimiento(appState, today);
-    if (alerts.length === 0) {
+    const recipients = calcularAlertasPorDestinatario(espacios, today);
+    const totalAlerts = recipients.reduce((total, recipient) => total + recipient.alerts.length, 0);
+    if (totalAlerts === 0) {
         console.log('No hay saldos pendientes vencidos, de hoy ni de mañana.');
         return;
     }
 
     if (process.env.ENVIAR_CORREO !== 'true') {
-        const cardAlerts = alerts.filter(item => item.esTarjeta).length;
-        console.log(`Prueba sin envío: ${alerts.length} alerta(s), ${cardAlerts} de tarjeta(s). No se envió ningún correo.`);
+        console.log(`Prueba sin envío: ${totalAlerts} alerta(s) para ${recipients.length} usuario(s). No se envió ningún correo.`);
         return;
     }
 
-    const total = Math.round(alerts.reduce((sum, item) => sum + item.monto, 0) * 100) / 100;
-    const resend = new Resend(requiredEnv('RESEND_API_KEY'));
-    const { data, error } = await resend.emails.send({
-        from: process.env.EMAIL_FROM?.trim() || 'Control de Gastos <onboarding@resend.dev>',
-        to: obtenerDestinatarios(),
-        subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes/vencidos`,
-        html: crearHtmlAlerta(alerts, total, today)
-    });
+    const emailFrom = requiredEnv('EMAIL_FROM');
+    if (emailFrom.toLowerCase().includes('onboarding@resend.dev')) {
+        throw new Error('EMAIL_FROM debe usar un dominio verificado en Resend para enviar a otros usuarios.');
+    }
 
-    if (error) throw new Error(`Resend no pudo enviar el correo: ${error.message}`);
-    if (!data?.id) throw new Error('Resend no devolvió un identificador de correo enviado.');
-    console.log('Correo de alerta enviado correctamente.');
+    const resend = new Resend(requiredEnv('RESEND_API_KEY'));
+    const erroresEnvio = [];
+    for (const [index, recipient] of recipients.entries()) {
+        const total = Math.round(recipient.alerts.reduce((sum, item) => sum + item.monto, 0) * 100) / 100;
+        try {
+            const { data, error } = await resend.emails.send({
+                from: emailFrom,
+                to: recipient.email,
+                subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes/vencidos`,
+                html: crearHtmlAlerta(recipient.alerts, total, today)
+            });
+
+            if (error) throw new Error(error.message);
+            if (!data?.id) throw new Error('Resend no devolvió un identificador de correo enviado.');
+        } catch (error) {
+            const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+            const mensajeSinCorreo = mensaje.split(recipient.email).join('[destinatario]');
+            console.error(`Falló el envío individual #${index + 1}: ${mensajeSinCorreo}`);
+            erroresEnvio.push(index + 1);
+        }
+    }
+
+    if (erroresEnvio.length > 0) {
+        throw new Error(`Falló el envío de ${erroresEnvio.length} de ${recipients.length} correos.`);
+    }
+    console.log(`Se enviaron ${recipients.length} correos individuales con ${totalAlerts} alerta(s).`);
 }
 
 enviarAlertas().catch(error => {
