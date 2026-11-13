@@ -168,6 +168,7 @@ async function enviarAlertas() {
     }
 
     const emailJsPublicKey = requiredEnv('EMAILJS_PUBLIC_KEY');
+    const emailJsPrivateKey = requiredEnv('EMAILJS_PRIVATE_KEY');
     const emailJsTemplateId = requiredEnv('EMAILJS_ALERTS_TEMPLATE_ID');
     const emailJsServiceId = process.env.EMAILJS_SERVICE_ID?.trim() || 'service_hib3aln';
     const erroresEnvio = [];
@@ -181,6 +182,7 @@ async function enviarAlertas() {
                     service_id: emailJsServiceId,
                     template_id: emailJsTemplateId,
                     user_id: emailJsPublicKey,
+                    accessToken: emailJsPrivateKey,
                     template_params: {
                         to_email: recipient.email,
                         subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes/vencidos`,
