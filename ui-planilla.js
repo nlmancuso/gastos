@@ -193,13 +193,16 @@
             const totalFijosRedondeado = redondearCentavos(totalFijos);
             const totalTarjetasRedondeado = redondearCentavos(totalTarjetas);
             const totalGastosMes = redondearCentavos(totalFijosRedondeado + totalTarjetasRedondeado);
+            const ahorroMes = window.getAhorroForMonth(currentMonth);
+            const retirosAhorroMes = window.getRetirosAhorroForMonth(currentMonth);
             const fmt = num => "$ " + num.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 
             if(document.getElementById('cardSueldo')) document.getElementById('cardSueldo').innerText = fmt(sueldoActual);
             if(document.getElementById('cardGastosFijos')) document.getElementById('cardGastosFijos').innerText = fmt(totalFijosRedondeado);
             if(document.getElementById('cardTarjetas')) document.getElementById('cardTarjetas').innerText = fmt(totalTarjetasRedondeado);
             if(document.getElementById('cardGastosTotales')) document.getElementById('cardGastosTotales').innerText = fmt(totalGastosMes);
-            if(document.getElementById('cardResto')) document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes);
+            if(document.getElementById('cardAhorro')) document.getElementById('cardAhorro').innerText = fmt(ahorroMes);
+            if(document.getElementById('cardResto')) document.getElementById('cardResto').innerText = fmt(sueldoActual - totalGastosMes - ahorroMes + retirosAhorroMes);
 
             renderFiltrosCategoriasPills();
             window.renderPlanillaAgrupadaTabla(items);
@@ -210,6 +213,207 @@
             const sueldoVal = window.getSueldoForMonth(currentMonth);
             document.getElementById('inputSueldoMonto').value = sueldoVal;
             document.getElementById('modalSueldo').classList.remove('hidden');
+        };
+
+        window.openModalAhorro = function() {
+            if (!window.esUsuarioEditor()) {
+                window.mostrarNotificacion('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
+                return;
+            }
+            document.getElementById('inputAhorroMes').value = window.appState.currentMonth || '2026-10';
+            window.actualizarFormularioAhorro();
+            document.getElementById('modalAhorro').classList.remove('hidden');
+        };
+
+        window.actualizarFormularioAhorro = function() {
+            const mes = document.getElementById('inputAhorroMes').value;
+            const configuracion = window.getConfiguracionAhorroForMonth(mes);
+            document.getElementById('inputAhorroTipo').value = configuracion?.tipo || 'importe';
+            document.getElementById('inputAhorroValor').value = configuracion?.valor ?? 0;
+            window.actualizarTipoAhorro();
+        };
+
+        window.actualizarTipoAhorro = function() {
+            const esPorcentaje = document.getElementById('inputAhorroTipo').value === 'porcentaje';
+            const input = document.getElementById('inputAhorroValor');
+            document.getElementById('labelAhorroValor').textContent = esPorcentaje
+                ? 'Porcentaje del sueldo (%)'
+                : 'Importe mensual ($)';
+            document.getElementById('ayudaAhorro').textContent = esPorcentaje
+                ? 'El porcentaje se calcula sobre el sueldo de cada mes. El ahorro se descuenta del resto disponible; los meses anteriores quedan iguales.'
+                : 'El importe se repite en los meses siguientes. El ahorro se descuenta del resto disponible; los meses anteriores quedan iguales.';
+            if (esPorcentaje) {
+                input.max = '100';
+                input.step = '0.01';
+            } else {
+                input.removeAttribute('max');
+                input.step = '0.01';
+            }
+        };
+
+        window.handleSaveAhorro = async function(event) {
+            event.preventDefault();
+            if (!window.esUsuarioEditor()) {
+                window.mostrarNotificacion('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
+                return;
+            }
+            const mes = document.getElementById('inputAhorroMes').value;
+            const tipo = document.getElementById('inputAhorroTipo').value;
+            const valor = Number(document.getElementById('inputAhorroValor').value);
+            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
+                window.mostrarNotificacion('Mes inválido', 'Seleccioná desde qué mes se aplicará el ahorro.', 'error');
+                return;
+            }
+            if (!['importe', 'porcentaje'].includes(tipo) || !Number.isFinite(valor) || valor < 0 || (tipo === 'porcentaje' && valor > 100)) {
+                window.mostrarNotificacion('Valor inválido', tipo === 'porcentaje'
+                    ? 'Ingresá un porcentaje entre 0 y 100.'
+                    : 'Ingresá un importe igual o mayor a cero.', 'error');
+                return;
+            }
+
+            if (!window.appState.ahorros) window.appState.ahorros = {};
+            const yaExistia = Object.prototype.hasOwnProperty.call(window.appState.ahorros, mes);
+            const configuracionAnterior = window.appState.ahorros[mes];
+            window.appState.ahorros[mes] = { tipo, valor };
+            if (!await window.saveDataToCloud()) {
+                if (yaExistia) window.appState.ahorros[mes] = configuracionAnterior;
+                else delete window.appState.ahorros[mes];
+                renderPlanillaTab();
+                return;
+            }
+
+            window.closeModal('modalAhorro');
+            renderPlanillaTab();
+            const mesTexto = window.formatMonthDisplay?.(mes) || mes;
+            window.mostrarNotificacion('Ahorro actualizado', `La configuración se aplicará desde ${mesTexto}.`, 'exito');
+        };
+
+        window.openModalRetiroAhorro = function() {
+            if (!window.esUsuarioEditor()) {
+                window.mostrarNotificacion('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
+                return;
+            }
+            document.getElementById('inputRetiroAhorroMes').value = window.appState.currentMonth || '2026-10';
+            document.getElementById('inputRetiroAhorroMonto').value = '';
+            document.getElementById('inputRetiroAhorroDescripcion').value = '';
+            window.renderRetirosAhorro();
+            document.getElementById('modalRetiroAhorro').classList.remove('hidden');
+        };
+
+        window.renderRetirosAhorro = function() {
+            const mes = document.getElementById('inputRetiroAhorroMes').value;
+            const saldo = window.getAhorroAcumuladoForMonth(mes);
+            const saldoElemento = document.getElementById('saldoAcumuladoAhorro');
+            saldoElemento.textContent = `$ ${saldo.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            const lista = document.getElementById('listaRetirosAhorro');
+            lista.replaceChildren();
+            const retiros = (Array.isArray(window.appState.retirosAhorro) ? window.appState.retirosAhorro : [])
+                .filter(retiro => retiro.mes === mes)
+                .sort((a, b) => String(b.id).localeCompare(String(a.id)));
+            if (!retiros.length) {
+                const vacio = document.createElement('p');
+                vacio.className = 'text-xs text-slate-500 italic';
+                vacio.textContent = 'No hay retiros registrados para este mes.';
+                lista.appendChild(vacio);
+                return;
+            }
+
+            retiros.forEach(retiro => {
+                const fila = document.createElement('div');
+                fila.className = 'flex items-center justify-between gap-3 rounded-lg bg-slate-950 px-3 py-2';
+
+                const detalle = document.createElement('div');
+                detalle.className = 'min-w-0';
+                const descripcion = document.createElement('p');
+                descripcion.className = 'truncate text-xs text-slate-300';
+                descripcion.textContent = retiro.descripcion || 'Retiro';
+                const monto = document.createElement('span');
+                monto.dataset.privacyAmount = '';
+                monto.className = 'text-sm font-bold text-rose-400';
+                monto.textContent = `-$ ${Number(retiro.monto).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                detalle.append(descripcion, monto);
+
+                const eliminar = document.createElement('button');
+                eliminar.type = 'button';
+                eliminar.className = 'shrink-0 rounded-lg px-2 py-1 text-xs text-rose-400 hover:bg-rose-950/60';
+                eliminar.setAttribute('aria-label', `Eliminar retiro de ${retiro.descripcion || 'ahorro'}`);
+                eliminar.textContent = 'Eliminar';
+                eliminar.addEventListener('click', () => window.eliminarRetiroAhorro(retiro.id));
+                fila.append(detalle, eliminar);
+                lista.appendChild(fila);
+            });
+        };
+
+        window.handleSaveRetiroAhorro = async function(event) {
+            event.preventDefault();
+            if (!window.esUsuarioEditor()) {
+                window.mostrarNotificacion('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
+                return;
+            }
+            const mes = document.getElementById('inputRetiroAhorroMes').value;
+            const monto = Number(document.getElementById('inputRetiroAhorroMonto').value);
+            const descripcion = document.getElementById('inputRetiroAhorroDescripcion').value.trim();
+            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
+                window.mostrarNotificacion('Mes inválido', 'Seleccioná el mes en que realizaste el retiro.', 'error');
+                return;
+            }
+            if (!Number.isFinite(monto) || monto <= 0) {
+                window.mostrarNotificacion('Importe inválido', 'Ingresá un importe mayor a cero.', 'error');
+                return;
+            }
+
+            if (!Array.isArray(window.appState.retirosAhorro)) window.appState.retirosAhorro = [];
+            const retiro = {
+                id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                mes,
+                monto: Math.round(monto * 100) / 100,
+                descripcion
+            };
+            window.appState.retirosAhorro.push(retiro);
+            if (!await window.saveDataToCloud()) {
+                window.appState.retirosAhorro = window.appState.retirosAhorro.filter(item => item.id !== retiro.id);
+                window.renderRetirosAhorro();
+                renderPlanillaTab();
+                return;
+            }
+
+            document.getElementById('inputRetiroAhorroMonto').value = '';
+            document.getElementById('inputRetiroAhorroDescripcion').value = '';
+            window.renderRetirosAhorro();
+            renderPlanillaTab();
+            window.mostrarNotificacion('Retiro registrado', 'El acumulado y el resto disponible se actualizaron.', 'exito');
+        };
+
+        window.eliminarRetiroAhorro = async function(retiroId) {
+            if (!window.esUsuarioEditor()) {
+                window.mostrarNotificacion('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
+                return;
+            }
+            const retiroExistente = (Array.isArray(window.appState.retirosAhorro) ? window.appState.retirosAhorro : [])
+                .find(item => item.id === retiroId);
+            if (!retiroExistente) return;
+            const confirmar = await window.mostrarConfirmacionApp(
+                'Eliminar retiro',
+                `¿Querés eliminar el retiro de $${Number(retiroExistente.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}?`
+            );
+            if (!confirmar) return;
+
+            const retiros = Array.isArray(window.appState.retirosAhorro) ? window.appState.retirosAhorro : [];
+            const indice = retiros.findIndex(retiro => retiro.id === retiroId);
+            if (indice === -1) return;
+            const retiro = retiros[indice];
+            retiros.splice(indice, 1);
+            if (!await window.saveDataToCloud()) {
+                retiros.splice(indice, 0, retiro);
+                window.renderRetirosAhorro();
+                renderPlanillaTab();
+                return;
+            }
+
+            window.renderRetirosAhorro();
+            renderPlanillaTab();
+            window.mostrarNotificacion('Retiro eliminado', 'El acumulado y el resto disponible se actualizaron.', 'exito');
         };
 
         window.handleSaveSueldo = async function(e) {

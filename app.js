@@ -13,6 +13,13 @@ import {
     obtenerPorcentajeAumentoSubcategoria,
     redondearMonto
 } from "./inflacion.mjs";
+import {
+    calcularAhorroAcumuladoParaMes,
+    calcularAhorroNetoParaMes,
+    calcularAhorroParaMes,
+    calcularRetirosAhorroParaMes,
+    obtenerConfiguracionAhorro
+} from "./ahorro.mjs";
 
 let pendingDatabaseOperations = 0;
 let databaseActivityTimer = null;
@@ -417,6 +424,8 @@ const appStateLimpioBase = {
     aumentosIndividuales: {},
     subcategorias: JSON.parse(JSON.stringify(subcategoriasDefault)),
     sueldos: {},
+    ahorros: {},
+    retirosAhorro: [],
     cuentasBancarias: [],
     categorias: JSON.parse(JSON.stringify(categoriasDefault)),
     recurrentesPreferidos: [],
@@ -447,6 +456,8 @@ function crearEstadoDesdeDatosGuardados(appStateGuardado, mesLocalGuardado, mesP
     if (!Array.isArray(estado.categorias)) estado.categorias = JSON.parse(JSON.stringify(categoriasDefault));
     if (!Array.isArray(estado.subcategorias)) estado.subcategorias = JSON.parse(JSON.stringify(subcategoriasDefault));
     if (!Array.isArray(estado.gastosMensuales)) estado.gastosMensuales = [];
+    if (!estado.ahorros || typeof estado.ahorros !== 'object' || Array.isArray(estado.ahorros)) estado.ahorros = {};
+    if (!Array.isArray(estado.retirosAhorro)) estado.retirosAhorro = [];
     if (!estado.excepcionesMontoGeneradas || typeof estado.excepcionesMontoGeneradas !== 'object') estado.excepcionesMontoGeneradas = {};
     if (!estado.aumentosIndividuales || typeof estado.aumentosIndividuales !== 'object') estado.aumentosIndividuales = {};
     if (!estado.excepcionesEliminacionSoloMes || typeof estado.excepcionesEliminacionSoloMes !== 'object') {
@@ -1425,6 +1436,26 @@ window.agregarGastoMensualCompartido = async function(gasto) {
     ];
 };
 
+window.actualizarGastoMensualCompartido = async function(gastoId, cambios) {
+    if (window.demoModeActive) return;
+    if (!window.docRef) throw new Error("No hay un grupo activo para actualizar el gasto mensual.");
+    if (!window.esUsuarioEditor()) throw new Error("No tenés permiso para modificar los gastos mensuales.");
+    const gastosActualizados = await runTransaction(db, async transaction => {
+        const snapshot = await transaction.get(window.docRef);
+        if (!snapshot.exists()) throw new Error("No se encontró el grupo para actualizar el gasto mensual.");
+        const appStateRemoto = snapshot.data().appState || {};
+        const gastos = Array.isArray(appStateRemoto.gastosMensuales) ? appStateRemoto.gastosMensuales : [];
+        const indice = gastos.findIndex(gasto => gasto.id === gastoId);
+        if (indice < 0) throw new Error("No se encontró el gasto mensual para actualizar.");
+        const nuevosGastos = gastos.map((gasto, index) => (
+            index === indice ? { ...gasto, ...cambios } : gasto
+        ));
+        transaction.update(window.docRef, { "appState.gastosMensuales": nuevosGastos });
+        return nuevosGastos;
+    });
+    window.appState.gastosMensuales = gastosActualizados;
+};
+
 window.eliminarGastoMensualCompartido = async function(gastoId) {
     if (window.demoModeActive) return;
     if (!window.docRef) throw new Error("No hay un grupo activo para eliminar el gasto mensual.");
@@ -1560,6 +1591,40 @@ window.getSueldoForMonth = function(targetMonth) {
     let sueldoAplicar = 0;
     for (let k of keys) { if (k <= targetMonth) sueldoAplicar = parseFloat(sueldos[k]) || 0; else break; }
     return sueldoAplicar;
+};
+
+window.getConfiguracionAhorroForMonth = function(targetMonth) {
+    return obtenerConfiguracionAhorro(window.appState.ahorros, targetMonth);
+};
+
+window.getAhorroForMonth = function(targetMonth) {
+    return calcularAhorroParaMes(
+        window.appState.ahorros,
+        targetMonth,
+        mes => window.getSueldoForMonth(mes)
+    );
+};
+
+window.getRetirosAhorroForMonth = function(targetMonth) {
+    return calcularRetirosAhorroParaMes(window.appState.retirosAhorro, targetMonth);
+};
+
+window.getAhorroNetoForMonth = function(targetMonth) {
+    return calcularAhorroNetoParaMes(
+        window.appState.ahorros,
+        window.appState.retirosAhorro,
+        targetMonth,
+        mes => window.getSueldoForMonth(mes)
+    );
+};
+
+window.getAhorroAcumuladoForMonth = function(targetMonth) {
+    return calcularAhorroAcumuladoParaMes(
+        window.appState.ahorros,
+        window.appState.retirosAhorro,
+        targetMonth,
+        mes => window.getSueldoForMonth(mes)
+    );
 };
 
 window.getPorcentajeAumentoSubcategoria = obtenerPorcentajeAumentoSubcategoria;

@@ -17,6 +17,7 @@
         let gastoMensualPendienteDeEliminar = null;
         let guardandoGastoMensual = false;
         let gastosMensualesExportables = [];
+        window.gastoMensualEnEdicionId = null;
 
         function obtenerCategoriasGastoMensual() {
             if (!Array.isArray(window.appState.categoriasGastosMensuales)) {
@@ -321,6 +322,21 @@
             renderGastoMensualApp();
         };
 
+        function obtenerValorOrdenGastoMensual(gasto, columna) {
+            if (columna === 'cargadoPor') {
+                return gasto.usuarioEmail
+                    ? gasto.usuarioEmail.split('@')[0]
+                    : (gasto.usuarioUid ? `Usuario ${gasto.usuarioUid.slice(0, 8)}` : 'Sin identificar');
+            }
+            if (columna === 'modificadoPor') {
+                return gasto.modificadoPorEmail
+                    ? gasto.modificadoPorEmail.split('@')[0]
+                    : (gasto.modificadoPorUid ? `Usuario ${gasto.modificadoPorUid.slice(0, 8)}` : '—');
+            }
+            if (columna === 'medioPago') return gasto.medioPago || 'Efectivo';
+            return gasto[columna] ?? '';
+        }
+
         window.exportarGastosMensualesCsv = function() {
             if (gastosMensualesExportables.length === 0) {
                 window.mostrarMensajeApp('Sin gastos para exportar', 'No hay gastos visibles para el mes seleccionado.', 'info');
@@ -336,11 +352,14 @@
                 gasto.usuarioEmail
                     ? gasto.usuarioEmail.split('@')[0]
                     : (gasto.usuarioUid ? `Usuario ${gasto.usuarioUid.slice(0, 8)}` : 'Sin identificar'),
+                gasto.modificadoPorEmail
+                    ? gasto.modificadoPorEmail.split('@')[0]
+                    : (gasto.modificadoPorUid ? `Usuario ${gasto.modificadoPorUid.slice(0, 8)}` : '—'),
                 formatoMoneda(gasto.monto)
             ]);
             window.descargarCsvConPipes(
                 `gastos_mensuales_${mes}.csv`,
-                ['Fecha', 'Descripción', 'Categoría', 'Medio de pago', 'Cargado por', 'Monto'],
+                ['Fecha', 'Descripción', 'Categoría', 'Medio de pago', 'Cargado por', 'Modificado por', 'Monto'],
                 filas
             );
         };
@@ -436,11 +455,12 @@
                     ? false
                     : filtrosCategoriasTablaGastoMensual.length === 0 || filtrosCategoriasTablaGastoMensual.includes(gasto.categoria || 'Sin categoría'))
                 .sort((a, b) => {
-                    const valorA = ordenGastosMensuales.columna === 'monto' ? Number(a.monto) || 0 : a[ordenGastosMensuales.columna] || '';
-                    const valorB = ordenGastosMensuales.columna === 'monto' ? Number(b.monto) || 0 : b[ordenGastosMensuales.columna] || '';
-                    if (valorA < valorB) return ordenGastosMensuales.ascendente ? -1 : 1;
-                    if (valorA > valorB) return ordenGastosMensuales.ascendente ? 1 : -1;
-                    return 0;
+                    const valorA = obtenerValorOrdenGastoMensual(a, ordenGastosMensuales.columna);
+                    const valorB = obtenerValorOrdenGastoMensual(b, ordenGastosMensuales.columna);
+                    const comparacion = ordenGastosMensuales.columna === 'monto'
+                        ? (Number(valorA) || 0) - (Number(valorB) || 0)
+                        : String(valorA).localeCompare(String(valorB), 'es', { sensitivity: 'base', numeric: true });
+                    return ordenGastosMensuales.ascendente ? comparacion : -comparacion;
                 });
             gastosMensualesExportables = gastosFiltrados;
             renderGraficosGastoMensual();
@@ -450,7 +470,7 @@
             if (gastosFiltrados.length === 0) {
                 const fila = document.createElement('tr');
                 const celda = document.createElement('td');
-                celda.colSpan = 7;
+                celda.colSpan = 8;
                 celda.className = 'px-6 py-8 text-center text-slate-500';
                 celda.textContent = 'No hay gastos mensuales que coincidan.';
                 fila.appendChild(celda);
@@ -488,25 +508,35 @@
                 medioPago.textContent = gasto.medioPago || 'Efectivo';
                 const usuario = document.createElement('td');
                 usuario.className = 'px-5 py-3.5 text-slate-400 text-xs';
-                usuario.textContent = gasto.usuarioEmail
-                    ? gasto.usuarioEmail.split('@')[0]
-                    : (gasto.usuarioUid ? `Usuario ${gasto.usuarioUid.slice(0, 8)}` : 'Sin identificar');
+                usuario.textContent = obtenerValorOrdenGastoMensual(gasto, 'cargadoPor');
+                const modificador = document.createElement('td');
+                modificador.className = 'px-5 py-3.5 text-slate-400 text-xs';
+                modificador.textContent = obtenerValorOrdenGastoMensual(gasto, 'modificadoPor');
                 const monto = document.createElement('td');
                 monto.className = 'px-5 py-3.5 text-right font-extrabold text-sky-400';
                 monto.textContent = formatoMoneda(Number(gasto.monto) || 0);
                 const acciones = document.createElement('td');
                 acciones.className = 'px-5 py-3.5 text-right';
                 if (editor) {
+                    const botonEditar = document.createElement('button');
+                    botonEditar.type = 'button';
+                    botonEditar.className = 'mr-3 text-slate-400 hover:text-sky-400 disabled:opacity-40 disabled:cursor-not-allowed';
+                    botonEditar.title = 'Editar';
+                    botonEditar.setAttribute('aria-label', `Editar ${gasto.concepto || 'gasto'}`);
+                    botonEditar.disabled = Boolean(window.gastoMensualEnEdicionId || window.gastoHormigaEnEdicionId);
+                    botonEditar.innerHTML = '<i class="fa-solid fa-pen text-xs"></i>';
+                    botonEditar.addEventListener('click', () => window.editarGastoMensual(gasto.id));
                     const botonEliminar = document.createElement('button');
                     botonEliminar.type = 'button';
-                    botonEliminar.className = 'text-slate-400 hover:text-rose-400';
+                    botonEliminar.className = 'text-slate-400 hover:text-rose-400 disabled:opacity-40 disabled:cursor-not-allowed';
                     botonEliminar.title = 'Eliminar';
                     botonEliminar.setAttribute('aria-label', `Eliminar ${gasto.concepto || 'gasto'}`);
+                    botonEliminar.disabled = Boolean(window.gastoMensualEnEdicionId || window.gastoHormigaEnEdicionId);
                     botonEliminar.innerHTML = '<i class="fa-solid fa-trash-can text-xs"></i>';
                     botonEliminar.addEventListener('click', () => window.deleteGastoMensual(gasto.id));
-                    acciones.appendChild(botonEliminar);
+                    acciones.append(botonEditar, botonEliminar);
                 }
-                fila.append(fecha, concepto, categoria, medioPago, usuario, monto, acciones);
+                fila.append(fecha, concepto, categoria, medioPago, usuario, modificador, monto, acciones);
                 tabla.appendChild(fila);
             });
         };
@@ -721,16 +751,33 @@
                 return;
             }
 
-            const nuevoGasto = {
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            const gastoEnEdicion = window.gastoMensualEnEdicionId
+                ? (window.appState.gastosMensuales || []).find(gasto => gasto.id === window.gastoMensualEnEdicionId)
+                : null;
+            if (window.gastoMensualEnEdicionId && !gastoEnEdicion) {
+                window.mostrarMensajeApp('No se encontró el gasto', 'Actualizá la lista e intentá nuevamente.', 'error');
+                return;
+            }
+            const camposGasto = {
                 concepto,
                 monto,
                 fecha,
                 categoria: document.getElementById('gastoMensualCategoria').value,
-                medioPago: document.getElementById('gastoMensualMedioPago').value,
-                usuarioUid: usuarioActual.uid,
-                usuarioEmail: usuarioActual.email || 'Usuario sin correo'
+                medioPago: document.getElementById('gastoMensualMedioPago').value
             };
+            const nuevoGasto = gastoEnEdicion
+                ? {
+                    ...camposGasto,
+                    modificadoPorUid: usuarioActual.uid,
+                    modificadoPorEmail: usuarioActual.email || 'Usuario sin correo',
+                    modificadoEn: new Date().toISOString()
+                }
+                : {
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    ...camposGasto,
+                    usuarioUid: usuarioActual.uid,
+                    usuarioEmail: usuarioActual.email || 'Usuario sin correo'
+                };
             const mesSeleccionado = window.appState.currentMonth;
             const formulario = document.getElementById('formGastoMensual');
             const botonGuardar = formulario.querySelector('button[type="submit"]');
@@ -739,24 +786,70 @@
             botonGuardar.disabled = true;
             botonGuardar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
             try {
-                await window.agregarGastoMensualCompartido(nuevoGasto);
+                if (gastoEnEdicion) {
+                    await window.actualizarGastoMensualCompartido(gastoEnEdicion.id, nuevoGasto);
+                } else {
+                    await window.agregarGastoMensualCompartido(nuevoGasto);
+                }
             } catch (error) {
-                console.error('Error al guardar el gasto mensual compartido:', error);
+                console.error(gastoEnEdicion ? 'Error al actualizar el gasto mensual compartido:' : 'Error al guardar el gasto mensual compartido:', error);
                 const detalle = error.code === 'permission-denied'
-                    ? 'Firestore rechazó la escritura por permisos. Revisá las reglas del grupo.'
+                    ? 'Firestore rechazó la escritura por permisos. Revisá los permisos del grupo.'
                     : 'Revisá tu conexión e intentá nuevamente.';
-                window.mostrarMensajeApp('No se pudo guardar', `El gasto no se guardó en Firestore. ${detalle}`, 'error');
+                window.mostrarMensajeApp(gastoEnEdicion ? 'No se pudo actualizar' : 'No se pudo guardar', `El gasto no se guardó en Firestore. ${detalle}`, 'error');
                 return;
             } finally {
                 guardandoGastoMensual = false;
                 botonGuardar.disabled = false;
                 botonGuardar.innerHTML = textoOriginalBoton;
             }
-            window.persistCurrentMonthSelection(mesSeleccionado);
+            window.persistCurrentMonthSelection(gastoEnEdicion ? fecha.slice(0, 7) : mesSeleccionado);
+            if (gastoEnEdicion) {
+                window.gastoMensualEnEdicionId = null;
+                document.getElementById('tipoGastoUnificado').disabled = false;
+                document.getElementById('tipoGastoUnificado').value = 'grupo';
+                window.cambiarTipoGastoUnificado('grupo');
+            }
             document.getElementById('gastoMensualConcepto').value = '';
             document.getElementById('gastoMensualMonto').value = '';
             document.getElementById('gastoMensualFecha').value = obtenerFechaLocalParaInput();
             renderGastoMensualApp();
+        };
+
+        window.editarGastoMensual = function(id) {
+            if (!esEditorGastoMensual()) {
+                window.mostrarMensajeApp('Acceso restringido', 'Tu permiso en este grupo es de solo lectura.', 'error');
+                return;
+            }
+            if (window.gastoMensualEnEdicionId || window.gastoHormigaEnEdicionId) {
+                window.mostrarMensajeApp('Edición en curso', 'Cancelá la edición actual antes de modificar otro gasto.', 'info');
+                return;
+            }
+            const gasto = (window.appState.gastosMensuales || []).find(item => item.id === id);
+            if (!gasto) {
+                window.mostrarMensajeApp('No se encontró el gasto', 'Actualizá la lista e intentá nuevamente.', 'error');
+                return;
+            }
+            window.gastoMensualEnEdicionId = id;
+            document.getElementById('tipoGastoUnificado').value = 'grupo';
+            window.cambiarTipoGastoUnificado('grupo');
+            document.getElementById('gastoMensualConcepto').value = gasto.concepto || '';
+            document.getElementById('gastoMensualMonto').value = gasto.monto ?? '';
+            document.getElementById('gastoMensualFecha').value = gasto.fecha || '';
+            document.getElementById('gastoMensualCategoria').value = gasto.categoria || '';
+            document.getElementById('gastoMensualMedioPago').value = gasto.medioPago || 'Efectivo';
+            document.getElementById('formGastoMensualContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.cancelarEdicionGastoMensual = function() {
+            if (!window.gastoMensualEnEdicionId) return;
+            window.gastoMensualEnEdicionId = null;
+            document.getElementById('tipoGastoUnificado').disabled = false;
+            document.getElementById('tipoGastoUnificado').value = 'grupo';
+            document.getElementById('gastoMensualConcepto').value = '';
+            document.getElementById('gastoMensualMonto').value = '';
+            document.getElementById('gastoMensualFecha').value = obtenerFechaLocalParaInput();
+            window.cambiarTipoGastoUnificado('grupo');
         };
 
         window.deleteGastoMensual = function(id) {

@@ -46,6 +46,11 @@
             const resumenHormiga = document.getElementById('resumenGastoHormiga');
             const titulo = document.getElementById('tituloFormGastoMensual');
             const ayuda = document.getElementById('ayudaTipoGastoUnificado');
+            const selectorTipoGasto = document.getElementById('tipoGastoUnificado');
+            const editando = esHormiga
+                ? Boolean(window.gastoHormigaEnEdicionId)
+                : Boolean(window.gastoMensualEnEdicionId);
+            const botonCancelarEdicion = document.getElementById('btnCancelarEdicionGasto');
             document.getElementById('categoriaGrupoContainer').classList.toggle('hidden', esHormiga);
             document.getElementById('categoriaHormigaContainer').classList.toggle('hidden', !esHormiga);
             document.getElementById('medioPagoGrupoContainer').classList.toggle('hidden', esHormiga);
@@ -66,18 +71,28 @@
             resumenGrupo.classList.toggle('hidden', esHormiga);
             resumenHormiga.classList.toggle('hidden', !esHormiga);
 
-            titulo.innerHTML = esHormiga
-                ? '<i class="fa-solid fa-cookie-bite text-amber-400"></i> Registrar Gasto Hormiga'
-                : '<i class="fa-solid fa-plus-circle text-sky-400"></i> Registrar gasto de Grupo';
-            ayuda.textContent = esHormiga
-                ? 'Este gasto es privado y solo vos podés verlo, sin importar el espacio seleccionado.'
-                : 'Este gasto será visible para los integrantes del grupo.';
+            titulo.innerHTML = editando
+                ? (esHormiga
+                    ? '<i class="fa-solid fa-pen text-amber-400"></i> Editar Gasto Hormiga'
+                    : '<i class="fa-solid fa-pen text-sky-400"></i> Editar gasto de Grupo')
+                : (esHormiga
+                    ? '<i class="fa-solid fa-cookie-bite text-amber-400"></i> Registrar Gasto Hormiga'
+                    : '<i class="fa-solid fa-plus-circle text-sky-400"></i> Registrar gasto de Grupo');
+            ayuda.textContent = editando
+                ? 'Guardá los cambios o cancelá para salir del modo edición.'
+                : esHormiga
+                    ? 'Este gasto es privado y solo vos podés verlo, sin importar el espacio seleccionado.'
+                    : 'Este gasto será visible para los integrantes del grupo.';
             botonGuardar.className = esHormiga
                 ? 'w-full sm:col-span-2 lg:col-span-1 sm:w-auto bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2'
                 : 'w-full sm:col-span-2 lg:col-span-1 sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2';
-            botonGuardar.innerHTML = esHormiga
-                ? '<i class="fa-solid fa-cookie"></i> Guardar Gasto Hormiga'
-                : '<i class="fa-solid fa-floppy-disk"></i> Guardar gasto de Grupo';
+            botonGuardar.innerHTML = editando
+                ? '<i class="fa-solid fa-floppy-disk"></i> Guardar cambios'
+                : esHormiga
+                    ? '<i class="fa-solid fa-cookie"></i> Guardar Gasto Hormiga'
+                    : '<i class="fa-solid fa-floppy-disk"></i> Guardar gasto de Grupo';
+            selectorTipoGasto.disabled = Boolean(window.gastoHormigaEnEdicionId || window.gastoMensualEnEdicionId);
+            botonCancelarEdicion.classList.toggle('hidden', !editando);
             botonCategorias.className = `shrink-0 h-[42px] px-3 rounded-xl border transition flex items-center justify-center gap-2 text-xs font-semibold ${
                 esHormiga
                     ? 'border-amber-800/60 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60'
@@ -87,6 +102,14 @@
 
             if (esHormiga) renderHormigaApp();
             else renderGastoMensualApp();
+        };
+
+        window.cancelarEdicionGastoUnificado = function() {
+            if (document.getElementById('tipoGastoUnificado').value === 'hormiga') {
+                window.cancelarEdicionGastoHormiga();
+            } else {
+                window.cancelarEdicionGastoMensual();
+            }
         };
 
         window.abrirCategoriasTipoGasto = function() {

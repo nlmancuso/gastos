@@ -1,5 +1,5 @@
         // ---------------- SCRIPT ANÁLISIS & GRÁFICOS (CORREGIDO) ----------------
-        let chartInstTotales = null; let chartInstEvolCat = null; let chartInstEvolSubcat = null; let chartInstRecurrentesIndiv = null; let chartInstBalance = null;
+        let chartInstTotales = null; let chartInstEvolCat = null; let chartInstEvolSubcat = null; let chartInstRecurrentesIndiv = null; let chartInstBalance = null; let chartInstAhorro = null;
 
         function initChartRangeInputs() {
             const currentMonth = window.appState.currentMonth || '2026-10';
@@ -127,7 +127,7 @@
             const contBalance = document.getElementById('containerFiltrosGraficoBalance');
             if (contBalance) {
                 contBalance.replaceChildren();
-                [ { nombre: "Ingreso / Sueldo", color: "#10b981" }, { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Resto Disponible", color: "#3b82f6" } ].forEach(item => {
+                [ { nombre: "Ingreso / Sueldo", color: "#10b981" }, { nombre: "Gastos Totales", color: "#f43f5e" }, { nombre: "Ahorro neto mensual", color: "#06b6d4" }, { nombre: "Resto Disponible", color: "#3b82f6" } ].forEach(item => {
                     const isChecked = window.filtrosGraficoBalance.length === 0 || window.filtrosGraficoBalance.includes(item.nombre);
                     contBalance.appendChild(crearEtiquetaFiltro(isChecked, item.nombre, item.color, item.nombre, input => window.toggleFiltroGrafico('Balance', input)));
                 });
@@ -138,7 +138,7 @@
             if (tipo === 'Totales') { if (window.filtrosGraficoTotales.length === 0) window.filtrosGraficoTotales = ["Gastos Totales", "Ingresos / Sueldo"]; arrRef = window.filtrosGraficoTotales; fullList = ["Gastos Totales", "Ingresos / Sueldo"]; }
             else if (tipo === 'EvolCat') { const catList = window.appState.categorias || []; if (window.filtrosGraficoEvolCat.length === 0) window.filtrosGraficoEvolCat = catList.map(c => c.nombre); arrRef = window.filtrosGraficoEvolCat; fullList = catList.map(c => c.nombre); }
             else if (tipo === 'EvolSubcat') { const subcatList = window.appState.subcategorias || []; if (!window.filtrosGraficoEvolSubcat) window.filtrosGraficoEvolSubcat = []; if (window.filtrosGraficoEvolSubcat.length === 0) window.filtrosGraficoEvolSubcat = subcatList.map(s => s.id); arrRef = window.filtrosGraficoEvolSubcat; fullList = subcatList.map(s => s.id); }
-            else if (tipo === 'Balance') { if (window.filtrosGraficoBalance.length === 0) window.filtrosGraficoBalance = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; arrRef = window.filtrosGraficoBalance; fullList = ["Ingreso / Sueldo", "Gastos Totales", "Resto Disponible"]; }
+            else if (tipo === 'Balance') { if (window.filtrosGraficoBalance.length === 0) window.filtrosGraficoBalance = ["Ingreso / Sueldo", "Gastos Totales", "Ahorro neto mensual", "Resto Disponible"]; arrRef = window.filtrosGraficoBalance; fullList = ["Ingreso / Sueldo", "Gastos Totales", "Ahorro neto mensual", "Resto Disponible"]; }
             
             if (checkbox.checked) { if (!arrRef.includes(val)) arrRef.push(val); } else { const idx = arrRef.indexOf(val); if (idx !== -1) arrRef.splice(idx, 1); }
             if (arrRef.length === fullList.length) { 
@@ -159,7 +159,7 @@
 
         function renderCharts() {
             if (!window.appState.chartRangeFrom || !window.appState.chartRangeTo) initChartRangeInputs();
-            let labelsMonths = [], dataTotales = [], dataIngresos = [], dataResto = [];
+            let labelsMonths = [], dataTotales = [], dataIngresos = [], dataAhorros = [], dataAhorroAcumulado = [], dataResto = [];
             let catList = window.appState.categorias || [];
             let subcatList = window.appState.subcategorias || [];
             let [startYear, startMonth] = window.appState.chartRangeFrom.split('-').map(Number);
@@ -198,7 +198,10 @@
                 labelsMonths.push(`${monthNames[currM - 1]} ${currY}`);
                 const calc = window.getCalculatedDataForMonth(ymStr);
                 const sumaTotalMes = calc.totalFijos + calc.totalTarjetas;
-                dataTotales.push(sumaTotalMes); dataIngresos.push(calc.sueldoActual); dataResto.push(calc.sueldoActual - sumaTotalMes);
+                const ahorroNetoMes = window.getAhorroNetoForMonth(ymStr);
+                dataTotales.push(sumaTotalMes); dataIngresos.push(calc.sueldoActual); dataAhorros.push(ahorroNetoMes);
+                dataAhorroAcumulado.push(window.getAhorroAcumuladoForMonth(ymStr));
+                dataResto.push(calc.sueldoActual - sumaTotalMes - ahorroNetoMes);
                 
                 let valoresMesRecurrente = new Array(datasetsRecurrentesIndiv.length).fill(0);
                 calc.items.forEach(item => { if (item.isRecurrente && mapIdToDatasetIndex[item.id] !== undefined) valoresMesRecurrente[mapIdToDatasetIndex[item.id]] += item.monto; });
@@ -260,9 +263,29 @@
             const ctxRecurrentesIndiv = document.getElementById('chartEvolucionRecurrentesIndiv');
             if (ctxRecurrentesIndiv) chartInstRecurrentesIndiv = updateOrCreateChart(chartInstRecurrentesIndiv, ctxRecurrentesIndiv, { type: 'line', data: { labels: labelsMonths, datasets: datasetsRecurrentesIndiv }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
 
+            const ctxAhorro = document.getElementById('chartAhorroMensual');
+            if (ctxAhorro) chartInstAhorro = updateOrCreateChart(chartInstAhorro, ctxAhorro, {
+                type: 'line',
+                data: {
+                    labels: labelsMonths,
+                    datasets: [{
+                        label: 'Ahorro acumulado',
+                        data: dataAhorroAcumulado,
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.18)',
+                        borderWidth: 3,
+                        pointRadius: 3,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
             let datasetsBalance = [];
             if (filtrosBalance.length === 0 || filtrosBalance.includes("Ingreso / Sueldo")) datasetsBalance.push({ label: 'Ingreso / Sueldo', data: dataIngresos, backgroundColor: '#10b981', borderRadius: 6 });
             if (filtrosBalance.length === 0 || filtrosBalance.includes("Gastos Totales")) datasetsBalance.push({ label: 'Gastos Totales', data: dataTotales, backgroundColor: '#f43f5e', borderRadius: 6 });
+            if (filtrosBalance.length === 0 || filtrosBalance.includes("Ahorro neto mensual")) datasetsBalance.push({ label: 'Ahorro neto mensual', data: dataAhorros, backgroundColor: '#06b6d4', borderRadius: 6 });
             if (filtrosBalance.length === 0 || filtrosBalance.includes("Resto Disponible")) datasetsBalance.push({ label: 'Resto Disponible', data: dataResto, backgroundColor: '#3b82f6', borderRadius: 6 });
 
             const ctxBalance = document.getElementById('chartBalanceGeneral');

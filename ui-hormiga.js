@@ -1,4 +1,5 @@
         let gastosHormigaExportables = [];
+        window.gastoHormigaEnEdicionId = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             const fechaInput = document.getElementById('hormigaFecha');
@@ -14,6 +15,16 @@
             }
             renderHormigaApp();
         };
+
+        function obtenerValorOrdenHormiga(gasto, columna) {
+            if (columna === 'modificadoPor') {
+                return gasto.modificadoPorEmail
+                    ? gasto.modificadoPorEmail.split('@')[0]
+                    : (gasto.modificadoPorUid ? `Usuario ${gasto.modificadoPorUid.slice(0, 8)}` : '—');
+            }
+            if (columna === 'medioPago') return gasto.medioPago || 'Efectivo';
+            return gasto[columna] ?? '';
+        }
 
         function renderHormigaApp() {
             const currentMonth = window.appState.currentMonth || '2026-10';
@@ -64,24 +75,47 @@
                 const sortCol = window.hormigaState.sortColumn || 'fecha';
                 const sortAsc = window.hormigaState.sortAscending !== false;
                 itemsFiltrados.sort((a, b) => {
-                    let valA = a[sortCol] || '';
-                    let valB = b[sortCol] || '';
-                    if (sortCol === 'monto') {
-                        valA = parseFloat(valA) || 0;
-                        valB = parseFloat(valB) || 0;
-                    }
-                    if (valA < valB) return sortAsc ? -1 : 1;
-                    if (valA > valB) return sortAsc ? 1 : -1;
-                    return 0;
+                    const valA = obtenerValorOrdenHormiga(a, sortCol);
+                    const valB = obtenerValorOrdenHormiga(b, sortCol);
+                    const comparacion = sortCol === 'monto'
+                        ? (Number(valA) || 0) - (Number(valB) || 0)
+                        : String(valA).localeCompare(String(valB), 'es', { sensitivity: 'base', numeric: true });
+                    return sortAsc ? comparacion : -comparacion;
                 });
                 gastosHormigaExportables = itemsFiltrados;
 
-                if (itemsFiltrados.length === 0) tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan.</td></tr>`;
+                if (itemsFiltrados.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-slate-500">No hay gastos hormiga que coincidan.</td></tr>`;
                 else {
                     itemsFiltrados.forEach(g => {
                         const catObj = catHormigaList.find(c => c.nombre === g.categoria); const colorCat = catObj ? catObj.color : '#f59e0b';
                         const fechaFmt = g.fecha ? g.fecha.split('-').reverse().join('/') : '';
-                        tbody.innerHTML += `<tr class="hover:bg-slate-900/40 transition-colors"><td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td><td class="px-5 py-3.5 text-white font-bold">${g.concepto}</td><td class="px-5 py-3.5"><span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${g.categoria}</span></td><td class="px-5 py-3.5 text-slate-400 text-xs">${g.medioPago || 'Efectivo'}</td><td class="px-5 py-3.5 text-right font-extrabold text-amber-400">${fmt(g.monto)}</td><td class="px-5 py-3.5 text-right"><button onclick="deleteGastoHormiga('${g.id}')" class="text-slate-400 hover:text-rose-400" title="Eliminar"><i class="fa-solid fa-trash-can text-xs"></i></button></td></tr>`;
+                        const fila = document.createElement('tr');
+                        fila.className = 'hover:bg-slate-900/40 transition-colors';
+                        fila.innerHTML = `<td class="px-5 py-3.5 text-slate-400 text-xs">${fechaFmt}</td><td class="px-5 py-3.5 text-white font-bold">${g.concepto}</td><td class="px-5 py-3.5"><span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-white border inline-flex items-center gap-1.5" style="background-color: ${colorCat}22; border-color: ${colorCat}55;"><span class="w-2 h-2 rounded-full" style="background-color: ${colorCat};"></span>${g.categoria}</span></td><td class="px-5 py-3.5 text-slate-400 text-xs">${g.medioPago || 'Efectivo'}</td><td class="px-5 py-3.5 text-right font-extrabold text-amber-400">${fmt(g.monto)}</td>`;
+                        const modificador = document.createElement('td');
+                        modificador.className = 'px-5 py-3.5 text-slate-400 text-xs';
+                        modificador.textContent = obtenerValorOrdenHormiga(g, 'modificadoPor');
+                        const acciones = document.createElement('td');
+                        acciones.className = 'px-5 py-3.5 text-right whitespace-nowrap';
+                        const botonEditar = document.createElement('button');
+                        botonEditar.type = 'button';
+                        botonEditar.className = 'mr-3 text-slate-400 hover:text-amber-300 disabled:opacity-40 disabled:cursor-not-allowed';
+                        botonEditar.title = 'Editar';
+                        botonEditar.setAttribute('aria-label', `Editar ${g.concepto || 'gasto hormiga'}`);
+                        botonEditar.disabled = Boolean(window.gastoHormigaEnEdicionId || window.gastoMensualEnEdicionId);
+                        botonEditar.innerHTML = '<i class="fa-solid fa-pen text-xs"></i>';
+                        botonEditar.addEventListener('click', () => window.editarGastoHormiga(g.id));
+                        const botonEliminar = document.createElement('button');
+                        botonEliminar.type = 'button';
+                        botonEliminar.className = 'text-slate-400 hover:text-rose-400 disabled:opacity-40 disabled:cursor-not-allowed';
+                        botonEliminar.title = 'Eliminar';
+                        botonEliminar.setAttribute('aria-label', `Eliminar ${g.concepto || 'gasto hormiga'}`);
+                        botonEliminar.disabled = Boolean(window.gastoHormigaEnEdicionId || window.gastoMensualEnEdicionId);
+                        botonEliminar.innerHTML = '<i class="fa-solid fa-trash-can text-xs"></i>';
+                        botonEliminar.addEventListener('click', () => window.deleteGastoHormiga(g.id));
+                        acciones.append(botonEditar, botonEliminar);
+                        fila.append(modificador, acciones);
+                        tbody.appendChild(fila);
                     });
                 }
             }
@@ -100,11 +134,14 @@
                 gasto.concepto || '',
                 gasto.categoria || 'Sin categoría',
                 gasto.medioPago || 'Efectivo',
+                gasto.modificadoPorEmail
+                    ? gasto.modificadoPorEmail.split('@')[0]
+                    : (gasto.modificadoPorUid ? `Usuario ${gasto.modificadoPorUid.slice(0, 8)}` : '—'),
                 formatoMoneda(gasto.monto)
             ]);
             window.descargarCsvConPipes(
                 `gastos_hormiga_${mes}.csv`,
-                ['Fecha', 'Descripción', 'Categoría', 'Medio de pago', 'Monto'],
+                ['Fecha', 'Descripción', 'Categoría', 'Medio de pago', 'Modificado por', 'Monto'],
                 filas
             );
         };
@@ -207,15 +244,84 @@
 
         window.handleSaveGastoHormiga = async function(e) {
             e.preventDefault();
-            const concepto = document.getElementById('hormigaConcepto').value; const monto = parseFloat(document.getElementById('hormigaMonto').value);
+            const concepto = document.getElementById('hormigaConcepto').value.trim(); const monto = Number(document.getElementById('hormigaMonto').value);
             const fecha = document.getElementById('hormigaFecha').value; const categoria = document.getElementById('hormigaCategoriaSelect').value; const medioPago = document.getElementById('hormigaMedioPago').value;
-            if (!concepto || !monto || !fecha) return;
+            if (!concepto || !Number.isFinite(monto) || monto <= 0 || !fecha) {
+                window.mostrarMensajeApp('Datos incompletos', 'Ingresá una descripción, un monto mayor a cero y una fecha válida.', 'error');
+                return;
+            }
+            const usuarioActual = window.auth?.currentUser;
+            const gastoEnEdicionId = window.gastoHormigaEnEdicionId;
+            if (gastoEnEdicionId && !usuarioActual && !window.demoModeActive) {
+                window.mostrarMensajeApp('Sesión no disponible', 'Volvé a iniciar sesión para editar el gasto Hormiga.', 'error');
+                return;
+            }
             const estadoAnterior = JSON.parse(JSON.stringify(window.hormigaState));
-            window.hormigaState.gastos.push({ id: Date.now().toString(), concepto, monto, fecha, categoria, medioPago });
+            if (gastoEnEdicionId) {
+                const indice = (window.hormigaState.gastos || []).findIndex(gasto => gasto.id === gastoEnEdicionId);
+                if (indice < 0) {
+                    window.mostrarMensajeApp('No se encontró el gasto', 'Actualizá la lista e intentá nuevamente.', 'error');
+                    return;
+                }
+                window.hormigaState.gastos[indice] = {
+                    ...window.hormigaState.gastos[indice],
+                    concepto,
+                    monto,
+                    fecha,
+                    categoria,
+                    medioPago,
+                    modificadoPorUid: usuarioActual?.uid || 'demo',
+                    modificadoPorEmail: usuarioActual?.email || 'Demo',
+                    modificadoEn: new Date().toISOString()
+                };
+            } else {
+                window.hormigaState.gastos.push({ id: Date.now().toString(), concepto, monto, fecha, categoria, medioPago });
+            }
             renderHormigaApp();
             if (!await guardarEstadoHormigaConManejoError(estadoAnterior)) return;
+            if (gastoEnEdicionId) {
+                window.gastoHormigaEnEdicionId = null;
+                document.getElementById('tipoGastoUnificado').disabled = false;
+                document.getElementById('tipoGastoUnificado').value = 'hormiga';
+                window.persistCurrentMonthSelection(fecha.slice(0, 7));
+                window.cambiarTipoGastoUnificado('hormiga');
+            }
             document.getElementById('hormigaConcepto').value = '';
             document.getElementById('hormigaMonto').value = '';
+        };
+        window.editarGastoHormiga = function(id) {
+            if (window.gastoMensualEnEdicionId || window.gastoHormigaEnEdicionId) {
+                window.mostrarMensajeApp('Edición en curso', 'Cancelá la edición actual antes de modificar otro gasto.', 'info');
+                return;
+            }
+            const gasto = (window.hormigaState.gastos || []).find(item => item.id === id);
+            if (!gasto) {
+                window.mostrarMensajeApp('No se encontró el gasto', 'Actualizá la lista e intentá nuevamente.', 'error');
+                return;
+            }
+            if (!window.auth?.currentUser && !window.demoModeActive) {
+                window.mostrarMensajeApp('Sesión no disponible', 'Volvé a iniciar sesión para editar el gasto Hormiga.', 'error');
+                return;
+            }
+            window.gastoHormigaEnEdicionId = id;
+            document.getElementById('tipoGastoUnificado').value = 'hormiga';
+            window.cambiarTipoGastoUnificado('hormiga');
+            document.getElementById('hormigaConcepto').value = gasto.concepto || '';
+            document.getElementById('hormigaMonto').value = gasto.monto ?? '';
+            document.getElementById('hormigaFecha').value = gasto.fecha || '';
+            document.getElementById('hormigaCategoriaSelect').value = gasto.categoria || '';
+            document.getElementById('hormigaMedioPago').value = gasto.medioPago || 'Efectivo';
+            document.getElementById('formGastoMensualContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        window.cancelarEdicionGastoHormiga = function() {
+            if (!window.gastoHormigaEnEdicionId) return;
+            window.gastoHormigaEnEdicionId = null;
+            document.getElementById('tipoGastoUnificado').disabled = false;
+            document.getElementById('tipoGastoUnificado').value = 'hormiga';
+            document.getElementById('hormigaConcepto').value = '';
+            document.getElementById('hormigaMonto').value = '';
+            document.getElementById('hormigaFecha').value = obtenerFechaLocalParaInput();
+            window.cambiarTipoGastoUnificado('hormiga');
         };
         window.deleteGastoHormiga = function(id) {
             gastoHormigaPendienteDeEliminar = (window.hormigaState.gastos || []).find(gasto => gasto.id === id) || null;
