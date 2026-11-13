@@ -185,7 +185,7 @@ async function enviarAlertas() {
                     accessToken: emailJsPrivateKey,
                     template_params: {
                         to_email: recipient.email,
-                        subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes/vencidos`,
+                        subject: `🚨 Alerta de Pagos: $${formatearMonto(total)} pendientes y vencidos`,
                         html_content: crearHtmlAlerta(recipient.alerts, total, today)
                     }
                 })
